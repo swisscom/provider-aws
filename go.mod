@@ -5,11 +5,12 @@ go 1.21
 require (
 	github.com/aws-controllers-k8s/code-generator v0.26.1
 	github.com/aws/aws-sdk-go v1.44.334
-	github.com/aws/aws-sdk-go-v2 v1.17.3
+	github.com/aws/aws-sdk-go-v2 v1.19.0
 	github.com/aws/aws-sdk-go-v2/config v1.11.1
 	github.com/aws/aws-sdk-go-v2/credentials v1.6.5
 	github.com/aws/aws-sdk-go-v2/service/acm v1.16.0
 	github.com/aws/aws-sdk-go-v2/service/acmpca v1.12.0
+	github.com/aws/aws-sdk-go-v2/service/cloudformation v1.30.1
 	github.com/aws/aws-sdk-go-v2/service/cognitoidentityprovider v1.17.3
 	github.com/aws/aws-sdk-go-v2/service/ec2 v1.26.0
 	github.com/aws/aws-sdk-go-v2/service/ecr v1.12.0
@@ -28,13 +29,14 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/sqs v1.14.0
 	github.com/aws/aws-sdk-go-v2/service/sts v1.12.0
 	github.com/aws/smithy-go v1.13.5
-	github.com/crossplane/crossplane-runtime v1.13.0
+	github.com/crossplane/crossplane-runtime v0.20.0
 	github.com/crossplane/crossplane-tools v0.0.0-20230714144037-2684f4bc7638
 	github.com/evanphx/json-patch v4.12.0+incompatible
 	github.com/go-ini/ini v1.67.0
 	github.com/golang/mock v1.5.0
 	github.com/google/go-cmp v0.5.9
 	github.com/jmattheis/goverter v0.18.0
+	github.com/google/uuid v1.3.0
 	github.com/mattbaird/jsonpatch v0.0.0-20200820163806-098863c1fc24
 	github.com/onsi/gomega v1.27.7
 	github.com/pkg/errors v0.9.1
@@ -57,8 +59,8 @@ require (
 	github.com/aws-controllers-k8s/pkg v0.0.4 // indirect
 	github.com/aws/aws-sdk-go-v2/aws/protocol/eventstream v1.0.0 // indirect
 	github.com/aws/aws-sdk-go-v2/feature/ec2/imds v1.8.2 // indirect
-	github.com/aws/aws-sdk-go-v2/internal/configsources v1.1.27 // indirect
-	github.com/aws/aws-sdk-go-v2/internal/endpoints/v2 v2.4.21 // indirect
+	github.com/aws/aws-sdk-go-v2/internal/configsources v1.1.35 // indirect
+	github.com/aws/aws-sdk-go-v2/internal/endpoints/v2 v2.4.29 // indirect
 	github.com/aws/aws-sdk-go-v2/internal/ini v1.3.2 // indirect
 	github.com/aws/aws-sdk-go-v2/service/internal/accept-encoding v1.5.0 // indirect
 	github.com/aws/aws-sdk-go-v2/service/internal/presigned-url v1.9.21 // indirect
