@@ -67,6 +67,7 @@ import (
 	"github.com/crossplane-contrib/provider-aws/pkg/controller/s3"
 	"github.com/crossplane-contrib/provider-aws/pkg/controller/s3control"
 	"github.com/crossplane-contrib/provider-aws/pkg/controller/secretsmanager"
+	"github.com/crossplane-contrib/provider-aws/pkg/controller/servicecatalog"
 	"github.com/crossplane-contrib/provider-aws/pkg/controller/servicediscovery"
 	"github.com/crossplane-contrib/provider-aws/pkg/controller/sesv2"
 	"github.com/crossplane-contrib/provider-aws/pkg/controller/sfn"
@@ -133,5 +134,6 @@ func Setup(mgr ctrl.Manager, o controller.Options) error {
 		sns.Setup,
 		sqs.Setup,
 		transfer.Setup,
+		servicecatalog.Setup,
 	)
 }
