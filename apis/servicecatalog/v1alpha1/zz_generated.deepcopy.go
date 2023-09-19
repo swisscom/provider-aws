@@ -550,6 +550,16 @@ func (in *ProvisionedProductObservation) DeepCopyInto(out *ProvisionedProductObs
 		*out = new(string)
 		**out = **in
 	}
+	if in.LastProductID != nil {
+		in, out := &in.LastProductID, &out.LastProductID
+		*out = new(string)
+		**out = **in
+	}
+	if in.LastProvisioningArtifactID != nil {
+		in, out := &in.LastProvisioningArtifactID, &out.LastProvisioningArtifactID
+		*out = new(string)
+		**out = **in
+	}
 	if in.LastProvisioningRecordID != nil {
 		in, out := &in.LastProvisioningRecordID, &out.LastProvisioningRecordID
 		*out = new(string)

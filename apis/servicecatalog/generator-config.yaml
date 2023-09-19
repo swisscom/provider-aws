@@ -67,6 +67,16 @@ resources:
         from:
           operation: DescribeRecord
           path: RecordDetail.PathId
+      LastProductID:
+        is_read_only: true
+        from:
+          operation: DescribeProvisionedProduct
+          path: ProvisionedProductDetail.ProductId
+      LastProvisioningArtifactID:
+        is_read_only: true
+        from:
+          operation: DescribeProvisionedProduct
+          path: ProvisionedProductDetail.ProvisioningArtifactId
       LaunchRoleArn:
         is_read_only: true
         from:

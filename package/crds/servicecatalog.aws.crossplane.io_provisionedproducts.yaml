@@ -379,6 +379,13 @@ spec:
                   lastPathID:
                     description: The path identifier.
                     type: string
+                  lastProductID:
+                    description: The product identifier. For example, prod-abcdzk7xy33qa.
+                    type: string
+                  lastProvisioningArtifactID:
+                    description: The identifier of the provisioning artifact. For
+                      example, pa-4abcdjnxjj6ne.
+                    type: string
                   lastProvisioningRecordID:
                     description: "The record identifier of the last request performed
                       on this provisioned product of the following types: \n * ProvisionedProduct

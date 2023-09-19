@@ -18,12 +18,12 @@ package provisionedproduct
 
 import (
 	"context"
-	"errors"
 	"fmt"
 
 	awsconfig "github.com/aws/aws-sdk-go-v2/config"
 	cfsdkv2 "github.com/aws/aws-sdk-go-v2/service/cloudformation"
 	cfsdkv2types "github.com/aws/aws-sdk-go-v2/service/cloudformation/types"
+	"github.com/aws/aws-sdk-go/aws/awserr"
 	svcsdk "github.com/aws/aws-sdk-go/service/servicecatalog"
 	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
 	"github.com/crossplane/crossplane-runtime/pkg/connection"
@@ -33,6 +33,7 @@ import (
 	"github.com/crossplane/crossplane-runtime/pkg/reconciler/managed"
 	"github.com/crossplane/crossplane-runtime/pkg/resource"
 	"github.com/google/uuid"
+	"github.com/pkg/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/pointer"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -46,11 +47,16 @@ import (
 )
 
 const (
-	acceptLanguageEnglish                     = "en"
+	acceptLanguageEnglish = "en"
+
 	msgProvisionedProductStatusSdkTainted     = "provisioned product has status TAINTED"
 	msgProvisionedProductStatusSdkUnderChange = "provisioned product is updating, availability depends on product"
 
-	errProvisionedProductStatusSdkError = "provisioned product has status ERROR"
+	errUpdatePending                        = "provisioned product is already under change, not updating"
+	errProvisionedProductStatusSdkError     = "provisioned product has status ERROR"
+	errCouldNotGetProvisionedProductOutputs = "could not get provisioned product outputs"
+	errCouldNotGetCFParameters              = "could not get cloudformation stack parameters"
+	errCouldNotDescribeRecord               = "could not describe record"
 )
 
 // SetupProvisionedProduct adds a controller that reconciles a ProvisionedProduct
@@ -123,12 +129,21 @@ func (c *custom) isUpToDate(_ context.Context, ds *svcapitypes.ProvisionedProduc
 	getPPOutputInput := &svcsdk.GetProvisionedProductOutputsInput{ProvisionedProductId: resp.ProvisionedProductDetail.Id}
 	getPPOutput, err := c.client.GetProvisionedProductOutputs(getPPOutputInput)
 	if err != nil {
-		return false, "", err
+		// We want to specifically handle this exception, since it will occur when something
+		// is wrong with the provisioned product (error on creation, tainted, etc)
+		// We will be able to handle those specific cases in postObserve
+		var aerr awserr.Error
+		if ok := errors.As(err, &aerr); ok {
+			if aerr.Code() == svcsdk.ErrCodeInvalidParametersException && aerr.Message() == "Last Successful Provisioning Record doesn't exist." {
+				return false, "", nil
+			}
+		}
+		return false, "", errors.Wrap(err, errCouldNotGetProvisionedProductOutputs)
 	}
 	c.cache.getProvisionedProductOutputs = getPPOutput.Outputs
 	cfStackParameters, err := c.client.GetCloudformationStackParameters(getPPOutput.Outputs)
 	if err != nil {
-		return false, "", err
+		return false, "", errors.Wrap(err, errCouldNotGetCFParameters)
 	}
 
 	productOrArtifactAreNotChanged, err := c.productOrArtifactAreNotChanged(&ds.Spec.ForProvider, resp.ProvisionedProductDetail)
@@ -150,7 +165,7 @@ func (c *custom) postObserve(_ context.Context, cr *svcapitypes.ProvisionedProdu
 	describeRecordInput := svcsdk.DescribeRecordInput{Id: resp.ProvisionedProductDetail.LastRecordId}
 	describeRecordOutput, err := c.client.DescribeRecord(&describeRecordInput)
 	if err != nil {
-		return managed.ExternalObservation{}, err
+		return managed.ExternalObservation{}, errors.Wrap(err, errCouldNotDescribeRecord)
 	}
 
 	ppStatus := aws.StringValue(resp.ProvisionedProductDetail.Status)
@@ -160,7 +175,7 @@ func (c *custom) postObserve(_ context.Context, cr *svcapitypes.ProvisionedProdu
 	case ppStatus == string(svcapitypes.ProvisionedProductStatus_SDK_UNDER_CHANGE) && *describeRecordOutput.RecordDetail.RecordType == "UPDATE_PROVISIONED_PRODUCT":
 		cr.SetConditions(xpv1.Available().WithMessage(msgProvisionedProductStatusSdkUnderChange))
 	case ppStatus == string(svcapitypes.ProvisionedProductStatus_SDK_ERROR):
-		cr.Status.SetConditions(xpv1.ReconcileError(errors.New(errProvisionedProductStatusSdkError)))
+		cr.Status.SetConditions(xpv1.Unavailable().WithMessage(errProvisionedProductStatusSdkError))
 	case ppStatus == string(svcapitypes.ProvisionedProductStatus_SDK_TAINTED):
 		cr.Status.SetConditions(xpv1.Unavailable().WithMessage(msgProvisionedProductStatusSdkTainted))
 	}
@@ -170,6 +185,10 @@ func (c *custom) postObserve(_ context.Context, cr *svcapitypes.ProvisionedProdu
 		outputs[*v.OutputKey] = &svcapitypes.RecordOutput{
 			Description: v.Description,
 			OutputValue: v.OutputValue}
+	}
+
+	if meta.GetExternalName(cr) == "" {
+		meta.SetExternalName(cr, *cr.Spec.ForProvider.Name)
 	}
 
 	cr.Status.AtProvider.Outputs = outputs
@@ -182,12 +201,15 @@ func (c *custom) postObserve(_ context.Context, cr *svcapitypes.ProvisionedProdu
 	cr.Status.AtProvider.ProvisionedProductType = resp.ProvisionedProductDetail.Type
 	cr.Status.AtProvider.RecordType = describeRecordOutput.RecordDetail.RecordType
 	cr.Status.AtProvider.LastPathID = describeRecordOutput.RecordDetail.PathId
+	cr.Status.AtProvider.LastProductID = describeRecordOutput.RecordDetail.ProductId
+	cr.Status.AtProvider.LastProvisioningArtifactID = describeRecordOutput.RecordDetail.ProvisioningArtifactId
 
 	return obs, nil
 }
 
-func preCreate(_ context.Context, _ *svcapitypes.ProvisionedProduct, obj *svcsdk.ProvisionProductInput) error {
+func preCreate(_ context.Context, cr *svcapitypes.ProvisionedProduct, obj *svcsdk.ProvisionProductInput) error {
 	obj.ProvisionToken = aws.String(genIdempotencyToken())
+	meta.SetExternalName(cr, *cr.Spec.ForProvider.Name)
 	return nil
 }
 
@@ -201,6 +223,9 @@ func preDelete(_ context.Context, cr *svcapitypes.ProvisionedProduct, obj *svcsd
 }
 
 func (c *custom) preUpdate(_ context.Context, cr *svcapitypes.ProvisionedProduct, input *svcsdk.UpdateProvisionedProductInput) error {
+	if pointer.StringDeref(cr.Status.AtProvider.Status, "") == string(svcapitypes.ProvisionedProductStatus_SDK_UNDER_CHANGE) {
+		return errors.New(errUpdatePending)
+	}
 	input.UpdateToken = aws.String(genIdempotencyToken())
 	input.ProvisionedProductName = aws.String(meta.GetExternalName(cr))
 	return nil

@@ -87,6 +87,10 @@ type ProvisionedProductObservation struct {
 	CreatedTime *metav1.Time `json:"createdTime,omitempty"`
 	// The path identifier.
 	LastPathID *string `json:"lastPathID,omitempty"`
+	// The product identifier. For example, prod-abcdzk7xy33qa.
+	LastProductID *string `json:"lastProductID,omitempty"`
+	// The identifier of the provisioning artifact. For example, pa-4abcdjnxjj6ne.
+	LastProvisioningArtifactID *string `json:"lastProvisioningArtifactID,omitempty"`
 	// The record identifier of the last request performed on this provisioned product
 	// of the following types:
 	//
