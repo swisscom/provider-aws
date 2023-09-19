@@ -36,14 +36,10 @@ func provisioningParamsAreChanged(cfStackParams []cfsdkv2types.Parameter, curren
 
 // productOrArtifactAreChanged will attempt to determine whether or not the currently requested SC product and provisioning artifact IDs have changed when using names instead of IDs
 func (c *custom) productOrArtifactAreChanged(ds *svcapitypes.ProvisionedProductParameters, resp *svcsdk.ProvisionedProductDetail) (bool, error) { // nolint:gocyclo
-	var productID, artifactID string
+	productID := pointer.StringDeref(ds.ProductID, "")
+	artifactID := pointer.StringDeref(ds.ProvisioningArtifactID, "")
 
-	if ds.ProductID != nil {
-		productID = pointer.StringDeref(ds.ProductID, "")
-	}
-	if ds.ProvisioningArtifactID != nil {
-		artifactID = pointer.StringDeref(ds.ProvisioningArtifactID, "")
-	}
+	// TODO: write tests for this function before any refactoring
 
 	if productID == "" || artifactID == "" {
 		// If we are using names for either the product or artifact, we should

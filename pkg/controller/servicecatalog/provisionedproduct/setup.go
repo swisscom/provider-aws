@@ -41,6 +41,8 @@ const (
 	acceptLanguageEnglish = "en"
 )
 
+// TODO: merge utils and lifecycle.go into this file
+
 type customConnector struct {
 	kube client.Client
 }
@@ -88,6 +90,8 @@ func SetupProvisionedProduct(mgr ctrl.Manager, o controller.Options) error {
 }
 
 func (c *customConnector) Connect(ctx context.Context, mg resource.Managed) (managed.ExternalClient, error) {
+	// TODO: remove custom connector and move code from Update method to preUpdate
+
 	cr, ok := mg.(*svcapitypes.ProvisionedProduct)
 	if !ok {
 		return nil, errors.New(errUnexpectedObject)

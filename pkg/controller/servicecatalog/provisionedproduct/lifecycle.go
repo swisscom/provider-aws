@@ -166,6 +166,8 @@ func (c *custom) Update(ctx context.Context, mg resource.Managed) (managed.Exter
 		return managed.ExternalUpdate{}, errors.New(errUnexpectedObject)
 	}
 
+	// TODO: move this to preUpdate
+
 	// We want to check if we are in a state where we can actually update it
 	ppStatus := pointer.StringDeref(cr.Status.AtProvider.Status, "")
 	if ppStatus == "" || ppStatus == string(svcapitypes.ProvisionedProductStatus_SDK_UNDER_CHANGE) {
