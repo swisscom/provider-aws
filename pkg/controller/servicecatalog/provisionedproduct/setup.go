@@ -172,7 +172,7 @@ func (c *custom) postObserve(_ context.Context, cr *svcapitypes.ProvisionedProdu
 	switch {
 	case ppStatus == string(svcapitypes.ProvisionedProductStatus_SDK_AVAILABLE):
 		cr.Status.SetConditions(xpv1.Available())
-	case ppStatus == string(svcapitypes.ProvisionedProductStatus_SDK_UNDER_CHANGE) && *describeRecordOutput.RecordDetail.RecordType == "UPDATE_PROVISIONED_PRODUCT":
+	case ppStatus == string(svcapitypes.ProvisionedProductStatus_SDK_UNDER_CHANGE) && pointer.StringDeref(describeRecordOutput.RecordDetail.RecordType, "") == "UPDATE_PROVISIONED_PRODUCT":
 		cr.SetConditions(xpv1.Available().WithMessage(msgProvisionedProductStatusSdkUnderChange))
 	case ppStatus == string(svcapitypes.ProvisionedProductStatus_SDK_ERROR):
 		cr.Status.SetConditions(xpv1.Unavailable().WithMessage(errProvisionedProductStatusSdkError))
@@ -238,11 +238,11 @@ func provisioningParamsAreNotChanged(cfStackParams []cfsdkv2types.Parameter, cur
 
 	cfStackKeyValue := make(map[string]string)
 	for _, v := range cfStackParams {
-		cfStackKeyValue[*v.ParameterKey] = *v.ParameterValue
+		cfStackKeyValue[*v.ParameterKey] = pointer.StringDeref(v.ParameterValue, "")
 	}
 
 	for _, v := range currentParams {
-		if cfv, ok := cfStackKeyValue[*v.Key]; ok && cfv == *v.Value {
+		if cfv, ok := cfStackKeyValue[*v.Key]; ok && pointer.StringEqual(&cfv, v.Value) {
 			continue
 		} else {
 			return false
@@ -285,7 +285,7 @@ func (c *custom) getArtifactID(crParams *svcapitypes.ProvisionedProductParameter
 	if err != nil {
 		return "", err
 	}
-	return *output.ProvisioningArtifactDetail.Id, nil
+	return pointer.StringDeref(output.ProvisioningArtifactDetail.Id, ""), nil
 }
 
 func genIdempotencyToken() string {
