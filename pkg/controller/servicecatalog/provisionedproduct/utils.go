@@ -21,15 +21,9 @@ func provisioningParamsAreChanged(cfStackParams []cfsdkv2types.Parameter, curren
 		return true
 	}
 
-	cfStackKeyValue := make(map[string]string)
-	for _, v := range cfStackParams {
-		cfStackKeyValue[*v.ParameterKey] = pointer.StringDeref(v.ParameterValue, "")
-	}
-
-	for _, v := range currentParams {
-		if cfv, ok := cfStackKeyValue[*v.Key]; ok && pointer.StringEqual(&cfv, v.Value) {
-			continue
-		} else {
+	for i, v := range cfStackParams {
+		if pointer.StringDeref(currentParams[i].Key, "") != pointer.StringDeref(v.ParameterKey, "") ||
+			pointer.StringDeref(currentParams[i].Value, "") != pointer.StringDeref(v.ParameterValue, "") {
 			return true
 		}
 	}

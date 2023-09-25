@@ -105,6 +105,7 @@ func TestIsUpToDate(t *testing.T) {
 	provisioningArtifactName := provisioningArtifactName
 	productID := productID
 	newProductID := newProductID
+
 	type want struct {
 		result bool
 		err    error
@@ -471,6 +472,54 @@ func TestIsUpToDate(t *testing.T) {
 			},
 			want: want{
 				result: true,
+				err:    nil,
+			},
+		},
+		"ParametersSequenceAreChanged": {
+			args: args{
+				provisionedProduct: provisionedProduct([]provisionedProductModifier{
+					withSpec(v1alpha1.ProvisionedProductParameters{
+						ProvisioningArtifactID: aws.String(provisioningArtifactID),
+						ProvisioningParameters: []*v1alpha1.ProvisioningParameter{
+							{Key: aws.String("Parameter1"), Value: aws.String("foo")},
+							{Key: aws.String("Parameter2"), Value: aws.String("bar")},
+						},
+					}),
+				}...),
+				describeProvisionedProductOutput: describeProvisionedProduct([]describeProvisionedProductOutputModifier{
+					withDetails(svcsdk.ProvisionedProductDetail{
+						Id:                     aws.String("pp-fake"),
+						ProvisioningArtifactId: aws.String(provisioningArtifactID),
+					}),
+				}...),
+				customClient: &fake.MockCustomServiceCatalogClient{
+					MockGetCloudformationStackParameters: func(provisionedProductOutputs []*svcsdk.RecordOutput) ([]cfsdkv2types.Parameter, error) {
+						return []cfsdkv2types.Parameter{
+								{ParameterKey: aws.String("Parameter2"), ParameterValue: aws.String("bar")},
+								{ParameterKey: aws.String("Parameter1"), ParameterValue: aws.String("foo")},
+							},
+							nil
+					},
+					MockGetProvisionedProductOutputs: func(getPPInput *svcsdk.GetProvisionedProductOutputsInput) (*svcsdk.GetProvisionedProductOutputsOutput, error) {
+						return &svcsdk.GetProvisionedProductOutputsOutput{}, nil
+					},
+					MockDescribeProduct: func(dpInput *svcsdk.DescribeProductInput) (*svcsdk.DescribeProductOutput, error) {
+						return &svcsdk.DescribeProductOutput{
+							ProductViewSummary: &svcsdk.ProductViewSummary{
+								ProductId: dpInput.Id,
+								Name:      aws.String("fake product"),
+							},
+							ProvisioningArtifacts: []*svcsdk.ProvisioningArtifact{
+								{
+									Id: aws.String(provisioningArtifactID),
+								},
+							},
+						}, nil
+					},
+				},
+			},
+			want: want{
+				result: false,
 				err:    nil,
 			},
 		},
