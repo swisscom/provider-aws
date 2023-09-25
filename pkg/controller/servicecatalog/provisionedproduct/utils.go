@@ -10,7 +10,10 @@ import (
 	"k8s.io/utils/pointer"
 
 	svcapitypes "github.com/crossplane-contrib/provider-aws/apis/servicecatalog/v1alpha1"
-	aws "github.com/crossplane-contrib/provider-aws/pkg/clients"
+)
+
+const (
+	errCouldNotLookupProduct = "could not lookup product"
 )
 
 func provisioningParamsAreChanged(cfStackParams []cfsdkv2types.Parameter, currentParams []*svcapitypes.ProvisioningParameter) bool {
@@ -34,66 +37,50 @@ func provisioningParamsAreChanged(cfStackParams []cfsdkv2types.Parameter, curren
 	return false
 }
 
-// productOrArtifactAreChanged will attempt to determine whether or not the currently requested SC product and provisioning artifact IDs have changed when using names instead of IDs
-func (c *custom) productOrArtifactAreChanged(ds *svcapitypes.ProvisionedProductParameters, resp *svcsdk.ProvisionedProductDetail) (bool, error) { // nolint:gocyclo
-	var productID, artifactID string
-
-	if ds.ProductID != nil {
-		productID = pointer.StringDeref(ds.ProductID, "")
-	}
-	if ds.ProvisioningArtifactID != nil {
-		artifactID = pointer.StringDeref(ds.ProvisioningArtifactID, "")
-	}
-
-	if productID == "" || artifactID == "" {
-		// If we are using names for either the product or artifact, we should
-		// do a lookup using the DescribeProduct API to find the matching
-		// product (either by name or ID). In the returned output, we will have
-		// access to both the product ID and all of the available provisioning
-		// artifact IDs so we will be able to discover both IDs with a single
-		// API call.
-		dpInput := &svcsdk.DescribeProductInput{}
-
-		if productID != "" {
-			dpInput.Id = aws.String(productID)
-		} else {
-			dpInput.Name = ds.ProductName
-		}
-
-		describeProduct, err := c.client.DescribeProduct(dpInput)
+func (c *custom) productOrArtifactAreChanged(ds *svcapitypes.ProvisionedProductParameters, resp *svcsdk.ProvisionedProductDetail) (bool, error) {
+	// ProvisioningArtifactID and ProvisioningArtifactName are mutual exclusive params, the same about ProductID and ProductName
+	// But if describe a provisioned product aws api will return only IDs, so it's impossible to compare names with ids
+	// Conditional statement below works only if desired state includes ProvisioningArtifactID and ProductID
+	if ds.ProvisioningArtifactID != nil && ds.ProductID != nil &&
+		(*ds.ProvisioningArtifactID != *resp.ProvisioningArtifactId ||
+			*ds.ProductID != *resp.ProductId) {
+		return true, nil
+		// In case if desired state includes not only IDs provider runs func `getArtifactID`, which produces
+		// additional request to aws api and retrieves an artifact id(even if it is already defined in the desired state)
+		// based on ProductId/ProductName for further comparison with artifact id in the current state
+	} else if ds.ProvisioningArtifactName != nil || ds.ProductName != nil {
+		desiredArtifactID, err := c.getArtifactID(ds)
 		if err != nil {
-			return true, errors.Wrap(err, "could not lookup product")
+			return false, err
 		}
-		if describeProduct == nil || describeProduct.ProductViewSummary == nil {
-			return true, errors.New("could not find product")
-		}
-
-		if productID == "" {
-			// fill in the product ID if we do not yet have it
-			if describeProduct == nil || describeProduct.ProductViewSummary == nil {
-				return true, errors.New("could not find product")
-			}
-			productID = pointer.StringDeref(describeProduct.ProductViewSummary.ProductId, "")
-		}
-
-		if artifactID == "" {
-			// find the matching artifact
-			for _, artifact := range describeProduct.ProvisioningArtifacts {
-				if pointer.StringEqual(ds.ProvisioningArtifactName, artifact.Name) {
-					artifactID = pointer.StringDeref(artifact.Id, "")
-					break
-				}
-			}
-		}
-
-		if artifactID == "" {
-			// we were unable to find an artifact that matches
-			return true, errors.New("could not find provisioning artifact")
+		if desiredArtifactID != *resp.ProvisioningArtifactId {
+			return true, nil
 		}
 	}
+	return false, nil
+}
 
-	return pointer.StringDeref(resp.ProductId, "") != productID ||
-		pointer.StringDeref(resp.ProvisioningArtifactId, "") != artifactID, nil
+func (c *custom) getArtifactID(ds *svcapitypes.ProvisionedProductParameters) (string, error) {
+	input := svcsdk.DescribeProductInput{
+		Id:   ds.ProductID,
+		Name: ds.ProductName,
+	}
+	// DescribeProvisioningArtifact methods fits much better, but it has a bug
+	output, err := c.client.DescribeProduct(&input)
+	if err != nil {
+		return "", errors.Wrap(err, errCouldNotLookupProduct)
+	}
+	if ds.ProvisioningArtifactName != nil && ds.ProvisioningArtifactID != nil {
+		return "", errors.Wrap(errors.New("artifact id and name are mutually exclusive"), errCouldNotLookupProduct)
+	}
+
+	for _, artifact := range output.ProvisioningArtifacts {
+		if pointer.StringDeref(ds.ProvisioningArtifactName, "") == *artifact.Name ||
+			pointer.StringDeref(ds.ProvisioningArtifactID, "") == *artifact.Id {
+			return pointer.StringDeref(artifact.Id, ""), nil
+		}
+	}
+	return "", errors.Wrap(errors.New("artifact not found"), errCouldNotLookupProduct)
 }
 
 func genIdempotencyToken() string {

@@ -38,6 +38,10 @@ import (
 
 const (
 	provisioningArtifactID          = "pa-1234567890"
+	newProvisioningArtifactID       = "pa-new1234567890"
+	provisioningArtifactName        = "v1.0"
+	productID                       = "prod-1234567890"
+	newProductID                    = "prod-new1234567890"
 	acceptLanguage                  = "jp"
 	latelyInitializedAcceptLanguage = "en"
 )
@@ -97,6 +101,10 @@ func prepareFakeExternal(fakeClient clientset.Client) func(*external) {
 
 func TestIsUpToDate(t *testing.T) {
 	provisioningArtifactID := provisioningArtifactID
+	newProvisioningArtifactID := newProvisioningArtifactID
+	provisioningArtifactName := provisioningArtifactName
+	productID := productID
+	newProductID := newProductID
 	type want struct {
 		result bool
 		err    error
@@ -105,12 +113,12 @@ func TestIsUpToDate(t *testing.T) {
 		args
 		want
 	}{
-		"ArtifactIdHasChanged": {
+		"ProductNameHasChanged": {
 			args: args{
 				provisionedProduct: provisionedProduct([]provisionedProductModifier{
 					withSpec(v1alpha1.ProvisionedProductParameters{
-						ProvisioningArtifactID: aws.String("pa-new1234567890"),
-						ProductID:              aws.String("prod-1234567890"),
+						ProvisioningArtifactName: aws.String(provisioningArtifactName),
+						ProductName:              aws.String("s3-product"),
 						ProvisioningParameters: []*v1alpha1.ProvisioningParameter{
 							{Key: aws.String("Parameter"), Value: aws.String("foo")}},
 					}),
@@ -118,8 +126,143 @@ func TestIsUpToDate(t *testing.T) {
 				describeProvisionedProductOutput: describeProvisionedProduct([]describeProvisionedProductOutputModifier{
 					withDetails(svcsdk.ProvisionedProductDetail{
 						Id:                     aws.String("pp-fake"),
-						ProductId:              aws.String("prod-1234567890"),
+						ProductId:              aws.String(productID),
 						ProvisioningArtifactId: aws.String(provisioningArtifactID),
+					}),
+				}...),
+				customClient: &fake.MockCustomServiceCatalogClient{
+					MockGetCloudformationStackParameters: func(provisionedProductOutputs []*svcsdk.RecordOutput) ([]cfsdkv2types.Parameter, error) {
+						return []cfsdkv2types.Parameter{{ParameterKey: aws.String("Parameter"), ParameterValue: aws.String("foo")}}, nil
+					},
+					MockGetProvisionedProductOutputs: func(getPPInput *svcsdk.GetProvisionedProductOutputsInput) (*svcsdk.GetProvisionedProductOutputsOutput, error) {
+						return &svcsdk.GetProvisionedProductOutputsOutput{}, nil
+					},
+					MockDescribeProduct: func(dpInput *svcsdk.DescribeProductInput) (*svcsdk.DescribeProductOutput, error) {
+						return &svcsdk.DescribeProductOutput{
+							ProductViewSummary: &svcsdk.ProductViewSummary{
+								ProductId: dpInput.Id,
+								Name:      aws.String("fake-product"),
+							},
+							ProvisioningArtifacts: []*svcsdk.ProvisioningArtifact{
+								{
+									Id:   aws.String(newProvisioningArtifactID),
+									Name: aws.String(provisioningArtifactName),
+								},
+							},
+						}, nil
+					},
+				},
+			},
+			want: want{
+				result: false,
+				err:    nil,
+			},
+		},
+		"ProductIdHasChanged": {
+			args: args{
+				provisionedProduct: provisionedProduct([]provisionedProductModifier{
+					withSpec(v1alpha1.ProvisionedProductParameters{
+						ProvisioningArtifactName: aws.String(provisioningArtifactName),
+						ProductID:                aws.String(newProductID),
+						ProvisioningParameters: []*v1alpha1.ProvisioningParameter{
+							{Key: aws.String("Parameter"), Value: aws.String("foo")}},
+					}),
+				}...),
+				describeProvisionedProductOutput: describeProvisionedProduct([]describeProvisionedProductOutputModifier{
+					withDetails(svcsdk.ProvisionedProductDetail{
+						Id:                     aws.String("pp-fake"),
+						ProductId:              aws.String(productID),
+						ProvisioningArtifactId: aws.String(provisioningArtifactID),
+					}),
+				}...),
+				customClient: &fake.MockCustomServiceCatalogClient{
+					MockGetCloudformationStackParameters: func(provisionedProductOutputs []*svcsdk.RecordOutput) ([]cfsdkv2types.Parameter, error) {
+						return []cfsdkv2types.Parameter{{ParameterKey: aws.String("Parameter"), ParameterValue: aws.String("foo")}}, nil
+					},
+					MockGetProvisionedProductOutputs: func(getPPInput *svcsdk.GetProvisionedProductOutputsInput) (*svcsdk.GetProvisionedProductOutputsOutput, error) {
+						return &svcsdk.GetProvisionedProductOutputsOutput{}, nil
+					},
+					MockDescribeProduct: func(dpInput *svcsdk.DescribeProductInput) (*svcsdk.DescribeProductOutput, error) {
+						return &svcsdk.DescribeProductOutput{
+							ProductViewSummary: &svcsdk.ProductViewSummary{
+								ProductId: dpInput.Id,
+								Name:      aws.String("fake-product"),
+							},
+							ProvisioningArtifacts: []*svcsdk.ProvisioningArtifact{
+								{
+									Id:   aws.String(newProvisioningArtifactID),
+									Name: aws.String(provisioningArtifactName),
+								},
+							},
+						}, nil
+					},
+				},
+			},
+			want: want{
+				result: false,
+				err:    nil,
+			},
+		},
+		"ArtifactNameHasChanged": {
+			args: args{
+				provisionedProduct: provisionedProduct([]provisionedProductModifier{
+					withSpec(v1alpha1.ProvisionedProductParameters{
+						ProvisioningArtifactName: aws.String(provisioningArtifactName),
+						ProductID:                aws.String(productID),
+						ProvisioningParameters: []*v1alpha1.ProvisioningParameter{
+							{Key: aws.String("Parameter"), Value: aws.String("foo")}},
+					}),
+				}...),
+				describeProvisionedProductOutput: describeProvisionedProduct([]describeProvisionedProductOutputModifier{
+					withDetails(svcsdk.ProvisionedProductDetail{
+						Id:                     aws.String("pp-fake"),
+						ProductId:              aws.String(productID),
+						ProvisioningArtifactId: aws.String(provisioningArtifactID),
+					}),
+				}...),
+				customClient: &fake.MockCustomServiceCatalogClient{
+					MockGetCloudformationStackParameters: func(provisionedProductOutputs []*svcsdk.RecordOutput) ([]cfsdkv2types.Parameter, error) {
+						return []cfsdkv2types.Parameter{{ParameterKey: aws.String("Parameter"), ParameterValue: aws.String("foo")}}, nil
+					},
+					MockGetProvisionedProductOutputs: func(getPPInput *svcsdk.GetProvisionedProductOutputsInput) (*svcsdk.GetProvisionedProductOutputsOutput, error) {
+						return &svcsdk.GetProvisionedProductOutputsOutput{}, nil
+					},
+					MockDescribeProduct: func(dpInput *svcsdk.DescribeProductInput) (*svcsdk.DescribeProductOutput, error) {
+						return &svcsdk.DescribeProductOutput{
+							ProductViewSummary: &svcsdk.ProductViewSummary{
+								ProductId: dpInput.Id,
+								Name:      aws.String("fake-product"),
+							},
+							ProvisioningArtifacts: []*svcsdk.ProvisioningArtifact{
+								{
+									Name: aws.String(provisioningArtifactName),
+									Id:   aws.String(newProvisioningArtifactID),
+								},
+							},
+						}, nil
+					},
+				},
+			},
+			want: want{
+				result: false,
+				err:    nil,
+			},
+		},
+		"ArtifactIdHasChanged": {
+			args: args{
+				provisionedProduct: provisionedProduct([]provisionedProductModifier{
+					withSpec(v1alpha1.ProvisionedProductParameters{
+						ProvisioningArtifactID: aws.String(newProvisioningArtifactID),
+						ProductID:              aws.String(productID),
+						ProvisioningParameters: []*v1alpha1.ProvisioningParameter{
+							{Key: aws.String("Parameter"), Value: aws.String("foo")}},
+					}),
+				}...),
+				describeProvisionedProductOutput: describeProvisionedProduct([]describeProvisionedProductOutputModifier{
+					withDetails(svcsdk.ProvisionedProductDetail{
+						Id:                     aws.String("pp-fake"),
+						ProductId:              aws.String(productID),
+						ProvisioningArtifactId: aws.String(provisioningArtifactName),
 					}),
 				}...),
 				customClient: &fake.MockCustomServiceCatalogClient{
@@ -137,7 +280,7 @@ func TestIsUpToDate(t *testing.T) {
 							},
 							ProvisioningArtifacts: []*svcsdk.ProvisioningArtifact{
 								{
-									Id: aws.String("prod-new1234567890"),
+									Id: aws.String(newProvisioningArtifactID),
 								},
 							},
 						}, nil
@@ -338,10 +481,10 @@ func TestIsUpToDate(t *testing.T) {
 			e := newExternal(tc.args.kube, tc.args.client, opts)
 			result, _, err := e.isUpToDate(nil, tc.args.provisionedProduct, tc.args.describeProvisionedProductOutput)
 			if diff := cmp.Diff(err, tc.want.err, test.EquateErrors()); diff != "" {
-				t.Errorf("r: -want, +got:\n%s", diff)
+				t.Errorf("r: +want, -got:\n%s", diff)
 			}
 			if diff := cmp.Diff(result, tc.want.result); diff != "" {
-				t.Errorf("r: -want, +got:\n%s", diff)
+				t.Errorf("r: +want, -got:\n%s", diff)
 			}
 		})
 	}
@@ -386,7 +529,7 @@ func TestLateInitialize(t *testing.T) {
 			e := newExternal(tc.args.kube, tc.args.client, opts)
 			_ = e.lateInitialize(&tc.args.provisionedProduct.Spec.ForProvider, tc.args.describeProvisionedProductOutput)
 			if diff := cmp.Diff(*tc.args.provisionedProduct.Spec.ForProvider.AcceptLanguage, tc.want.acceptLanguage); diff != "" {
-				t.Errorf("r: -want, +got:\n%s", diff)
+				t.Errorf("r: +want, -got:\n%s", diff)
 			}
 		})
 	}
@@ -511,7 +654,7 @@ func TestPostObserve(t *testing.T) {
 			conditions := tc.args.provisionedProduct.Status.Conditions
 			latestCondition := conditions[len(conditions)-1]
 			if diff := cmp.Diff(latestCondition, tc.want.status); diff != "" {
-				t.Errorf("r: -want, +got:\n%s", diff)
+				t.Errorf("r: +want, -got:\n%s", diff)
 			}
 			test.EquateConditions()
 		})
@@ -559,7 +702,7 @@ func TestPreDelete(t *testing.T) {
 			e := newExternal(tc.args.kube, tc.args.client, opts)
 			ignore, _ := e.preDelete(context.TODO(), tc.args.provisionedProduct, &svcsdk.TerminateProvisionedProductInput{})
 			if diff := cmp.Diff(ignore, tc.want.ignoreDeletion); diff != "" {
-				t.Errorf("r: -want, +got:\n%s", diff)
+				t.Errorf("r: +want, -got\n%s", diff)
 
 			}
 		})
