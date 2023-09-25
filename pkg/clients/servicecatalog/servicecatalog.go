@@ -37,6 +37,7 @@ type Client interface {
 	GetProvisionedProductOutputs(*svcsdk.GetProvisionedProductOutputsInput) (*svcsdk.GetProvisionedProductOutputsOutput, error)
 	DescribeRecord(*svcsdk.DescribeRecordInput) (*svcsdk.DescribeRecordOutput, error)
 	DescribeProvisioningArtifact(*svcsdk.DescribeProvisioningArtifactInput) (*svcsdk.DescribeProvisioningArtifactOutput, error)
+	DescribeProduct(*svcsdk.DescribeProductInput) (*svcsdk.DescribeProductOutput, error)
 }
 
 // CustomServiceCatalogClient is the implementation of a Client
@@ -80,4 +81,9 @@ func (c *CustomServiceCatalogClient) DescribeRecord(describeRecordInput *svcsdk.
 func (c *CustomServiceCatalogClient) DescribeProvisioningArtifact(input *svcsdk.DescribeProvisioningArtifactInput) (*svcsdk.DescribeProvisioningArtifactOutput, error) {
 	output, err := c.Client.DescribeProvisioningArtifact(input)
 	return output, err
+}
+
+// DescribeProduct is wrapped (*ServiceCatalog) DescribeProduct from github.com/aws/aws-sdk-go/service/servicecatalog
+func (c *CustomServiceCatalogClient) DescribeProduct(input *svcsdk.DescribeProductInput) (*svcsdk.DescribeProductOutput, error) {
+	return c.Client.DescribeProduct(input)
 }

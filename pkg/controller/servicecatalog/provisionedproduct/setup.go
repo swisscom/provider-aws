@@ -57,6 +57,7 @@ const (
 	errCouldNotGetProvisionedProductOutputs = "could not get provisioned product outputs"
 	errCouldNotGetCFParameters              = "could not get cloudformation stack parameters"
 	errCouldNotDescribeRecord               = "could not describe record"
+	errCouldNotLookupProduct                = "could not lookup product"
 )
 
 // SetupProvisionedProduct adds a controller that reconciles a ProvisionedProduct
@@ -103,6 +104,7 @@ func prepareSetupExternal(cfClient *cfsdkv2.Client) func(*external) {
 		e.postObserve = c.postObserve
 		e.preUpdate = c.preUpdate
 		e.preCreate = preCreate
+		e.postCreate = c.postCreate
 		e.preDelete = preDelete
 	}
 }
@@ -146,12 +148,12 @@ func (c *custom) isUpToDate(_ context.Context, ds *svcapitypes.ProvisionedProduc
 		return false, "", errors.Wrap(err, errCouldNotGetCFParameters)
 	}
 
-	productOrArtifactAreNotChanged, err := c.productOrArtifactAreNotChanged(&ds.Spec.ForProvider, resp.ProvisionedProductDetail)
+	productOrArtifactAreChanged, err := c.productOrArtifactAreChanged(&ds.Spec.ForProvider, resp.ProvisionedProductDetail)
 	if err != nil {
 		return false, "", err
 	}
 
-	if !provisioningParamsAreNotChanged(cfStackParameters, ds.Spec.ForProvider.ProvisioningParameters) || !productOrArtifactAreNotChanged {
+	if provisioningParamsAreChanged(cfStackParameters, ds.Spec.ForProvider.ProvisioningParameters) || productOrArtifactAreChanged {
 		return false, "", nil
 	}
 	return true, "", nil
@@ -161,6 +163,7 @@ func (c *custom) postObserve(_ context.Context, cr *svcapitypes.ProvisionedProdu
 	if err != nil {
 		return managed.ExternalObservation{}, err
 	}
+	meta.SetExternalName(cr, *cr.Spec.ForProvider.Name)
 
 	describeRecordInput := svcsdk.DescribeRecordInput{Id: resp.ProvisionedProductDetail.LastRecordId}
 	describeRecordOutput, err := c.client.DescribeRecord(&describeRecordInput)
@@ -187,10 +190,6 @@ func (c *custom) postObserve(_ context.Context, cr *svcapitypes.ProvisionedProdu
 			OutputValue: v.OutputValue}
 	}
 
-	if meta.GetExternalName(cr) == "" {
-		meta.SetExternalName(cr, *cr.Spec.ForProvider.Name)
-	}
-
 	cr.Status.AtProvider.Outputs = outputs
 	cr.Status.AtProvider.ARN = resp.ProvisionedProductDetail.Arn
 	cr.Status.AtProvider.CreatedTime = &metav1.Time{Time: *resp.ProvisionedProductDetail.CreatedTime}
@@ -213,6 +212,20 @@ func preCreate(_ context.Context, cr *svcapitypes.ProvisionedProduct, obj *svcsd
 	return nil
 }
 
+func (c *custom) postCreate(_ context.Context, cr *svcapitypes.ProvisionedProduct, obj *svcsdk.ProvisionProductOutput, cre managed.ExternalCreation, err error) (managed.ExternalCreation, error) {
+	if err != nil {
+		return cre, err
+	}
+
+	// We are expected to set the external-name annotation upon creation since
+	// it can differ from the metadata.name for the ProvisionedProduct
+	if obj.RecordDetail != nil && obj.RecordDetail.ProvisionedProductName != nil {
+		meta.SetExternalName(cr, *obj.RecordDetail.ProvisionedProductName)
+	}
+
+	return cre, nil
+}
+
 func preDelete(_ context.Context, cr *svcapitypes.ProvisionedProduct, obj *svcsdk.TerminateProvisionedProductInput) (bool, error) {
 	if pointer.StringDeref(cr.Status.AtProvider.Status, "") == string(svcapitypes.ProvisionedProductStatus_SDK_UNDER_CHANGE) {
 		return true, nil
@@ -231,9 +244,9 @@ func (c *custom) preUpdate(_ context.Context, cr *svcapitypes.ProvisionedProduct
 	return nil
 }
 
-func provisioningParamsAreNotChanged(cfStackParams []cfsdkv2types.Parameter, currentParams []*svcapitypes.ProvisioningParameter) bool {
+func provisioningParamsAreChanged(cfStackParams []cfsdkv2types.Parameter, currentParams []*svcapitypes.ProvisioningParameter) bool {
 	if len(cfStackParams) != len(currentParams) {
-		return false
+		return true
 	}
 
 	cfStackKeyValue := make(map[string]string)
@@ -245,13 +258,13 @@ func provisioningParamsAreNotChanged(cfStackParams []cfsdkv2types.Parameter, cur
 		if cfv, ok := cfStackKeyValue[*v.Key]; ok && pointer.StringEqual(&cfv, v.Value) {
 			continue
 		} else {
-			return false
+			return true
 		}
 	}
-	return true
+	return false
 }
 
-func (c *custom) productOrArtifactAreNotChanged(ds *svcapitypes.ProvisionedProductParameters, resp *svcsdk.ProvisionedProductDetail) (bool, error) {
+func (c *custom) productOrArtifactAreChanged(ds *svcapitypes.ProvisionedProductParameters, resp *svcsdk.ProvisionedProductDetail) (bool, error) {
 	// ProvisioningArtifactID and ProvisioningArtifactName are mutual exclusive params, the same about ProductID and ProductName
 	// But if describe a provisioned product aws api will return only IDs, so it's impossible to compare names with ids
 	// Conditional statement below works only if desired state includes ProvisioningArtifactID and ProductID
@@ -260,32 +273,41 @@ func (c *custom) productOrArtifactAreNotChanged(ds *svcapitypes.ProvisionedProdu
 			*ds.ProductID != *resp.ProductId) {
 		return false, nil
 		// In case if desired state includes not only IDs provider runs func `getArtifactID`, which produces
-		// additional request to aws api and retrieves an artifact id based on ProductId/ProductName and ProvisioningArtifactId/ProvisioningArtifactName
-		// for further comparison with artifact id in the current state
+		// additional request to aws api and retrieves an artifact id(even if it is already defined in the desired state)
+		// based on ProductId/ProductName for further comparison with artifact id in the current state
 	} else if ds.ProvisioningArtifactName != nil || ds.ProductName != nil {
 		desiredArtifactID, err := c.getArtifactID(ds)
 		if err != nil {
 			return false, err
 		}
 		if desiredArtifactID != *resp.ProvisioningArtifactId {
-			return false, nil
+			return true, nil
 		}
 	}
-	return true, nil
+	return false, nil
 }
 
-func (c *custom) getArtifactID(crParams *svcapitypes.ProvisionedProductParameters) (string, error) {
-	input := svcsdk.DescribeProvisioningArtifactInput{
-		ProductId:                crParams.ProductID,
-		ProvisioningArtifactId:   crParams.ProvisioningArtifactID,
-		ProductName:              crParams.ProductName,
-		ProvisioningArtifactName: crParams.ProvisioningArtifactName,
+func (c *custom) getArtifactID(ds *svcapitypes.ProvisionedProductParameters) (string, error) {
+	input := svcsdk.DescribeProductInput{
+		Id:   ds.ProductID,
+		Name: ds.ProductName,
 	}
-	output, err := c.client.DescribeProvisioningArtifact(&input)
+	// DescribeProvisioningArtifact methods fits much better, but it has a bug
+	output, err := c.client.DescribeProduct(&input)
 	if err != nil {
-		return "", err
+		return "", errors.Wrap(err, errCouldNotLookupProduct)
 	}
-	return pointer.StringDeref(output.ProvisioningArtifactDetail.Id, ""), nil
+	if ds.ProvisioningArtifactName != nil && ds.ProvisioningArtifactID != nil {
+		return "", errors.Wrap(errors.New("artifact id and name are mutually exclusive"), errCouldNotLookupProduct)
+	}
+
+	for _, artifact := range output.ProvisioningArtifacts {
+		if pointer.StringDeref(ds.ProvisioningArtifactName, "") == *artifact.Name ||
+			pointer.StringDeref(ds.ProvisioningArtifactID, "") == *artifact.Id {
+			return pointer.StringDeref(artifact.Id, ""), nil
+		}
+	}
+	return "", errors.Wrap(errors.New("artifact not found"), errCouldNotLookupProduct)
 }
 
 func genIdempotencyToken() string {

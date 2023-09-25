@@ -31,6 +31,7 @@ type MockCustomServiceCatalogClient struct {
 	MockGetProvisionedProductOutputs     func(getPPInput *svcsdk.GetProvisionedProductOutputsInput) (*svcsdk.GetProvisionedProductOutputsOutput, error)
 	MockDescribeRecord                   func(describeRecordInput *svcsdk.DescribeRecordInput) (*svcsdk.DescribeRecordOutput, error)
 	MockDescribeProvisioningArtifact     func(*svcsdk.DescribeProvisioningArtifactInput) (*svcsdk.DescribeProvisioningArtifactOutput, error)
+	MockDescribeProduct                  func(*svcsdk.DescribeProductInput) (*svcsdk.DescribeProductOutput, error)
 }
 
 // GetCloudformationStackParameters mocks GetCloudformationStackParameters method
@@ -51,4 +52,9 @@ func (m *MockCustomServiceCatalogClient) DescribeRecord(describeRecordInput *svc
 // DescribeProvisioningArtifact mocks DescribeProvisioningArtifact method
 func (m *MockCustomServiceCatalogClient) DescribeProvisioningArtifact(input *svcsdk.DescribeProvisioningArtifactInput) (*svcsdk.DescribeProvisioningArtifactOutput, error) {
 	return m.MockDescribeProvisioningArtifact(input)
+}
+
+// DescribeProduct mocks DescribeProduct method
+func (m *MockCustomServiceCatalogClient) DescribeProduct(input *svcsdk.DescribeProductInput) (*svcsdk.DescribeProductOutput, error) {
+	return m.MockDescribeProduct(input)
 }
