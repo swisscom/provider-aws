@@ -2,6 +2,7 @@ package provisionedproduct
 
 import (
 	"fmt"
+	"strings"
 
 	cfsdkv2types "github.com/aws/aws-sdk-go-v2/service/cloudformation/types"
 	svcsdk "github.com/aws/aws-sdk-go/service/servicecatalog"
@@ -23,7 +24,9 @@ func provisioningParamsAreChanged(cfStackParams []cfsdkv2types.Parameter, curren
 	}
 
 	for _, v := range currentParams {
-		if cfv, ok := cfStackKeyValue[*v.Key]; ok && pointer.StringEqual(&cfv, v.Value) {
+		// In this statement/comparison, the provider ignores spaces from the left and right of the parameter value from
+		// the desired state. Because on cloudformation side spaces are also trimmed
+		if cfv, ok := cfStackKeyValue[*v.Key]; ok && strings.TrimSpace(pointer.StringDeref(v.Value, "")) == cfv {
 			continue
 		} else {
 			return true
