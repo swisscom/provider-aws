@@ -8,7 +8,6 @@ import (
 	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
 	"github.com/crossplane/crossplane-runtime/pkg/meta"
 	"github.com/crossplane/crossplane-runtime/pkg/reconciler/managed"
-	"github.com/crossplane/crossplane-runtime/pkg/resource"
 	"github.com/pkg/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/pointer"
@@ -24,7 +23,10 @@ const (
 	msgProvisionedProductStatusSdkPlanInProgress = "provisioned product is awaiting plan approval"
 	msgProvisionedProductStatusSdkError          = "provisioned product has status ERROR"
 
-	errUpdatePending = "Provisioned product is already under change, not updating"
+	errUpdatePending                        = "provisioned product is already under change, not updating"
+	errCouldNotGetProvisionedProductOutputs = "could not get provisioned product outputs"
+	errCouldNotGetCFParameters              = "could not get cloudformation stack parameters"
+	errCouldNotDescribeRecord               = "could not describe record"
 )
 
 func (c *custom) lateInitialize(spec *svcapitypes.ProvisionedProductParameters, _ *svcsdk.DescribeProvisionedProductOutput) error {
@@ -50,19 +52,16 @@ func (c *custom) isUpToDate(_ context.Context, ds *svcapitypes.ProvisionedProduc
 		// We will be able to handle those specific cases in postObserve
 		var aerr awserr.Error
 		if ok := errors.As(err, &aerr); ok {
-			if aerr.Code() == svcsdk.ErrCodeInvalidParametersException {
-				if aerr.Message() == "Last Successful Provisioning Record doesn't exist." {
-					return false, "", nil
-				}
+			if aerr.Code() == svcsdk.ErrCodeInvalidParametersException && aerr.Message() == "Last Successful Provisioning Record doesn't exist." {
+				return false, "", nil
 			}
 		}
-
-		return false, "", errors.Wrap(err, "could not get provisioned product outputs")
+		return false, "", errors.Wrap(err, errCouldNotGetProvisionedProductOutputs)
 	}
 	c.cache.getProvisionedProductOutputs = getPPOutput.Outputs
 	cfStackParameters, err := c.client.GetCloudformationStackParameters(getPPOutput.Outputs)
 	if err != nil {
-		return false, "", errors.Wrap(err, "could not get cloudformation stack parameters")
+		return false, "", errors.Wrap(err, errCouldNotGetCFParameters)
 	}
 
 	productOrArtifactAreChanged, err := c.productOrArtifactAreChanged(&ds.Spec.ForProvider, resp.ProvisionedProductDetail)
@@ -76,39 +75,19 @@ func (c *custom) isUpToDate(_ context.Context, ds *svcapitypes.ProvisionedProduc
 	return true, "", nil
 }
 
-func (c *custom) postObserve(_ context.Context, cr *svcapitypes.ProvisionedProduct, resp *svcsdk.DescribeProvisionedProductOutput, obs managed.ExternalObservation, err error) (managed.ExternalObservation, error) { // nolint:gocyclo
+func (c *custom) postObserve(_ context.Context, cr *svcapitypes.ProvisionedProduct, resp *svcsdk.DescribeProvisionedProductOutput, obs managed.ExternalObservation, err error) (managed.ExternalObservation, error) {
 	if err != nil {
 		return managed.ExternalObservation{}, err
 	}
+	meta.SetExternalName(cr, *cr.Spec.ForProvider.Name)
 
 	describeRecordInput := svcsdk.DescribeRecordInput{Id: resp.ProvisionedProductDetail.LastRecordId}
 	describeRecordOutput, err := c.client.DescribeRecord(&describeRecordInput)
 	if err != nil {
-		return managed.ExternalObservation{}, errors.Wrap(err, "could not describe record")
+		return managed.ExternalObservation{}, errors.Wrap(err, errCouldNotDescribeRecord)
 	}
 
-	recordType := ""
-	if describeRecordOutput != nil && describeRecordOutput.RecordDetail != nil {
-		recordType = pointer.StringDeref(describeRecordOutput.RecordDetail.RecordType, "UPDATE_PROVISIONED_PRODUCT")
-	}
-
-	ppStatus := aws.StringValue(resp.ProvisionedProductDetail.Status)
-	switch {
-	case ppStatus == string(svcapitypes.ProvisionedProductStatus_SDK_AVAILABLE):
-		cr.SetConditions(xpv1.Available())
-	case ppStatus == string(svcapitypes.ProvisionedProductStatus_SDK_UNDER_CHANGE) && recordType == "PROVISION_PRODUCT":
-		cr.SetConditions(xpv1.Creating())
-	case ppStatus == string(svcapitypes.ProvisionedProductStatus_SDK_UNDER_CHANGE) && recordType == "UPDATE_PROVISIONED_PRODUCT":
-		cr.SetConditions(xpv1.Unavailable().WithMessage(msgProvisionedProductStatusSdkUnderChange))
-	case ppStatus == string(svcapitypes.ProvisionedProductStatus_SDK_UNDER_CHANGE) && recordType == "TERMINATE_PROVISIONED_PRODUCT":
-		cr.SetConditions(xpv1.Deleting())
-	case ppStatus == string(svcapitypes.ProvisionedProductStatus_SDK_PLAN_IN_PROGRESS):
-		cr.SetConditions(xpv1.Available().WithMessage(msgProvisionedProductStatusSdkPlanInProgress))
-	case ppStatus == string(svcapitypes.ProvisionedProductStatus_SDK_ERROR):
-		cr.SetConditions(xpv1.Unavailable().WithMessage(msgProvisionedProductStatusSdkError))
-	case ppStatus == string(svcapitypes.ProvisionedProductStatus_SDK_TAINTED):
-		cr.SetConditions(xpv1.Unavailable().WithMessage(msgProvisionedProductStatusSdkTainted))
-	}
+	setConditions(describeRecordOutput, resp, cr)
 
 	var outputs = make(map[string]*svcapitypes.RecordOutput)
 	for _, v := range c.cache.getProvisionedProductOutputs {
@@ -159,26 +138,10 @@ func (c *custom) postCreate(_ context.Context, cr *svcapitypes.ProvisionedProduc
 	return cre, nil
 }
 
-// Update replaces the ExternalClient.Update function so we can perform some custom actions before delegating back to it
-func (c *custom) Update(ctx context.Context, mg resource.Managed) (managed.ExternalUpdate, error) {
-	cr, ok := mg.(*svcapitypes.ProvisionedProduct)
-	if !ok {
-		return managed.ExternalUpdate{}, errors.New(errUnexpectedObject)
-	}
-
-	// We want to check if we are in a state where we can actually update it
-	ppStatus := pointer.StringDeref(cr.Status.AtProvider.Status, "")
-	if ppStatus == "" || ppStatus == string(svcapitypes.ProvisionedProductStatus_SDK_UNDER_CHANGE) {
-		// If we do not yet have a status, or it is still under change, it has
-		// not yet been processed by the Service Catalog API, and requesting an
-		// update will cause a 400 error code to be returned prematurely.
-		return managed.ExternalUpdate{}, errors.New(errUpdatePending)
-	}
-
-	return c.external.Update(ctx, mg)
-}
-
 func (c *custom) preUpdate(_ context.Context, cr *svcapitypes.ProvisionedProduct, input *svcsdk.UpdateProvisionedProductInput) error {
+	if pointer.StringDeref(cr.Status.AtProvider.Status, "") == string(svcapitypes.ProvisionedProductStatus_SDK_UNDER_CHANGE) {
+		return errors.New(errUpdatePending)
+	}
 	input.UpdateToken = aws.String(genIdempotencyToken())
 	input.ProvisionedProductName = aws.String(meta.GetExternalName(cr))
 	return nil
@@ -191,4 +154,26 @@ func (c *custom) preDelete(_ context.Context, cr *svcapitypes.ProvisionedProduct
 	obj.TerminateToken = aws.String(genIdempotencyToken())
 	obj.ProvisionedProductName = aws.String(meta.GetExternalName(cr))
 	return false, nil
+}
+
+func setConditions(describeRecordOutput *svcsdk.DescribeRecordOutput, resp *svcsdk.DescribeProvisionedProductOutput, cr *svcapitypes.ProvisionedProduct) {
+	var recordType string = pointer.StringDeref(describeRecordOutput.RecordDetail.RecordType, "UPDATE_PROVISIONED_PRODUCT")
+
+	ppStatus := aws.StringValue(resp.ProvisionedProductDetail.Status)
+	switch {
+	case ppStatus == string(svcapitypes.ProvisionedProductStatus_SDK_AVAILABLE):
+		cr.SetConditions(xpv1.Available())
+	case ppStatus == string(svcapitypes.ProvisionedProductStatus_SDK_UNDER_CHANGE) && recordType == "PROVISION_PRODUCT":
+		cr.SetConditions(xpv1.Creating())
+	case ppStatus == string(svcapitypes.ProvisionedProductStatus_SDK_UNDER_CHANGE) && recordType == "UPDATE_PROVISIONED_PRODUCT":
+		cr.SetConditions(xpv1.Available().WithMessage(msgProvisionedProductStatusSdkUnderChange))
+	case ppStatus == string(svcapitypes.ProvisionedProductStatus_SDK_UNDER_CHANGE) && recordType == "TERMINATE_PROVISIONED_PRODUCT":
+		cr.SetConditions(xpv1.Deleting())
+	case ppStatus == string(svcapitypes.ProvisionedProductStatus_SDK_PLAN_IN_PROGRESS):
+		cr.SetConditions(xpv1.Unavailable().WithMessage(msgProvisionedProductStatusSdkPlanInProgress))
+	case ppStatus == string(svcapitypes.ProvisionedProductStatus_SDK_ERROR):
+		cr.SetConditions(xpv1.Unavailable().WithMessage(msgProvisionedProductStatusSdkError))
+	case ppStatus == string(svcapitypes.ProvisionedProductStatus_SDK_TAINTED):
+		cr.SetConditions(xpv1.Unavailable().WithMessage(msgProvisionedProductStatusSdkTainted))
+	}
 }
