@@ -91,6 +91,8 @@ type ProvisionedProductObservation struct {
 	LastProductID *string `json:"lastProductID,omitempty"`
 	// The identifier of the provisioning artifact. For example, pa-4abcdjnxjj6ne.
 	LastProvisioningArtifactID *string `json:"lastProvisioningArtifactID,omitempty"`
+
+	LastProvisioningParameters []*ProvisioningParameter `json:"lastProvisioningParameters,omitempty"`
 	// The record identifier of the last request performed on this provisioned product
 	// of the following types:
 	//

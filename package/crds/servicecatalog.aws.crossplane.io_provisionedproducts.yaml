@@ -386,6 +386,15 @@ spec:
                     description: The identifier of the provisioning artifact. For
                       example, pa-4abcdjnxjj6ne.
                     type: string
+                  lastProvisioningParameters:
+                    items:
+                      properties:
+                        key:
+                          type: string
+                        value:
+                          type: string
+                      type: object
+                    type: array
                   lastProvisioningRecordID:
                     description: "The record identifier of the last request performed
                       on this provisioned product of the following types: \n * ProvisionedProduct
