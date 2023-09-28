@@ -21,27 +21,28 @@ import (
 	"fmt"
 	"strings"
 
-	cfsdkv2types "github.com/aws/aws-sdk-go-v2/service/cloudformation/types"
-	"github.com/google/uuid"
-
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/awserr"
-	awsclient "github.com/crossplane-contrib/provider-aws/pkg/clients"
-	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
-	"github.com/crossplane/crossplane-runtime/pkg/meta"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/utils/pointer"
+	"k8s.io/apimachinery/pkg/types"
 
 	awsconfig "github.com/aws/aws-sdk-go-v2/config"
 	cfsdkv2 "github.com/aws/aws-sdk-go-v2/service/cloudformation"
+	cfsdkv2types "github.com/aws/aws-sdk-go-v2/service/cloudformation/types"
+	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/awserr"
 	svcsdk "github.com/aws/aws-sdk-go/service/servicecatalog"
+	awsclient "github.com/crossplane-contrib/provider-aws/pkg/clients"
+	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
 	"github.com/crossplane/crossplane-runtime/pkg/connection"
 	"github.com/crossplane/crossplane-runtime/pkg/controller"
 	"github.com/crossplane/crossplane-runtime/pkg/event"
+	"github.com/crossplane/crossplane-runtime/pkg/meta"
 	"github.com/crossplane/crossplane-runtime/pkg/reconciler/managed"
 	"github.com/crossplane/crossplane-runtime/pkg/resource"
+	"github.com/google/uuid"
 	"github.com/pkg/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/utils/pointer"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	svcapitypes "github.com/crossplane-contrib/provider-aws/apis/servicecatalog/v1alpha1"
 	"github.com/crossplane-contrib/provider-aws/apis/v1alpha1"
@@ -73,14 +74,15 @@ func SetupProvisionedProduct(mgr ctrl.Manager, o controller.Options) error {
 		return err
 	}
 	cfClient := cfsdkv2.NewFromConfig(awsCfg)
-	opts := []option{prepareSetupExternal(cfClient)}
+	kube := mgr.GetClient()
+	opts := []option{prepareSetupExternal(cfClient, kube)}
 	cps := []managed.ConnectionPublisher{managed.NewAPISecretPublisher(mgr.GetClient(), mgr.GetScheme())}
 	if o.Features.Enabled(features.EnableAlphaExternalSecretStores) {
 		cps = append(cps, connection.NewDetailsManager(mgr.GetClient(), v1alpha1.StoreConfigGroupVersionKind))
 	}
 
 	reconcilerOpts := []managed.ReconcilerOption{
-		managed.WithExternalConnecter(&connector{kube: mgr.GetClient(), opts: opts}),
+		managed.WithExternalConnecter(&connector{kube: kube, opts: opts}),
 		managed.WithPollInterval(o.PollInterval),
 		managed.WithLogger(o.Logger.WithValues("controller", name)),
 		managed.WithRecorder(event.NewAPIRecorder(mgr.GetEventRecorderFor(name))),
@@ -101,9 +103,9 @@ func SetupProvisionedProduct(mgr ctrl.Manager, o controller.Options) error {
 			reconcilerOpts...))
 }
 
-func prepareSetupExternal(cfClient *cfsdkv2.Client) func(*external) {
+func prepareSetupExternal(cfClient *cfsdkv2.Client, kube client.Client) func(*external) {
 	return func(e *external) {
-		c := &custom{client: &clientset.CustomServiceCatalogClient{CfClient: cfClient, Client: e.client}}
+		c := &custom{client: &clientset.CustomServiceCatalogClient{CfClient: cfClient, Client: e.client}, kube: kube}
 		e.isUpToDate = c.isUpToDate
 		e.lateInitialize = c.lateInitialize
 		e.postObserve = c.postObserve
@@ -115,6 +117,7 @@ func prepareSetupExternal(cfClient *cfsdkv2.Client) func(*external) {
 }
 
 type custom struct {
+	kube   client.Client
 	client clientset.Client
 	cache  cache
 }
@@ -162,8 +165,12 @@ func (c *custom) isUpToDate(_ context.Context, ds *svcapitypes.ProvisionedProduc
 	if err != nil {
 		return false, "", errors.Wrap(err, "could not discover if product or artifact ids have changed")
 	}
+	provisioningParamsAreChanged, err := c.provisioningParamsAreChanged(cfStackParameters, ds)
+	if err != nil {
+		return false, "", errors.Wrap(err, "could not compare provisioning parameters with previous ones")
+	}
 
-	if productOrArtifactAreChanged || c.provisioningParamsAreChanged(cfStackParameters, ds.Spec.ForProvider.ProvisioningParameters) {
+	if productOrArtifactAreChanged || provisioningParamsAreChanged {
 		return false, "", nil
 	}
 	return true, "", nil
@@ -252,7 +259,7 @@ func preDelete(_ context.Context, cr *svcapitypes.ProvisionedProduct, obj *svcsd
 }
 
 func setConditions(describeRecordOutput *svcsdk.DescribeRecordOutput, resp *svcsdk.DescribeProvisionedProductOutput, cr *svcapitypes.ProvisionedProduct) {
-	var recordType string = pointer.StringDeref(describeRecordOutput.RecordDetail.RecordType, "UPDATE_PROVISIONED_PRODUCT")
+	recordType := pointer.StringDeref(describeRecordOutput.RecordDetail.RecordType, "UPDATE_PROVISIONED_PRODUCT")
 
 	ppStatus := aws.StringValue(resp.ProvisionedProductDetail.Status)
 	switch {
@@ -273,24 +280,35 @@ func setConditions(describeRecordOutput *svcsdk.DescribeRecordOutput, resp *svcs
 	}
 }
 
-func (c *custom) provisioningParamsAreChanged(cfStackParams []cfsdkv2types.Parameter, currentParams []*svcapitypes.ProvisioningParameter) bool {
+func (c *custom) provisioningParamsAreChanged(cfStackParams []cfsdkv2types.Parameter, ds *svcapitypes.ProvisionedProduct) (bool, error) {
+	nn := types.NamespacedName{
+		Name: ds.GetName(),
+	}
+	mr := svcapitypes.ProvisionedProduct{}
+	err := c.kube.Get(context.TODO(), nn, &mr)
+	if err != nil {
+		return false, err
+	}
+	if len(mr.Status.AtProvider.LastProvisioningParameters) != len(ds.Spec.ForProvider.ProvisioningParameters) {
+		return true, nil
+	}
 
 	cfStackKeyValue := make(map[string]string)
 	for _, v := range cfStackParams {
 		cfStackKeyValue[*v.ParameterKey] = pointer.StringDeref(v.ParameterValue, "")
 	}
 
-	for _, v := range currentParams {
+	for _, v := range ds.Spec.ForProvider.ProvisioningParameters {
 		// In this statement/comparison, the provider ignores spaces from the left and right of the parameter value from
 		// the desired state. Because on cloudformation side spaces are also trimmed
 		if cfv, ok := cfStackKeyValue[*v.Key]; ok && strings.TrimSpace(pointer.StringDeref(v.Value, "")) == cfv {
 			continue
 		} else {
-			return true
+			return true, nil
 		}
 	}
 
-	return false
+	return false, nil
 }
 
 func (c *custom) productOrArtifactAreChanged(ds *svcapitypes.ProvisionedProductParameters, resp *svcsdk.ProvisionedProductDetail) (bool, error) {
