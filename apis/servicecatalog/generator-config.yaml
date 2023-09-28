@@ -77,6 +77,10 @@ resources:
         from:
           operation: DescribeProvisionedProduct
           path: ProvisionedProductDetail.ProvisioningArtifactId
+      LastProvisioningParameters:
+        is_read_only: true
+        custom_field:
+          list_of: ProvisioningParameter
       LaunchRoleArn:
         is_read_only: true
         from:

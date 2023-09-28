@@ -560,6 +560,17 @@ func (in *ProvisionedProductObservation) DeepCopyInto(out *ProvisionedProductObs
 		*out = new(string)
 		**out = **in
 	}
+	if in.LastProvisioningParameters != nil {
+		in, out := &in.LastProvisioningParameters, &out.LastProvisioningParameters
+		*out = make([]*ProvisioningParameter, len(*in))
+		for i := range *in {
+			if (*in)[i] != nil {
+				in, out := &(*in)[i], &(*out)[i]
+				*out = new(ProvisioningParameter)
+				(*in).DeepCopyInto(*out)
+			}
+		}
+	}
 	if in.LastProvisioningRecordID != nil {
 		in, out := &in.LastProvisioningRecordID, &out.LastProvisioningRecordID
 		*out = new(string)

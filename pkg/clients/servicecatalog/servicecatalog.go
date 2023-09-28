@@ -22,7 +22,6 @@ import (
 
 	cfsdkv2 "github.com/aws/aws-sdk-go-v2/service/cloudformation"
 	cfsdkv2types "github.com/aws/aws-sdk-go-v2/service/cloudformation/types"
-	"github.com/aws/aws-sdk-go/aws/request"
 	svcsdk "github.com/aws/aws-sdk-go/service/servicecatalog"
 	svcsdkapi "github.com/aws/aws-sdk-go/service/servicecatalog/servicecatalogiface"
 )
@@ -38,8 +37,6 @@ type Client interface {
 	GetProvisionedProductOutputs(*svcsdk.GetProvisionedProductOutputsInput) (*svcsdk.GetProvisionedProductOutputsOutput, error)
 	DescribeRecord(*svcsdk.DescribeRecordInput) (*svcsdk.DescribeRecordOutput, error)
 	DescribeProduct(*svcsdk.DescribeProductInput) (*svcsdk.DescribeProductOutput, error)
-	DescribeProvisioningArtifact(*svcsdk.DescribeProvisioningArtifactInput) (*svcsdk.DescribeProvisioningArtifactOutput, error)
-	UpdateProvisionedProductWithContext(context.Context, *svcsdk.UpdateProvisionedProductInput, ...request.Option) (*svcsdk.UpdateProvisionedProductOutput, error)
 }
 
 // CustomServiceCatalogClient is the implementation of a Client
@@ -77,17 +74,6 @@ func (c *CustomServiceCatalogClient) GetProvisionedProductOutputs(getPPInput *sv
 func (c *CustomServiceCatalogClient) DescribeRecord(describeRecordInput *svcsdk.DescribeRecordInput) (*svcsdk.DescribeRecordOutput, error) {
 	describeRecordOutput, err := c.Client.DescribeRecord(describeRecordInput)
 	return describeRecordOutput, err
-}
-
-// DescribeProvisioningArtifact is wrapped (*ServiceCatalog) DescribeProvisioningArtifact from github.com/aws/aws-sdk-go/service/servicecatalog
-func (c *CustomServiceCatalogClient) DescribeProvisioningArtifact(input *svcsdk.DescribeProvisioningArtifactInput) (*svcsdk.DescribeProvisioningArtifactOutput, error) {
-	output, err := c.Client.DescribeProvisioningArtifact(input)
-	return output, err
-}
-
-// UpdateProvisionedProductWithContext is wrapped (*ServiceCatalog) UpdateProvisionedProductWithContext from github.com/aws/aws-sdk-go/service/servicecatalog
-func (c *CustomServiceCatalogClient) UpdateProvisionedProductWithContext(ctx context.Context, in *svcsdk.UpdateProvisionedProductInput, opts ...request.Option) (*svcsdk.UpdateProvisionedProductOutput, error) {
-	return c.Client.UpdateProvisionedProductWithContext(ctx, in, opts...)
 }
 
 // DescribeProduct is wrapped (*ServiceCatalog) DescribeProduct from github.com/aws/aws-sdk-go/service/servicecatalog
