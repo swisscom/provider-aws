@@ -185,6 +185,7 @@ func (c *custom) isUpToDate(ctx context.Context, ds *svcapitypes.ProvisionedProd
 	}
 	return true, "", nil
 }
+
 func (c *custom) preObserve(_ context.Context, cr *svcapitypes.ProvisionedProduct, input *svcsdk.DescribeProvisionedProductInput) error {
 	if cr.GetName() == meta.GetExternalName(cr) {
 		input.Name = aws.String(meta.GetExternalName(cr))
@@ -259,18 +260,20 @@ func preDelete(_ context.Context, cr *svcapitypes.ProvisionedProduct, input *svc
 }
 
 func setConditions(describeRecordOutput *svcsdk.DescribeRecordOutput, resp *svcsdk.DescribeProvisionedProductOutput, cr *svcapitypes.ProvisionedProduct) {
-	recordType := pointer.StringDeref(describeRecordOutput.RecordDetail.RecordType, "UPDATE_PROVISIONED_PRODUCT")
-
 	ppStatus := aws.StringValue(resp.ProvisionedProductDetail.Status)
 	switch {
 	case ppStatus == string(svcapitypes.ProvisionedProductStatus_SDK_AVAILABLE):
 		cr.SetConditions(xpv1.Available())
-		//	case ppStatus == string(svcapitypes.ProvisionedProductStatus_SDK_UNDER_CHANGE) && recordType == "PROVISION_PRODUCT":
-		//		cr.SetConditions(xpv1.Creating())
-	case ppStatus == string(svcapitypes.ProvisionedProductStatus_SDK_UNDER_CHANGE) && recordType == "UPDATE_PROVISIONED_PRODUCT":
-		cr.SetConditions(xpv1.Available().WithMessage(msgProvisionedProductStatusSdkUnderChange))
-	case ppStatus == string(svcapitypes.ProvisionedProductStatus_SDK_UNDER_CHANGE) && recordType == "TERMINATE_PROVISIONED_PRODUCT":
-		cr.SetConditions(xpv1.Deleting())
+	case ppStatus == string(svcapitypes.ProvisionedProductStatus_SDK_UNDER_CHANGE):
+		recordType := pointer.StringDeref(describeRecordOutput.RecordDetail.RecordType, "UPDATE_PROVISIONED_PRODUCT")
+		switch {
+		case recordType == "PROVISION_PRODUCT":
+			cr.SetConditions(xpv1.Creating())
+		case recordType == "UPDATE_PROVISIONED_PRODUCT":
+			cr.SetConditions(xpv1.Available().WithMessage(msgProvisionedProductStatusSdkUnderChange))
+		case recordType == "TERMINATE_PROVISIONED_PRODUCT":
+			cr.SetConditions(xpv1.Deleting())
+		}
 	case ppStatus == string(svcapitypes.ProvisionedProductStatus_SDK_PLAN_IN_PROGRESS):
 		cr.SetConditions(xpv1.Unavailable().WithMessage(msgProvisionedProductStatusSdkPlanInProgress))
 	case ppStatus == string(svcapitypes.ProvisionedProductStatus_SDK_ERROR):
