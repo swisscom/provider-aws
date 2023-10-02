@@ -63,6 +63,7 @@ const (
 	errCouldNotGetCFParameters              = "could not get cloudformation stack parameters"
 	errCouldNotDescribeRecord               = "could not describe record"
 	errCouldNotLookupProduct                = "could not lookup product"
+	errCreatExternalNameIsNotValid          = "external name is not equal provisioned product name"
 	errAwsAPICodeInvalidParametersException = "Last Successful Provisioning Record doesn't exist."
 )
 
@@ -106,12 +107,12 @@ func SetupProvisionedProduct(mgr ctrl.Manager, o controller.Options) error {
 func prepareSetupExternal(cfClient *cfsdkv2.Client, kube client.Client) func(*external) {
 	return func(e *external) {
 		c := &custom{client: &clientset.CustomServiceCatalogClient{CfClient: cfClient, Client: e.client}, kube: kube}
+		e.preCreate = preCreate
 		e.isUpToDate = c.isUpToDate
 		e.lateInitialize = c.lateInitialize
+		e.preObserve = c.preObserve
 		e.postObserve = c.postObserve
 		e.preUpdate = c.preUpdate
-		e.preCreate = preCreate
-		e.postCreate = c.postCreate
 		e.preDelete = preDelete
 	}
 }
@@ -132,7 +133,16 @@ func (c *custom) lateInitialize(spec *svcapitypes.ProvisionedProductParameters, 
 	return nil
 }
 
-func (c *custom) isUpToDate(_ context.Context, ds *svcapitypes.ProvisionedProduct, resp *svcsdk.DescribeProvisionedProductOutput) (bool, string, error) {
+func preCreate(_ context.Context, cr *svcapitypes.ProvisionedProduct, input *svcsdk.ProvisionProductInput) error {
+	input.ProvisionToken = aws.String(genIdempotencyToken())
+	if cr.GetName() != meta.GetExternalName(cr) {
+		return errors.New(errCreatExternalNameIsNotValid)
+	}
+	input.ProvisionedProductName = aws.String(meta.GetExternalName(cr))
+	return nil
+}
+
+func (c *custom) isUpToDate(ctx context.Context, ds *svcapitypes.ProvisionedProduct, resp *svcsdk.DescribeProvisionedProductOutput) (bool, string, error) {
 	// If the product is undergoing change, we want to assume that it is not up-to-date. This will force this resource
 	// to be queued for an update (which will be skipped due to UNDER_CHANGE), and once that update fails, we will
 	// recheck the status again. This will allow us to quickly transition from UNDER_CHANGE to AVAILABLE without having
@@ -161,26 +171,34 @@ func (c *custom) isUpToDate(_ context.Context, ds *svcapitypes.ProvisionedProduc
 		return false, "", errors.Wrap(err, errCouldNotGetCFParameters)
 	}
 
-	productOrArtifactAreChanged, err := c.productOrArtifactAreChanged(&ds.Spec.ForProvider, resp.ProvisionedProductDetail)
+	productOrArtifactIsChanged, err := c.productOrArtifactIsChanged(&ds.Spec.ForProvider, resp.ProvisionedProductDetail)
 	if err != nil {
 		return false, "", errors.Wrap(err, "could not discover if product or artifact ids have changed")
 	}
-	provisioningParamsAreChanged, err := c.provisioningParamsAreChanged(cfStackParameters, ds)
+	provisioningParamsAreChanged, err := c.provisioningParamsAreChanged(ctx, cfStackParameters, ds)
 	if err != nil {
 		return false, "", errors.Wrap(err, "could not compare provisioning parameters with previous ones")
 	}
 
-	if productOrArtifactAreChanged || provisioningParamsAreChanged {
+	if productOrArtifactIsChanged || provisioningParamsAreChanged {
 		return false, "", nil
 	}
 	return true, "", nil
+}
+func (c *custom) preObserve(_ context.Context, cr *svcapitypes.ProvisionedProduct, input *svcsdk.DescribeProvisionedProductInput) error {
+	if cr.GetName() == meta.GetExternalName(cr) {
+		input.Name = aws.String(meta.GetExternalName(cr))
+	} else {
+		input.Id = aws.String(meta.GetExternalName(cr))
+	}
+	return nil
+
 }
 
 func (c *custom) postObserve(_ context.Context, cr *svcapitypes.ProvisionedProduct, resp *svcsdk.DescribeProvisionedProductOutput, obs managed.ExternalObservation, err error) (managed.ExternalObservation, error) {
 	if err != nil {
 		return managed.ExternalObservation{}, err
 	}
-	meta.SetExternalName(cr, *cr.Spec.ForProvider.Name)
 
 	describeRecordInput := svcsdk.DescribeRecordInput{Id: resp.ProvisionedProductDetail.LastRecordId}
 	describeRecordOutput, err := c.client.DescribeRecord(&describeRecordInput)
@@ -214,47 +232,29 @@ func (c *custom) postObserve(_ context.Context, cr *svcapitypes.ProvisionedProdu
 	return obs, nil
 }
 
-func preCreate(_ context.Context, cr *svcapitypes.ProvisionedProduct, obj *svcsdk.ProvisionProductInput) error {
-	obj.ProvisionToken = aws.String(genIdempotencyToken())
-
-	// We want to specifically set this to match the forProvider name, as that
-	// is what we use to track the provisioned product
-	if cr.Spec.ForProvider.Name != nil {
-		meta.SetExternalName(cr, *cr.Spec.ForProvider.Name)
-	}
-
-	return nil
-}
-
-func (c *custom) postCreate(_ context.Context, cr *svcapitypes.ProvisionedProduct, obj *svcsdk.ProvisionProductOutput, cre managed.ExternalCreation, err error) (managed.ExternalCreation, error) {
-	if err != nil {
-		return cre, err
-	}
-
-	// We are expected to set the external-name annotation upon creation since
-	// it can differ from the metadata.name for the ProvisionedProduct
-	if obj.RecordDetail != nil && obj.RecordDetail.ProvisionedProductName != nil {
-		meta.SetExternalName(cr, *obj.RecordDetail.ProvisionedProductName)
-	}
-
-	return cre, nil
-}
-
 func (c *custom) preUpdate(_ context.Context, cr *svcapitypes.ProvisionedProduct, input *svcsdk.UpdateProvisionedProductInput) error {
 	if pointer.StringDeref(cr.Status.AtProvider.Status, "") == string(svcapitypes.ProvisionedProductStatus_SDK_UNDER_CHANGE) {
 		return errors.New(errUpdatePending)
 	}
 	input.UpdateToken = aws.String(genIdempotencyToken())
-	input.ProvisionedProductName = aws.String(meta.GetExternalName(cr))
+	if cr.GetName() == meta.GetExternalName(cr) {
+		input.ProvisionedProductName = aws.String(meta.GetExternalName(cr))
+	} else {
+		input.ProvisionedProductId = aws.String(meta.GetExternalName(cr))
+	}
 	return nil
 }
 
-func preDelete(_ context.Context, cr *svcapitypes.ProvisionedProduct, obj *svcsdk.TerminateProvisionedProductInput) (bool, error) {
+func preDelete(_ context.Context, cr *svcapitypes.ProvisionedProduct, input *svcsdk.TerminateProvisionedProductInput) (bool, error) {
 	if pointer.StringDeref(cr.Status.AtProvider.Status, "") == string(svcapitypes.ProvisionedProductStatus_SDK_UNDER_CHANGE) {
 		return true, nil
 	}
-	obj.TerminateToken = aws.String(genIdempotencyToken())
-	obj.ProvisionedProductName = aws.String(meta.GetExternalName(cr))
+	input.TerminateToken = aws.String(genIdempotencyToken())
+	if cr.GetName() == meta.GetExternalName(cr) {
+		input.ProvisionedProductName = aws.String(meta.GetExternalName(cr))
+	} else {
+		input.ProvisionedProductId = aws.String(meta.GetExternalName(cr))
+	}
 	return false, nil
 }
 
@@ -265,8 +265,8 @@ func setConditions(describeRecordOutput *svcsdk.DescribeRecordOutput, resp *svcs
 	switch {
 	case ppStatus == string(svcapitypes.ProvisionedProductStatus_SDK_AVAILABLE):
 		cr.SetConditions(xpv1.Available())
-	case ppStatus == string(svcapitypes.ProvisionedProductStatus_SDK_UNDER_CHANGE) && recordType == "PROVISION_PRODUCT":
-		cr.SetConditions(xpv1.Creating())
+		//	case ppStatus == string(svcapitypes.ProvisionedProductStatus_SDK_UNDER_CHANGE) && recordType == "PROVISION_PRODUCT":
+		//		cr.SetConditions(xpv1.Creating())
 	case ppStatus == string(svcapitypes.ProvisionedProductStatus_SDK_UNDER_CHANGE) && recordType == "UPDATE_PROVISIONED_PRODUCT":
 		cr.SetConditions(xpv1.Available().WithMessage(msgProvisionedProductStatusSdkUnderChange))
 	case ppStatus == string(svcapitypes.ProvisionedProductStatus_SDK_UNDER_CHANGE) && recordType == "TERMINATE_PROVISIONED_PRODUCT":
@@ -280,16 +280,17 @@ func setConditions(describeRecordOutput *svcsdk.DescribeRecordOutput, resp *svcs
 	}
 }
 
-func (c *custom) provisioningParamsAreChanged(cfStackParams []cfsdkv2types.Parameter, ds *svcapitypes.ProvisionedProduct) (bool, error) {
+func (c *custom) provisioningParamsAreChanged(ctx context.Context, cfStackParams []cfsdkv2types.Parameter, ds *svcapitypes.ProvisionedProduct) (bool, error) {
 	nn := types.NamespacedName{
 		Name: ds.GetName(),
 	}
-	mr := svcapitypes.ProvisionedProduct{}
-	err := c.kube.Get(context.TODO(), nn, &mr)
+	xr := svcapitypes.ProvisionedProduct{}
+	err := c.kube.Get(ctx, nn, &xr)
 	if err != nil {
 		return false, err
 	}
-	if len(mr.Status.AtProvider.LastProvisioningParameters) != len(ds.Spec.ForProvider.ProvisioningParameters) {
+	// Product should be updated if amount of provisioning params from desired stats lesser than the amount from previous reconciliation loop
+	if len(xr.Status.AtProvider.LastProvisioningParameters) > len(ds.Spec.ForProvider.ProvisioningParameters) {
 		return true, nil
 	}
 
@@ -303,6 +304,8 @@ func (c *custom) provisioningParamsAreChanged(cfStackParams []cfsdkv2types.Param
 		// the desired state. Because on cloudformation side spaces are also trimmed
 		if cfv, ok := cfStackKeyValue[*v.Key]; ok && strings.TrimSpace(pointer.StringDeref(v.Value, "")) == cfv {
 			continue
+		} else if !ok {
+			return false, errors.Errorf("provisioning parameter %s is not present in cloud formation stack", *v.Key)
 		} else {
 			return true, nil
 		}
@@ -311,7 +314,7 @@ func (c *custom) provisioningParamsAreChanged(cfStackParams []cfsdkv2types.Param
 	return false, nil
 }
 
-func (c *custom) productOrArtifactAreChanged(ds *svcapitypes.ProvisionedProductParameters, resp *svcsdk.ProvisionedProductDetail) (bool, error) {
+func (c *custom) productOrArtifactIsChanged(ds *svcapitypes.ProvisionedProductParameters, resp *svcsdk.ProvisionedProductDetail) (bool, error) {
 	// ProvisioningArtifactID and ProvisioningArtifactName are mutual exclusive params, the same about ProductID and ProductName
 	// But if describe a provisioned product aws api will return only IDs, so it's impossible to compare names with ids
 	// Conditional statement below works only if desired state includes ProvisioningArtifactID and ProductID
@@ -343,7 +346,7 @@ func (c *custom) getArtifactID(ds *svcapitypes.ProvisionedProductParameters) (st
 		Id:   ds.ProductID,
 		Name: ds.ProductName,
 	}
-	// DescribeProvisioningArtifact methods fits much better, but it has a bug
+	// DescribeProvisioningArtifact method fits much better, but it has a bug
 	output, err := c.client.DescribeProduct(&input)
 	if err != nil {
 		return "", errors.Wrap(err, errCouldNotLookupProduct)

@@ -37,11 +37,6 @@ type ProvisionedProductParameters struct {
 	//
 	//    * zh - Chinese
 	AcceptLanguage *string `json:"acceptLanguage,omitempty"`
-	// A user-friendly name for the provisioned product. This value must be unique
-	// for the Amazon Web Services account and cannot be updated after the product
-	// is provisioned.
-	// +kubebuilder:validation:Required
-	Name *string `json:"name"`
 	// Passed to CloudFormation. The SNS topic ARNs to which to publish stack-related
 	// events.
 	NotificationARNs []*string `json:"notificationARNs,omitempty"`
@@ -110,6 +105,8 @@ type ProvisionedProductObservation struct {
 	Outputs map[string]*RecordOutput `json:"outputs,omitempty"`
 	// The identifier of the provisioned product.
 	ProvisionedProductID *string `json:"provisionedProductID,omitempty"`
+	// The user-friendly name of the provisioned product.
+	ProvisionedProductName *string `json:"provisionedProductName,omitempty"`
 	// The type of provisioned product. The supported values are CFN_STACK and CFN_STACKSET.
 	ProvisionedProductType *string `json:"provisionedProductType,omitempty"`
 	// The errors that occurred.

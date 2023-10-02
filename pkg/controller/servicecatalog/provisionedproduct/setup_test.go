@@ -87,14 +87,14 @@ func describeProvisionedProduct(m ...describeProvisionedProductOutputModifier) *
 	return output
 }
 
-func prepareFakeExternal(fakeClient clientset.Client) func(*external) {
+func prepareFakeExternal(fakeClient clientset.Client, kube client.Client) func(*external) {
 	return func(e *external) {
-		c := &custom{client: fakeClient}
+		c := &custom{client: fakeClient, kube: kube}
 		e.isUpToDate = c.isUpToDate
 		e.lateInitialize = c.lateInitialize
 		e.postObserve = c.postObserve
-		e.preCreate = c.preCreate
-		e.preDelete = c.preDelete
+		e.preCreate = preCreate
+		e.preDelete = preDelete
 		e.preUpdate = c.preUpdate
 	}
 }
@@ -153,6 +153,13 @@ func TestIsUpToDate(t *testing.T) {
 						}, nil
 					},
 				},
+				kube: &test.MockClient{
+					MockGet: func(ctx context.Context, key client.ObjectKey, obj client.Object) error {
+						pp := obj.(*v1alpha1.ProvisionedProduct)
+						pp.Status.AtProvider.LastProvisioningParameters = []*v1alpha1.ProvisioningParameter{}
+						return nil
+					},
+				},
 			},
 			want: want{
 				result: false,
@@ -196,6 +203,13 @@ func TestIsUpToDate(t *testing.T) {
 								},
 							},
 						}, nil
+					},
+				},
+				kube: &test.MockClient{
+					MockGet: func(ctx context.Context, key client.ObjectKey, obj client.Object) error {
+						pp := obj.(*v1alpha1.ProvisionedProduct)
+						pp.Status.AtProvider.LastProvisioningParameters = []*v1alpha1.ProvisioningParameter{}
+						return nil
 					},
 				},
 			},
@@ -243,6 +257,13 @@ func TestIsUpToDate(t *testing.T) {
 						}, nil
 					},
 				},
+				kube: &test.MockClient{
+					MockGet: func(ctx context.Context, key client.ObjectKey, obj client.Object) error {
+						pp := obj.(*v1alpha1.ProvisionedProduct)
+						pp.Status.AtProvider.LastProvisioningParameters = []*v1alpha1.ProvisioningParameter{}
+						return nil
+					},
+				},
 			},
 			want: want{
 				result: false,
@@ -287,6 +308,13 @@ func TestIsUpToDate(t *testing.T) {
 						}, nil
 					},
 				},
+				kube: &test.MockClient{
+					MockGet: func(ctx context.Context, key client.ObjectKey, obj client.Object) error {
+						pp := obj.(*v1alpha1.ProvisionedProduct)
+						pp.Status.AtProvider.LastProvisioningParameters = []*v1alpha1.ProvisioningParameter{}
+						return nil
+					},
+				},
 			},
 			want: want{
 				result: false,
@@ -299,7 +327,7 @@ func TestIsUpToDate(t *testing.T) {
 					withSpec(v1alpha1.ProvisionedProductParameters{
 						ProvisioningArtifactID: aws.String(provisioningArtifactID),
 						ProvisioningParameters: []*v1alpha1.ProvisioningParameter{
-							{Key: aws.String("ParameterIsNotChanged"), Value: aws.String("true")}},
+							{Key: aws.String("Parameter1"), Value: aws.String("quux")}},
 					}),
 				}...),
 				describeProvisionedProductOutput: describeProvisionedProduct([]describeProvisionedProductOutputModifier{
@@ -310,7 +338,12 @@ func TestIsUpToDate(t *testing.T) {
 				}...),
 				customClient: &fake.MockCustomServiceCatalogClient{
 					MockGetCloudformationStackParameters: func(provisionedProductOutputs []*svcsdk.RecordOutput) ([]cfsdkv2types.Parameter, error) {
-						return []cfsdkv2types.Parameter{{ParameterKey: aws.String("ParameterIsNotChanged"), ParameterValue: aws.String("false")}}, nil
+						return []cfsdkv2types.Parameter{
+							{ParameterKey: aws.String("Parameter1"), ParameterValue: aws.String("foo")},
+							{ParameterKey: aws.String("Parameter2"), ParameterValue: aws.String("product_default_value")},
+							{ParameterKey: aws.String("Parameter3"), ParameterValue: aws.String("product_default_value")},
+							{ParameterKey: aws.String("Parameter4"), ParameterValue: aws.String("product_default_value")},
+						}, nil
 					},
 					MockGetProvisionedProductOutputs: func(getPPInput *svcsdk.GetProvisionedProductOutputsInput) (*svcsdk.GetProvisionedProductOutputsOutput, error) {
 						return &svcsdk.GetProvisionedProductOutputsOutput{}, nil
@@ -329,20 +362,29 @@ func TestIsUpToDate(t *testing.T) {
 						}, nil
 					},
 				},
+				kube: &test.MockClient{
+					MockGet: func(ctx context.Context, key client.ObjectKey, obj client.Object) error {
+						pp := obj.(*v1alpha1.ProvisionedProduct)
+						pp.Status.AtProvider.LastProvisioningParameters = []*v1alpha1.ProvisioningParameter{
+							{Key: aws.String("Parameter1"), Value: aws.String("foo")},
+						}
+						return nil
+					},
+				},
 			},
 			want: want{
 				result: false,
 				err:    nil,
 			},
 		},
-		"NewParameterHasBeenAdded": {
+		"ParameterHasBeenAddedWithNewValue": {
 			args: args{
 				provisionedProduct: provisionedProduct([]provisionedProductModifier{
 					withSpec(v1alpha1.ProvisionedProductParameters{
 						ProvisioningArtifactID: aws.String(provisioningArtifactID),
 						ProvisioningParameters: []*v1alpha1.ProvisioningParameter{
-							{Key: aws.String("OldParameter"), Value: aws.String("foo")},
-							{Key: aws.String("NewParameter"), Value: aws.String("bar")},
+							{Key: aws.String("Parameter1"), Value: aws.String("foo")},
+							{Key: aws.String("Parameter2"), Value: aws.String("quux")},
 						},
 					}),
 				}...),
@@ -355,7 +397,11 @@ func TestIsUpToDate(t *testing.T) {
 				customClient: &fake.MockCustomServiceCatalogClient{
 					MockGetCloudformationStackParameters: func(provisionedProductOutputs []*svcsdk.RecordOutput) ([]cfsdkv2types.Parameter, error) {
 						return []cfsdkv2types.Parameter{
-							{ParameterKey: aws.String("OldParameter"), ParameterValue: aws.String("foo")}}, nil
+							{ParameterKey: aws.String("Parameter1"), ParameterValue: aws.String("foo")},
+							{ParameterKey: aws.String("Parameter2"), ParameterValue: aws.String("product_default_value")},
+							{ParameterKey: aws.String("Parameter3"), ParameterValue: aws.String("product_default_value")},
+							{ParameterKey: aws.String("Parameter4"), ParameterValue: aws.String("product_default_value")},
+						}, nil
 					},
 					MockGetProvisionedProductOutputs: func(getPPInput *svcsdk.GetProvisionedProductOutputsInput) (*svcsdk.GetProvisionedProductOutputsOutput, error) {
 						return &svcsdk.GetProvisionedProductOutputsOutput{}, nil
@@ -374,9 +420,77 @@ func TestIsUpToDate(t *testing.T) {
 						}, nil
 					},
 				},
+				kube: &test.MockClient{
+					MockGet: func(ctx context.Context, key client.ObjectKey, obj client.Object) error {
+						pp := obj.(*v1alpha1.ProvisionedProduct)
+						pp.Status.AtProvider.LastProvisioningParameters = []*v1alpha1.ProvisioningParameter{
+							{Key: aws.String("Parameter1"), Value: aws.String("foo")},
+						}
+						return nil
+					},
+				},
 			},
 			want: want{
 				result: false,
+				err:    nil,
+			},
+		},
+		"ParameterHasBeenAddedWithDefaultValue": {
+			args: args{
+				provisionedProduct: provisionedProduct([]provisionedProductModifier{
+					withSpec(v1alpha1.ProvisionedProductParameters{
+						ProvisioningArtifactID: aws.String(provisioningArtifactID),
+						ProvisioningParameters: []*v1alpha1.ProvisioningParameter{
+							{Key: aws.String("Parameter1"), Value: aws.String("foo")},
+							{Key: aws.String("Parameter2"), Value: aws.String("product_default_value")},
+						},
+					}),
+				}...),
+				describeProvisionedProductOutput: describeProvisionedProduct([]describeProvisionedProductOutputModifier{
+					withDetails(svcsdk.ProvisionedProductDetail{
+						Id:                     aws.String("pp-fake"),
+						ProvisioningArtifactId: aws.String(provisioningArtifactID),
+					}),
+				}...),
+				customClient: &fake.MockCustomServiceCatalogClient{
+					MockGetCloudformationStackParameters: func(provisionedProductOutputs []*svcsdk.RecordOutput) ([]cfsdkv2types.Parameter, error) {
+						return []cfsdkv2types.Parameter{
+							{ParameterKey: aws.String("Parameter1"), ParameterValue: aws.String("foo")},
+							{ParameterKey: aws.String("Parameter2"), ParameterValue: aws.String("product_default_value")},
+							{ParameterKey: aws.String("Parameter3"), ParameterValue: aws.String("product_default_value")},
+							{ParameterKey: aws.String("Parameter4"), ParameterValue: aws.String("product_default_value")},
+						}, nil
+					},
+					MockGetProvisionedProductOutputs: func(getPPInput *svcsdk.GetProvisionedProductOutputsInput) (*svcsdk.GetProvisionedProductOutputsOutput, error) {
+						return &svcsdk.GetProvisionedProductOutputsOutput{}, nil
+					},
+					MockDescribeProduct: func(dpInput *svcsdk.DescribeProductInput) (*svcsdk.DescribeProductOutput, error) {
+						return &svcsdk.DescribeProductOutput{
+							ProductViewSummary: &svcsdk.ProductViewSummary{
+								ProductId: aws.String("prod-fake"),
+								Name:      aws.String("fake product"),
+							},
+							ProvisioningArtifacts: []*svcsdk.ProvisioningArtifact{
+								{
+									Id: aws.String(provisioningArtifactID),
+								},
+							},
+						}, nil
+					},
+				},
+				kube: &test.MockClient{
+					MockGet: func(ctx context.Context, key client.ObjectKey, obj client.Object) error {
+						pp := obj.(*v1alpha1.ProvisionedProduct)
+						pp.Status.AtProvider.LastProvisioningParameters = []*v1alpha1.ProvisioningParameter{
+							{Key: aws.String("Parameter1"), Value: aws.String("foo")},
+							{Key: aws.String("Parameter2"), Value: aws.String("product_default_value")},
+						}
+						return nil
+					},
+				},
+			},
+			want: want{
+				result: true,
 				err:    nil,
 			},
 		},
@@ -399,10 +513,11 @@ func TestIsUpToDate(t *testing.T) {
 				customClient: &fake.MockCustomServiceCatalogClient{
 					MockGetCloudformationStackParameters: func(provisionedProductOutputs []*svcsdk.RecordOutput) ([]cfsdkv2types.Parameter, error) {
 						return []cfsdkv2types.Parameter{
-								{ParameterKey: aws.String("Parameter1"), ParameterValue: aws.String("foo")},
-								{ParameterKey: aws.String("Parameter2"), ParameterValue: aws.String("bar")},
-							},
-							nil
+							{ParameterKey: aws.String("Parameter1"), ParameterValue: aws.String("foo")},
+							{ParameterKey: aws.String("Parameter2"), ParameterValue: aws.String("no_ways_to_determine_is_it_default_value_or_not")},
+							{ParameterKey: aws.String("Parameter3"), ParameterValue: aws.String("product_default_value")},
+							{ParameterKey: aws.String("Parameter4"), ParameterValue: aws.String("product_default_value")},
+						}, nil
 					},
 					MockGetProvisionedProductOutputs: func(getPPInput *svcsdk.GetProvisionedProductOutputsInput) (*svcsdk.GetProvisionedProductOutputsOutput, error) {
 						return &svcsdk.GetProvisionedProductOutputsOutput{}, nil
@@ -419,6 +534,16 @@ func TestIsUpToDate(t *testing.T) {
 								},
 							},
 						}, nil
+					},
+				},
+				kube: &test.MockClient{
+					MockGet: func(ctx context.Context, key client.ObjectKey, obj client.Object) error {
+						pp := obj.(*v1alpha1.ProvisionedProduct)
+						pp.Status.AtProvider.LastProvisioningParameters = []*v1alpha1.ProvisioningParameter{
+							{Key: aws.String("Parameter1"), Value: aws.String("foo")},
+							{Key: aws.String("Parameter2"), Value: aws.String("no_ways_to_determine_is_it_default_value_or_not")},
+						}
+						return nil
 					},
 				},
 			},
@@ -435,6 +560,7 @@ func TestIsUpToDate(t *testing.T) {
 						ProvisioningParameters: []*v1alpha1.ProvisioningParameter{
 							{Key: aws.String("Parameter1"), Value: aws.String("foo")},
 							{Key: aws.String("Parameter2"), Value: aws.String("bar")},
+							{Key: aws.String("Parameter3"), Value: aws.String("baz")},
 						},
 					}),
 				}...),
@@ -447,10 +573,11 @@ func TestIsUpToDate(t *testing.T) {
 				customClient: &fake.MockCustomServiceCatalogClient{
 					MockGetCloudformationStackParameters: func(provisionedProductOutputs []*svcsdk.RecordOutput) ([]cfsdkv2types.Parameter, error) {
 						return []cfsdkv2types.Parameter{
-								{ParameterKey: aws.String("Parameter1"), ParameterValue: aws.String("foo")},
-								{ParameterKey: aws.String("Parameter2"), ParameterValue: aws.String("bar")},
-							},
-							nil
+							{ParameterKey: aws.String("Parameter1"), ParameterValue: aws.String("foo")},
+							{ParameterKey: aws.String("Parameter2"), ParameterValue: aws.String("bar")},
+							{ParameterKey: aws.String("Parameter3"), ParameterValue: aws.String("baz")},
+							{ParameterKey: aws.String("Parameter4"), ParameterValue: aws.String("product_default_value")},
+						}, nil
 					},
 					MockGetProvisionedProductOutputs: func(getPPInput *svcsdk.GetProvisionedProductOutputsInput) (*svcsdk.GetProvisionedProductOutputsOutput, error) {
 						return &svcsdk.GetProvisionedProductOutputsOutput{}, nil
@@ -469,6 +596,17 @@ func TestIsUpToDate(t *testing.T) {
 						}, nil
 					},
 				},
+				kube: &test.MockClient{
+					MockGet: func(ctx context.Context, key client.ObjectKey, obj client.Object) error {
+						pp := obj.(*v1alpha1.ProvisionedProduct)
+						pp.Status.AtProvider.LastProvisioningParameters = []*v1alpha1.ProvisioningParameter{
+							{Key: aws.String("Parameter1"), Value: aws.String("foo")},
+							{Key: aws.String("Parameter2"), Value: aws.String("bar")},
+							{Key: aws.String("Parameter2"), Value: aws.String("baz")},
+						}
+						return nil
+					},
+				},
 			},
 			want: want{
 				result: true,
@@ -478,14 +616,14 @@ func TestIsUpToDate(t *testing.T) {
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			opts := []option{prepareFakeExternal(tc.args.customClient)}
+			opts := []option{prepareFakeExternal(tc.args.customClient, tc.args.kube)}
 			e := newExternal(tc.args.kube, tc.args.client, opts)
-			result, _, err := e.isUpToDate(nil, tc.args.provisionedProduct, tc.args.describeProvisionedProductOutput)
+			result, _, err := e.isUpToDate(context.TODO(), tc.args.provisionedProduct, tc.args.describeProvisionedProductOutput)
 			if diff := cmp.Diff(err, tc.want.err, test.EquateErrors()); diff != "" {
-				t.Errorf("r: +want, -got:\n%s", diff)
+				t.Errorf("r: -want, +got:\n%s", diff)
 			}
-			if diff := cmp.Diff(result, tc.want.result); diff != "" {
-				t.Errorf("r: +want, -got:\n%s", diff)
+			if diff := cmp.Diff(tc.want.result, result); diff != "" {
+				t.Errorf("r: -want, +got:\n%s", diff)
 			}
 		})
 	}
@@ -526,11 +664,11 @@ func TestLateInitialize(t *testing.T) {
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			opts := []option{prepareFakeExternal(tc.args.customClient)}
+			opts := []option{prepareFakeExternal(tc.args.customClient, tc.args.kube)}
 			e := newExternal(tc.args.kube, tc.args.client, opts)
 			_ = e.lateInitialize(&tc.args.provisionedProduct.Spec.ForProvider, tc.args.describeProvisionedProductOutput)
-			if diff := cmp.Diff(*tc.args.provisionedProduct.Spec.ForProvider.AcceptLanguage, tc.want.acceptLanguage); diff != "" {
-				t.Errorf("r: +want, -got:\n%s", diff)
+			if diff := cmp.Diff(tc.want.acceptLanguage, *tc.args.provisionedProduct.Spec.ForProvider.AcceptLanguage); diff != "" {
+				t.Errorf("r: -want, +got:\n%s", diff)
 			}
 		})
 	}
@@ -595,7 +733,7 @@ func TestPostObserve(t *testing.T) {
 				},
 			},
 			want: want{
-				status: xpv1.Unavailable().WithMessage(msgProvisionedProductStatusSdkUnderChange),
+				status: xpv1.Available().WithMessage(msgProvisionedProductStatusSdkUnderChange),
 			},
 		},
 		"StatusReconcileErrorProductError": {
@@ -649,13 +787,13 @@ func TestPostObserve(t *testing.T) {
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			opts := []option{prepareFakeExternal(tc.args.customClient)}
+			opts := []option{prepareFakeExternal(tc.args.customClient, tc.args.kube)}
 			e := newExternal(tc.args.kube, tc.args.client, opts)
 			_, _ = e.postObserve(context.TODO(), tc.args.provisionedProduct, tc.args.describeProvisionedProductOutput, managed.ExternalObservation{}, nil)
 			conditions := tc.args.provisionedProduct.Status.Conditions
 			latestCondition := conditions[len(conditions)-1]
-			if diff := cmp.Diff(latestCondition, tc.want.status); diff != "" {
-				t.Errorf("r: +want, -got:\n%s", diff)
+			if diff := cmp.Diff(tc.want.status, latestCondition); diff != "" {
+				t.Errorf("r: -want, +got:\n%s", diff)
 			}
 			test.EquateConditions()
 		})
@@ -699,11 +837,11 @@ func TestPreDelete(t *testing.T) {
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			opts := []option{prepareFakeExternal(tc.args.customClient)}
+			opts := []option{prepareFakeExternal(tc.args.customClient, tc.args.kube)}
 			e := newExternal(tc.args.kube, tc.args.client, opts)
 			ignore, _ := e.preDelete(context.TODO(), tc.args.provisionedProduct, &svcsdk.TerminateProvisionedProductInput{})
-			if diff := cmp.Diff(ignore, tc.want.ignoreDeletion); diff != "" {
-				t.Errorf("r: +want, -got\n%s", diff)
+			if diff := cmp.Diff(tc.want.ignoreDeletion, ignore); diff != "" {
+				t.Errorf("r: -want, +got\n%s", diff)
 
 			}
 		})

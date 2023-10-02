@@ -601,6 +601,11 @@ func (in *ProvisionedProductObservation) DeepCopyInto(out *ProvisionedProductObs
 		*out = new(string)
 		**out = **in
 	}
+	if in.ProvisionedProductName != nil {
+		in, out := &in.ProvisionedProductName, &out.ProvisionedProductName
+		*out = new(string)
+		**out = **in
+	}
 	if in.ProvisionedProductType != nil {
 		in, out := &in.ProvisionedProductType, &out.ProvisionedProductType
 		*out = new(string)
@@ -669,11 +674,6 @@ func (in *ProvisionedProductParameters) DeepCopyInto(out *ProvisionedProductPara
 	*out = *in
 	if in.AcceptLanguage != nil {
 		in, out := &in.AcceptLanguage, &out.AcceptLanguage
-		*out = new(string)
-		**out = **in
-	}
-	if in.Name != nil {
-		in, out := &in.Name, &out.Name
 		*out = new(string)
 		**out = **in
 	}
