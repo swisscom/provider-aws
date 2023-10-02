@@ -73,11 +73,6 @@ spec:
                     description: "The language code. \n * en - English (default) \n
                       * jp - Japanese \n * zh - Chinese"
                     type: string
-                  name:
-                    description: A user-friendly name for the provisioned product.
-                      This value must be unique for the Amazon Web Services account
-                      and cannot be updated after the product is provisioned.
-                    type: string
                   notificationARNs:
                     description: Passed to CloudFormation. The SNS topic ARNs to which
                       to publish stack-related events.
@@ -162,7 +157,6 @@ spec:
                       type: object
                     type: array
                 required:
-                - name
                 - region
                 type: object
               managementPolicies:
@@ -418,6 +412,9 @@ spec:
                     type: object
                   provisionedProductID:
                     description: The identifier of the provisioned product.
+                    type: string
+                  provisionedProductName:
+                    description: The user-friendly name of the provisioned product.
                     type: string
                   provisionedProductType:
                     description: The type of provisioned product. The supported values

@@ -36,9 +36,6 @@ func GenerateDescribeProvisionedProductInput(cr *svcapitypes.ProvisionedProduct)
 	if cr.Spec.ForProvider.AcceptLanguage != nil {
 		res.SetAcceptLanguage(*cr.Spec.ForProvider.AcceptLanguage)
 	}
-	if cr.Spec.ForProvider.Name != nil {
-		res.SetName(*cr.Spec.ForProvider.Name)
-	}
 
 	return res
 }
@@ -78,9 +75,6 @@ func GenerateProvisionProductInput(cr *svcapitypes.ProvisionedProduct) *svcsdk.P
 	if cr.Spec.ForProvider.ProductName != nil {
 		res.SetProductName(*cr.Spec.ForProvider.ProductName)
 	}
-	if cr.Spec.ForProvider.Name != nil {
-		res.SetProvisionedProductName(*cr.Spec.ForProvider.Name)
-	}
 	if cr.Spec.ForProvider.ProvisioningArtifactID != nil {
 		res.SetProvisioningArtifactId(*cr.Spec.ForProvider.ProvisioningArtifactID)
 	}
@@ -88,100 +82,9 @@ func GenerateProvisionProductInput(cr *svcapitypes.ProvisionedProduct) *svcsdk.P
 		res.SetProvisioningArtifactName(*cr.Spec.ForProvider.ProvisioningArtifactName)
 	}
 	if cr.Spec.ForProvider.ProvisioningParameters != nil {
-		f9 := []*svcsdk.ProvisioningParameter{}
-		for _, f9iter := range cr.Spec.ForProvider.ProvisioningParameters {
-			f9elem := &svcsdk.ProvisioningParameter{}
-			if f9iter.Key != nil {
-				f9elem.SetKey(*f9iter.Key)
-			}
-			if f9iter.Value != nil {
-				f9elem.SetValue(*f9iter.Value)
-			}
-			f9 = append(f9, f9elem)
-		}
-		res.SetProvisioningParameters(f9)
-	}
-	if cr.Spec.ForProvider.ProvisioningPreferences != nil {
-		f10 := &svcsdk.ProvisioningPreferences{}
-		if cr.Spec.ForProvider.ProvisioningPreferences.StackSetAccounts != nil {
-			f10f0 := []*string{}
-			for _, f10f0iter := range cr.Spec.ForProvider.ProvisioningPreferences.StackSetAccounts {
-				var f10f0elem string
-				f10f0elem = *f10f0iter
-				f10f0 = append(f10f0, &f10f0elem)
-			}
-			f10.SetStackSetAccounts(f10f0)
-		}
-		if cr.Spec.ForProvider.ProvisioningPreferences.StackSetFailureToleranceCount != nil {
-			f10.SetStackSetFailureToleranceCount(*cr.Spec.ForProvider.ProvisioningPreferences.StackSetFailureToleranceCount)
-		}
-		if cr.Spec.ForProvider.ProvisioningPreferences.StackSetFailureTolerancePercentage != nil {
-			f10.SetStackSetFailureTolerancePercentage(*cr.Spec.ForProvider.ProvisioningPreferences.StackSetFailureTolerancePercentage)
-		}
-		if cr.Spec.ForProvider.ProvisioningPreferences.StackSetMaxConcurrencyCount != nil {
-			f10.SetStackSetMaxConcurrencyCount(*cr.Spec.ForProvider.ProvisioningPreferences.StackSetMaxConcurrencyCount)
-		}
-		if cr.Spec.ForProvider.ProvisioningPreferences.StackSetMaxConcurrencyPercentage != nil {
-			f10.SetStackSetMaxConcurrencyPercentage(*cr.Spec.ForProvider.ProvisioningPreferences.StackSetMaxConcurrencyPercentage)
-		}
-		if cr.Spec.ForProvider.ProvisioningPreferences.StackSetRegions != nil {
-			f10f5 := []*string{}
-			for _, f10f5iter := range cr.Spec.ForProvider.ProvisioningPreferences.StackSetRegions {
-				var f10f5elem string
-				f10f5elem = *f10f5iter
-				f10f5 = append(f10f5, &f10f5elem)
-			}
-			f10.SetStackSetRegions(f10f5)
-		}
-		res.SetProvisioningPreferences(f10)
-	}
-	if cr.Spec.ForProvider.Tags != nil {
-		f11 := []*svcsdk.Tag{}
-		for _, f11iter := range cr.Spec.ForProvider.Tags {
-			f11elem := &svcsdk.Tag{}
-			if f11iter.Key != nil {
-				f11elem.SetKey(*f11iter.Key)
-			}
-			if f11iter.Value != nil {
-				f11elem.SetValue(*f11iter.Value)
-			}
-			f11 = append(f11, f11elem)
-		}
-		res.SetTags(f11)
-	}
-
-	return res
-}
-
-// GenerateUpdateProvisionedProductInput returns an update input.
-func GenerateUpdateProvisionedProductInput(cr *svcapitypes.ProvisionedProduct) *svcsdk.UpdateProvisionedProductInput {
-	res := &svcsdk.UpdateProvisionedProductInput{}
-
-	if cr.Spec.ForProvider.AcceptLanguage != nil {
-		res.SetAcceptLanguage(*cr.Spec.ForProvider.AcceptLanguage)
-	}
-	if cr.Spec.ForProvider.PathID != nil {
-		res.SetPathId(*cr.Spec.ForProvider.PathID)
-	}
-	if cr.Spec.ForProvider.PathName != nil {
-		res.SetPathName(*cr.Spec.ForProvider.PathName)
-	}
-	if cr.Spec.ForProvider.ProductID != nil {
-		res.SetProductId(*cr.Spec.ForProvider.ProductID)
-	}
-	if cr.Spec.ForProvider.ProductName != nil {
-		res.SetProductName(*cr.Spec.ForProvider.ProductName)
-	}
-	if cr.Spec.ForProvider.ProvisioningArtifactID != nil {
-		res.SetProvisioningArtifactId(*cr.Spec.ForProvider.ProvisioningArtifactID)
-	}
-	if cr.Spec.ForProvider.ProvisioningArtifactName != nil {
-		res.SetProvisioningArtifactName(*cr.Spec.ForProvider.ProvisioningArtifactName)
-	}
-	if cr.Spec.ForProvider.ProvisioningParameters != nil {
-		f8 := []*svcsdk.UpdateProvisioningParameter{}
+		f8 := []*svcsdk.ProvisioningParameter{}
 		for _, f8iter := range cr.Spec.ForProvider.ProvisioningParameters {
-			f8elem := &svcsdk.UpdateProvisioningParameter{}
+			f8elem := &svcsdk.ProvisioningParameter{}
 			if f8iter.Key != nil {
 				f8elem.SetKey(*f8iter.Key)
 			}
@@ -193,7 +96,7 @@ func GenerateUpdateProvisionedProductInput(cr *svcapitypes.ProvisionedProduct) *
 		res.SetProvisioningParameters(f8)
 	}
 	if cr.Spec.ForProvider.ProvisioningPreferences != nil {
-		f9 := &svcsdk.UpdateProvisioningPreferences{}
+		f9 := &svcsdk.ProvisioningPreferences{}
 		if cr.Spec.ForProvider.ProvisioningPreferences.StackSetAccounts != nil {
 			f9f0 := []*string{}
 			for _, f9f0iter := range cr.Spec.ForProvider.ProvisioningPreferences.StackSetAccounts {
@@ -239,6 +142,97 @@ func GenerateUpdateProvisionedProductInput(cr *svcapitypes.ProvisionedProduct) *
 			f10 = append(f10, f10elem)
 		}
 		res.SetTags(f10)
+	}
+
+	return res
+}
+
+// GenerateUpdateProvisionedProductInput returns an update input.
+func GenerateUpdateProvisionedProductInput(cr *svcapitypes.ProvisionedProduct) *svcsdk.UpdateProvisionedProductInput {
+	res := &svcsdk.UpdateProvisionedProductInput{}
+
+	if cr.Spec.ForProvider.AcceptLanguage != nil {
+		res.SetAcceptLanguage(*cr.Spec.ForProvider.AcceptLanguage)
+	}
+	if cr.Spec.ForProvider.PathID != nil {
+		res.SetPathId(*cr.Spec.ForProvider.PathID)
+	}
+	if cr.Spec.ForProvider.PathName != nil {
+		res.SetPathName(*cr.Spec.ForProvider.PathName)
+	}
+	if cr.Spec.ForProvider.ProductID != nil {
+		res.SetProductId(*cr.Spec.ForProvider.ProductID)
+	}
+	if cr.Spec.ForProvider.ProductName != nil {
+		res.SetProductName(*cr.Spec.ForProvider.ProductName)
+	}
+	if cr.Spec.ForProvider.ProvisioningArtifactID != nil {
+		res.SetProvisioningArtifactId(*cr.Spec.ForProvider.ProvisioningArtifactID)
+	}
+	if cr.Spec.ForProvider.ProvisioningArtifactName != nil {
+		res.SetProvisioningArtifactName(*cr.Spec.ForProvider.ProvisioningArtifactName)
+	}
+	if cr.Spec.ForProvider.ProvisioningParameters != nil {
+		f7 := []*svcsdk.UpdateProvisioningParameter{}
+		for _, f7iter := range cr.Spec.ForProvider.ProvisioningParameters {
+			f7elem := &svcsdk.UpdateProvisioningParameter{}
+			if f7iter.Key != nil {
+				f7elem.SetKey(*f7iter.Key)
+			}
+			if f7iter.Value != nil {
+				f7elem.SetValue(*f7iter.Value)
+			}
+			f7 = append(f7, f7elem)
+		}
+		res.SetProvisioningParameters(f7)
+	}
+	if cr.Spec.ForProvider.ProvisioningPreferences != nil {
+		f8 := &svcsdk.UpdateProvisioningPreferences{}
+		if cr.Spec.ForProvider.ProvisioningPreferences.StackSetAccounts != nil {
+			f8f0 := []*string{}
+			for _, f8f0iter := range cr.Spec.ForProvider.ProvisioningPreferences.StackSetAccounts {
+				var f8f0elem string
+				f8f0elem = *f8f0iter
+				f8f0 = append(f8f0, &f8f0elem)
+			}
+			f8.SetStackSetAccounts(f8f0)
+		}
+		if cr.Spec.ForProvider.ProvisioningPreferences.StackSetFailureToleranceCount != nil {
+			f8.SetStackSetFailureToleranceCount(*cr.Spec.ForProvider.ProvisioningPreferences.StackSetFailureToleranceCount)
+		}
+		if cr.Spec.ForProvider.ProvisioningPreferences.StackSetFailureTolerancePercentage != nil {
+			f8.SetStackSetFailureTolerancePercentage(*cr.Spec.ForProvider.ProvisioningPreferences.StackSetFailureTolerancePercentage)
+		}
+		if cr.Spec.ForProvider.ProvisioningPreferences.StackSetMaxConcurrencyCount != nil {
+			f8.SetStackSetMaxConcurrencyCount(*cr.Spec.ForProvider.ProvisioningPreferences.StackSetMaxConcurrencyCount)
+		}
+		if cr.Spec.ForProvider.ProvisioningPreferences.StackSetMaxConcurrencyPercentage != nil {
+			f8.SetStackSetMaxConcurrencyPercentage(*cr.Spec.ForProvider.ProvisioningPreferences.StackSetMaxConcurrencyPercentage)
+		}
+		if cr.Spec.ForProvider.ProvisioningPreferences.StackSetRegions != nil {
+			f8f5 := []*string{}
+			for _, f8f5iter := range cr.Spec.ForProvider.ProvisioningPreferences.StackSetRegions {
+				var f8f5elem string
+				f8f5elem = *f8f5iter
+				f8f5 = append(f8f5, &f8f5elem)
+			}
+			f8.SetStackSetRegions(f8f5)
+		}
+		res.SetProvisioningPreferences(f8)
+	}
+	if cr.Spec.ForProvider.Tags != nil {
+		f9 := []*svcsdk.Tag{}
+		for _, f9iter := range cr.Spec.ForProvider.Tags {
+			f9elem := &svcsdk.Tag{}
+			if f9iter.Key != nil {
+				f9elem.SetKey(*f9iter.Key)
+			}
+			if f9iter.Value != nil {
+				f9elem.SetValue(*f9iter.Value)
+			}
+			f9 = append(f9, f9elem)
+		}
+		res.SetTags(f9)
 	}
 
 	return res
