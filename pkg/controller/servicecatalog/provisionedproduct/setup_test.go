@@ -123,6 +123,10 @@ func TestIsUpToDate(t *testing.T) {
 						ProvisioningParameters: []*v1alpha1.ProvisioningParameter{
 							{Key: aws.String("Parameter"), Value: aws.String("foo")}},
 					}),
+					withStatus(v1alpha1.ProvisionedProductStatus{
+						AtProvider: v1alpha1.ProvisionedProductObservation{
+							Status: aws.String(string(v1alpha1.ProvisionedProductStatus_SDK_AVAILABLE))},
+					}),
 				}...),
 				describeProvisionedProductOutput: describeProvisionedProduct([]describeProvisionedProductOutputModifier{
 					withDetails(svcsdk.ProvisionedProductDetail{
@@ -174,6 +178,10 @@ func TestIsUpToDate(t *testing.T) {
 						ProductID:                aws.String(newProductID),
 						ProvisioningParameters: []*v1alpha1.ProvisioningParameter{
 							{Key: aws.String("Parameter"), Value: aws.String("foo")}},
+					}),
+					withStatus(v1alpha1.ProvisionedProductStatus{
+						AtProvider: v1alpha1.ProvisionedProductObservation{
+							Status: aws.String(string(v1alpha1.ProvisionedProductStatus_SDK_AVAILABLE))},
 					}),
 				}...),
 				describeProvisionedProductOutput: describeProvisionedProduct([]describeProvisionedProductOutputModifier{
@@ -227,6 +235,10 @@ func TestIsUpToDate(t *testing.T) {
 						ProvisioningParameters: []*v1alpha1.ProvisioningParameter{
 							{Key: aws.String("Parameter"), Value: aws.String("foo")}},
 					}),
+					withStatus(v1alpha1.ProvisionedProductStatus{
+						AtProvider: v1alpha1.ProvisionedProductObservation{
+							Status: aws.String(string(v1alpha1.ProvisionedProductStatus_SDK_AVAILABLE))},
+					}),
 				}...),
 				describeProvisionedProductOutput: describeProvisionedProduct([]describeProvisionedProductOutputModifier{
 					withDetails(svcsdk.ProvisionedProductDetail{
@@ -279,6 +291,10 @@ func TestIsUpToDate(t *testing.T) {
 						ProvisioningParameters: []*v1alpha1.ProvisioningParameter{
 							{Key: aws.String("Parameter"), Value: aws.String("foo")}},
 					}),
+					withStatus(v1alpha1.ProvisionedProductStatus{
+						AtProvider: v1alpha1.ProvisionedProductObservation{
+							Status: aws.String(string(v1alpha1.ProvisionedProductStatus_SDK_AVAILABLE))},
+					}),
 				}...),
 				describeProvisionedProductOutput: describeProvisionedProduct([]describeProvisionedProductOutputModifier{
 					withDetails(svcsdk.ProvisionedProductDetail{
@@ -327,7 +343,11 @@ func TestIsUpToDate(t *testing.T) {
 					withSpec(v1alpha1.ProvisionedProductParameters{
 						ProvisioningArtifactID: aws.String(provisioningArtifactID),
 						ProvisioningParameters: []*v1alpha1.ProvisioningParameter{
-							{Key: aws.String("Parameter1"), Value: aws.String("quux")}},
+							{Key: aws.String("Parameter1"), Value: aws.String("bar")}},
+					}),
+					withStatus(v1alpha1.ProvisionedProductStatus{
+						AtProvider: v1alpha1.ProvisionedProductObservation{
+							Status: aws.String(string(v1alpha1.ProvisionedProductStatus_SDK_AVAILABLE))},
 					}),
 				}...),
 				describeProvisionedProductOutput: describeProvisionedProduct([]describeProvisionedProductOutputModifier{
@@ -387,6 +407,10 @@ func TestIsUpToDate(t *testing.T) {
 							{Key: aws.String("Parameter2"), Value: aws.String("quux")},
 						},
 					}),
+					withStatus(v1alpha1.ProvisionedProductStatus{
+						AtProvider: v1alpha1.ProvisionedProductObservation{
+							Status: aws.String(string(v1alpha1.ProvisionedProductStatus_SDK_AVAILABLE))},
+					}),
 				}...),
 				describeProvisionedProductOutput: describeProvisionedProduct([]describeProvisionedProductOutputModifier{
 					withDetails(svcsdk.ProvisionedProductDetail{
@@ -445,6 +469,10 @@ func TestIsUpToDate(t *testing.T) {
 							{Key: aws.String("Parameter2"), Value: aws.String("product_default_value")},
 						},
 					}),
+					withStatus(v1alpha1.ProvisionedProductStatus{
+						AtProvider: v1alpha1.ProvisionedProductObservation{
+							Status: aws.String(string(v1alpha1.ProvisionedProductStatus_SDK_AVAILABLE))},
+					}),
 				}...),
 				describeProvisionedProductOutput: describeProvisionedProduct([]describeProvisionedProductOutputModifier{
 					withDetails(svcsdk.ProvisionedProductDetail{
@@ -502,6 +530,10 @@ func TestIsUpToDate(t *testing.T) {
 						ProvisioningParameters: []*v1alpha1.ProvisioningParameter{
 							{Key: aws.String("Parameter1"), Value: aws.String("foo")},
 						},
+					}),
+					withStatus(v1alpha1.ProvisionedProductStatus{
+						AtProvider: v1alpha1.ProvisionedProductObservation{
+							Status: aws.String(string(v1alpha1.ProvisionedProductStatus_SDK_AVAILABLE))},
 					}),
 				}...),
 				describeProvisionedProductOutput: describeProvisionedProduct([]describeProvisionedProductOutputModifier{
@@ -562,6 +594,10 @@ func TestIsUpToDate(t *testing.T) {
 							{Key: aws.String("Parameter2"), Value: aws.String("bar")},
 							{Key: aws.String("Parameter3"), Value: aws.String("baz")},
 						},
+					}),
+					withStatus(v1alpha1.ProvisionedProductStatus{
+						AtProvider: v1alpha1.ProvisionedProductObservation{
+							Status: aws.String(string(v1alpha1.ProvisionedProductStatus_SDK_AVAILABLE))},
 					}),
 				}...),
 				describeProvisionedProductOutput: describeProvisionedProduct([]describeProvisionedProductOutputModifier{
@@ -712,7 +748,7 @@ func TestPostObserve(t *testing.T) {
 				status: xpv1.Available(),
 			},
 		},
-		"StatusUnavailableWithAmendment": {
+		"StatusAvailableWithAmendment": {
 			args: args{
 				provisionedProduct: provisionedProduct([]provisionedProductModifier{provisionedProductStatus}...),
 				describeProvisionedProductOutput: describeProvisionedProduct([]describeProvisionedProductOutputModifier{
