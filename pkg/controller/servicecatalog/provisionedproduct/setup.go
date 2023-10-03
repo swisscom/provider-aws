@@ -19,9 +19,8 @@ package provisionedproduct
 import (
 	"context"
 	"fmt"
+	"reflect"
 	"strings"
-
-	"k8s.io/apimachinery/pkg/types"
 
 	awsconfig "github.com/aws/aws-sdk-go-v2/config"
 	cfsdkv2 "github.com/aws/aws-sdk-go-v2/service/cloudformation"
@@ -29,7 +28,6 @@ import (
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/awserr"
 	svcsdk "github.com/aws/aws-sdk-go/service/servicecatalog"
-	awsclient "github.com/crossplane-contrib/provider-aws/pkg/clients"
 	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
 	"github.com/crossplane/crossplane-runtime/pkg/connection"
 	"github.com/crossplane/crossplane-runtime/pkg/controller"
@@ -40,12 +38,14 @@ import (
 	"github.com/google/uuid"
 	"github.com/pkg/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/utils/pointer"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	svcapitypes "github.com/crossplane-contrib/provider-aws/apis/servicecatalog/v1alpha1"
 	"github.com/crossplane-contrib/provider-aws/apis/v1alpha1"
+	awsclient "github.com/crossplane-contrib/provider-aws/pkg/clients"
 	clientset "github.com/crossplane-contrib/provider-aws/pkg/clients/servicecatalog"
 	"github.com/crossplane-contrib/provider-aws/pkg/features"
 )
@@ -58,7 +58,6 @@ const (
 	msgProvisionedProductStatusSdkPlanInProgress = "provisioned product is awaiting plan approval"
 	msgProvisionedProductStatusSdkError          = "provisioned product has status ERROR"
 
-	errUpdatePending                        = "provisioned product is already under change, not updating"
 	errCouldNotGetProvisionedProductOutputs = "could not get provisioned product outputs"
 	errCouldNotGetCFParameters              = "could not get cloudformation stack parameters"
 	errCouldNotDescribeRecord               = "could not describe record"
@@ -108,11 +107,11 @@ func prepareSetupExternal(cfClient *cfsdkv2.Client, kube client.Client) func(*ex
 	return func(e *external) {
 		c := &custom{client: &clientset.CustomServiceCatalogClient{CfClient: cfClient, Client: e.client}, kube: kube}
 		e.preCreate = preCreate
+		e.preUpdate = c.preUpdate
 		e.isUpToDate = c.isUpToDate
 		e.lateInitialize = c.lateInitialize
 		e.preObserve = c.preObserve
 		e.postObserve = c.postObserve
-		e.preUpdate = c.preUpdate
 		e.preDelete = preDelete
 	}
 }
@@ -142,12 +141,23 @@ func preCreate(_ context.Context, cr *svcapitypes.ProvisionedProduct, input *svc
 	return nil
 }
 
-func (c *custom) isUpToDate(ctx context.Context, ds *svcapitypes.ProvisionedProduct, resp *svcsdk.DescribeProvisionedProductOutput) (bool, string, error) {
+func (c *custom) preUpdate(_ context.Context, cr *svcapitypes.ProvisionedProduct, input *svcsdk.UpdateProvisionedProductInput) error {
+	input.UpdateToken = aws.String(genIdempotencyToken())
+	if cr.GetName() == meta.GetExternalName(cr) {
+		input.ProvisionedProductName = aws.String(meta.GetExternalName(cr))
+	} else {
+		input.ProvisionedProductId = aws.String(meta.GetExternalName(cr))
+	}
+	return nil
+}
+
+func (c *custom) isUpToDate(ctx context.Context, ds *svcapitypes.ProvisionedProduct, resp *svcsdk.DescribeProvisionedProductOutput) (bool, string, error) { // nolint:gocyclo
 	// If the product is undergoing change, we want to assume that it is not up-to-date. This will force this resource
 	// to be queued for an update (which will be skipped due to UNDER_CHANGE), and once that update fails, we will
 	// recheck the status again. This will allow us to quickly transition from UNDER_CHANGE to AVAILABLE without having
 	// to wait for the entire polling interval to pass before re-checking the status.
-	if pointer.StringDeref(ds.Status.AtProvider.Status, "") == string(svcapitypes.ProvisionedProductStatus_SDK_UNDER_CHANGE) {
+	if pointer.StringDeref(ds.Status.AtProvider.Status, "") == string(svcapitypes.ProvisionedProductStatus_SDK_UNDER_CHANGE) ||
+		reflect.ValueOf(ds.Status.AtProvider).IsZero() {
 		return true, "", nil
 	}
 
@@ -158,10 +168,8 @@ func (c *custom) isUpToDate(ctx context.Context, ds *svcapitypes.ProvisionedProd
 		// is wrong with the provisioned product (error on creation, tainted, etc)
 		// We will be able to handle those specific cases in postObserve
 		var aerr awserr.Error
-		if ok := errors.As(err, &aerr); ok {
-			if aerr.Code() == svcsdk.ErrCodeInvalidParametersException && aerr.Message() == errAwsAPICodeInvalidParametersException {
-				return false, "", nil
-			}
+		if ok := errors.As(err, &aerr); ok && aerr.Code() == svcsdk.ErrCodeInvalidParametersException && aerr.Message() == errAwsAPICodeInvalidParametersException {
+			return false, "", nil
 		}
 		return false, "", errors.Wrap(err, errCouldNotGetProvisionedProductOutputs)
 	}
@@ -231,19 +239,6 @@ func (c *custom) postObserve(_ context.Context, cr *svcapitypes.ProvisionedProdu
 	cr.Status.AtProvider.LastProvisioningParameters = cr.Spec.ForProvider.ProvisioningParameters
 
 	return obs, nil
-}
-
-func (c *custom) preUpdate(_ context.Context, cr *svcapitypes.ProvisionedProduct, input *svcsdk.UpdateProvisionedProductInput) error {
-	if pointer.StringDeref(cr.Status.AtProvider.Status, "") == string(svcapitypes.ProvisionedProductStatus_SDK_UNDER_CHANGE) {
-		return errors.New(errUpdatePending)
-	}
-	input.UpdateToken = aws.String(genIdempotencyToken())
-	if cr.GetName() == meta.GetExternalName(cr) {
-		input.ProvisionedProductName = aws.String(meta.GetExternalName(cr))
-	} else {
-		input.ProvisionedProductId = aws.String(meta.GetExternalName(cr))
-	}
-	return nil
 }
 
 func preDelete(_ context.Context, cr *svcapitypes.ProvisionedProduct, input *svcsdk.TerminateProvisionedProductInput) (bool, error) {
