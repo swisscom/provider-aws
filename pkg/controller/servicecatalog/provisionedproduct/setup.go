@@ -19,7 +19,6 @@ package provisionedproduct
 import (
 	"context"
 	"fmt"
-	"reflect"
 	"strings"
 
 	awsconfig "github.com/aws/aws-sdk-go-v2/config"
@@ -108,8 +107,8 @@ func prepareSetupExternal(cfClient *cfsdkv2.Client, kube client.Client) func(*ex
 		c := &custom{client: &clientset.CustomServiceCatalogClient{CfClient: cfClient, Client: e.client}, kube: kube}
 		e.preCreate = preCreate
 		e.preUpdate = c.preUpdate
-		e.isUpToDate = c.isUpToDate
 		e.lateInitialize = c.lateInitialize
+		e.isUpToDate = c.isUpToDate
 		e.preObserve = c.preObserve
 		e.postObserve = c.postObserve
 		e.preDelete = preDelete
@@ -156,8 +155,7 @@ func (c *custom) isUpToDate(ctx context.Context, ds *svcapitypes.ProvisionedProd
 	// to be queued for an update (which will be skipped due to UNDER_CHANGE), and once that update fails, we will
 	// recheck the status again. This will allow us to quickly transition from UNDER_CHANGE to AVAILABLE without having
 	// to wait for the entire polling interval to pass before re-checking the status.
-	if pointer.StringDeref(ds.Status.AtProvider.Status, "") == string(svcapitypes.ProvisionedProductStatus_SDK_UNDER_CHANGE) ||
-		reflect.ValueOf(ds.Status.AtProvider).IsZero() {
+	if pointer.StringDeref(resp.ProvisionedProductDetail.Status, "") == string(svcapitypes.ProvisionedProductStatus_SDK_UNDER_CHANGE) {
 		return true, "", nil
 	}
 
@@ -294,7 +292,9 @@ func (c *custom) provisioningParamsAreChanged(ctx context.Context, cfStackParams
 
 	cfStackKeyValue := make(map[string]string)
 	for _, v := range cfStackParams {
-		cfStackKeyValue[*v.ParameterKey] = pointer.StringDeref(v.ParameterValue, "")
+		if v.ParameterKey != nil {
+			cfStackKeyValue[*v.ParameterKey] = pointer.StringDeref(v.ParameterValue, "")
+		}
 	}
 
 	for _, v := range ds.Spec.ForProvider.ProvisioningParameters {
@@ -353,7 +353,7 @@ func (c *custom) getArtifactID(ds *svcapitypes.ProvisionedProductParameters) (st
 	for _, artifact := range output.ProvisioningArtifacts {
 		if pointer.StringDeref(ds.ProvisioningArtifactName, "") == *artifact.Name ||
 			pointer.StringDeref(ds.ProvisioningArtifactID, "") == *artifact.Id {
-			return pointer.StringDeref(artifact.Id, ""), nil
+			return *artifact.Id, nil
 		}
 	}
 	return "", errors.Wrap(errors.New("artifact not found"), errCouldNotLookupProduct)
