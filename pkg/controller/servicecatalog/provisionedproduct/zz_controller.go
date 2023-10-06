@@ -142,9 +142,9 @@ func (e *external) Create(ctx context.Context, mg cpresource.Managed) (managed.E
 		cr.Status.AtProvider.ProvisionedProductID = nil
 	}
 	if resp.RecordDetail.ProvisionedProductName != nil {
-		cr.Spec.ForProvider.Name = resp.RecordDetail.ProvisionedProductName
+		cr.Status.AtProvider.ProvisionedProductName = resp.RecordDetail.ProvisionedProductName
 	} else {
-		cr.Spec.ForProvider.Name = nil
+		cr.Status.AtProvider.ProvisionedProductName = nil
 	}
 	if resp.RecordDetail.ProvisionedProductType != nil {
 		cr.Status.AtProvider.ProvisionedProductType = resp.RecordDetail.ProvisionedProductType

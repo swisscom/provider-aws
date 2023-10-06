@@ -14,8 +14,11 @@ ignore:
     - ProvisionProductInput.ProvisionToken
     - UpdateProvisioningParameter.UsePreviousValue
     - UpdateProvisioningPreferences.StackSetOperationType
+    - ProvisionProductInput.ProvisionedProductName
     - UpdateProvisionedProductInput.ProvisionedProductId
+    - UpdateProvisionedProductInput.ProvisionedProductName
     - TerminateProvisionedProductInput.ProvisionedProductId
+    - TerminateProvisionedProductInput.ProvisionedProductName
   shape_names:
     - ProvisionedProductPlanSummary
     - ProvisionedProductPlanDetails
@@ -96,8 +99,3 @@ resources:
         from:
           operation: DescribeProvisionedProduct
           path: ProvisionedProductDetail.StatusMessage
-    renames:
-      operations:
-        ProvisionProduct:
-          input_fields:
-            ProvisionedProductName: Name
