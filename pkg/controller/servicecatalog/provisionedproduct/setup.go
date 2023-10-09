@@ -21,15 +21,14 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/crossplane-contrib/provider-aws/pkg/utils/metrics"
+	"github.com/prometheus/client_golang/prometheus"
 
 	cfsdkv2 "github.com/aws/aws-sdk-go-v2/service/cloudformation"
 	cfsdkv2types "github.com/aws/aws-sdk-go-v2/service/cloudformation/types"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/awserr"
-	requestv1 "github.com/aws/aws-sdk-go/aws/request"
-	"github.com/aws/aws-sdk-go/aws/session"
 	svcsdk "github.com/aws/aws-sdk-go/service/servicecatalog"
+	"github.com/crossplane-contrib/provider-aws/pkg/utils/metrics"
 	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
 	"github.com/crossplane/crossplane-runtime/pkg/connection"
 	"github.com/crossplane/crossplane-runtime/pkg/controller"
@@ -69,25 +68,35 @@ const (
 	errAwsAPICodeInvalidParametersException = "Last Successful Provisioning Record doesn't exist."
 )
 
+type customConnector struct {
+	kube client.Client
+}
+
 type custom struct {
 	*external
 	kube    client.Client
 	client  clientset.Client
-	session *session.Session
 	cache   cache
+	metrics metricsRec
 }
 
 type cache struct {
 	getProvisionedProductOutputs []*svcsdk.RecordOutput
 }
 
-func (c *custom) Connect(ctx context.Context, mg cpresource.Managed) (managed.ExternalClient, error) {
+type metricsRec struct {
+	create  prometheus.Counter
+	observe prometheus.Counter
+	update  prometheus.Counter
+	delete  prometheus.Counter
+}
+
+func (c *customConnector) Connect(ctx context.Context, mg cpresource.Managed) (managed.ExternalClient, error) {
 	cr, ok := mg.(*svcapitypes.ProvisionedProduct)
 	if !ok {
 		return nil, errors.New(errUnexpectedObject)
 	}
 	sess, err := awsclient.GetConfigV1(ctx, c.kube, mg, cr.Spec.ForProvider.Region)
-	c.session = sess
 	if err != nil {
 		return nil, errors.Wrap(err, errCreateSession)
 	}
@@ -98,34 +107,41 @@ func (c *custom) Connect(ctx context.Context, mg cpresource.Managed) (managed.Ex
 	}
 	cfClient := cfsdkv2.NewFromConfig(*awsCfg)
 	svcClient := svcsdk.New(sess)
-	c.client = &clientset.CustomServiceCatalogClient{CfClient: cfClient, Client: svcClient}
+	cust := &custom{
+		client: &clientset.CustomServiceCatalogClient{
+			CfClient: cfClient,
+			Client:   svcClient},
+		kube: c.kube}
 	// We do not re-implement all the ExternalClient interface, so we want
 	// to reuse the generated one as much as we can (mostly for the Observe,
 	// Create, Update, Delete methods which call all of our custom hooks)
-	c.external = &external{
+	cust.external = &external{
 		kube:   c.kube,
 		client: svcClient,
 
 		// All of our overrides must go here
-		isUpToDate:     c.isUpToDate,
-		lateInitialize: c.lateInitialize,
-		preObserve:     c.preObserve,
-		postObserve:    c.postObserve,
-		preUpdate:      c.preUpdate,
-		preCreate:      c.preCreate,
-		preDelete:      c.preDelete,
+		isUpToDate:     cust.isUpToDate,
+		lateInitialize: cust.lateInitialize,
+		preObserve:     cust.preObserve,
+		postObserve:    cust.postObserve,
+		preUpdate:      cust.preUpdate,
+		preCreate:      cust.preCreate,
+		preDelete:      cust.preDelete,
 
 		// If we do not implement a method, we must specify the no-op function
 		postCreate: nopPostCreate,
 		postDelete: nopPostDelete,
 		postUpdate: nopPostUpdate,
 	}
-	metrics.MetricAWSAPIRecCalls.WithLabelValues(cr.GetObjectKind().GroupVersionKind().Kind, cr.GetObjectKind().GroupVersionKind().Group, cr.Name, "create").Set(0)
-	metrics.MetricAWSAPIRecCalls.WithLabelValues(cr.GetObjectKind().GroupVersionKind().Kind, cr.GetObjectKind().GroupVersionKind().Group, cr.Name, "observe").Set(0)
-	metrics.MetricAWSAPIRecCalls.WithLabelValues(cr.GetObjectKind().GroupVersionKind().Kind, cr.GetObjectKind().GroupVersionKind().Group, cr.Name, "update").Set(0)
-	metrics.MetricAWSAPIRecCalls.WithLabelValues(cr.GetObjectKind().GroupVersionKind().Kind, cr.GetObjectKind().GroupVersionKind().Group, cr.Name, "delete").Set(0)
 
-	return c.external, nil
+	customResourceApiVersion := fmt.Sprintf("%s/%s", cr.GetObjectKind().GroupVersionKind().Group, cr.GetObjectKind().GroupVersionKind().Version)
+	metrics.MetricManagedResRec.WithLabelValues(customResourceApiVersion, cr.GetObjectKind().GroupVersionKind().Kind, cr.Name).Inc()
+	cust.metrics.create = metrics.MetricAWSAPICallsRec.WithLabelValues(customResourceApiVersion, cr.GetObjectKind().GroupVersionKind().Kind, cr.Name, "create")
+	cust.metrics.observe = metrics.MetricAWSAPICallsRec.WithLabelValues(customResourceApiVersion, cr.GetObjectKind().GroupVersionKind().Kind, cr.Name, "observe")
+	cust.metrics.update = metrics.MetricAWSAPICallsRec.WithLabelValues(customResourceApiVersion, cr.GetObjectKind().GroupVersionKind().Kind, cr.Name, "update")
+	cust.metrics.delete = metrics.MetricAWSAPICallsRec.WithLabelValues(customResourceApiVersion, cr.GetObjectKind().GroupVersionKind().Kind, cr.Name, "delete")
+
+	return cust.external, nil
 }
 
 // SetupProvisionedProduct adds a controller that reconciles a ProvisionedProduct
@@ -137,7 +153,7 @@ func SetupProvisionedProduct(mgr ctrl.Manager, o controller.Options) error {
 	}
 
 	reconcilerOpts := []managed.ReconcilerOption{
-		managed.WithExternalConnecter(&custom{kube: mgr.GetClient()}),
+		managed.WithExternalConnecter(&customConnector{kube: mgr.GetClient()}),
 		managed.WithPollInterval(o.PollInterval),
 		managed.WithLogger(o.Logger.WithValues("controller", name)),
 		managed.WithRecorder(event.NewAPIRecorder(mgr.GetEventRecorderFor(name))),
@@ -165,23 +181,23 @@ func (c *custom) lateInitialize(spec *svcapitypes.ProvisionedProductParameters, 
 }
 
 func (c *custom) preCreate(_ context.Context, ds *svcapitypes.ProvisionedProduct, input *svcsdk.ProvisionProductInput) error {
-	metrics.MetricAWSAPIRecCalls.WithLabelValues(ds.GetObjectKind().GroupVersionKind().Kind, ds.GetObjectKind().GroupVersionKind().Group, ds.Name, "create").Inc()
 	input.ProvisionToken = aws.String(genIdempotencyToken())
 	if ds.GetName() != meta.GetExternalName(ds) {
 		return errors.New(errCreatExternalNameIsNotValid)
 	}
 	input.ProvisionedProductName = aws.String(meta.GetExternalName(ds))
+	c.metrics.create.Inc()
 	return nil
 }
 
 func (c *custom) preUpdate(_ context.Context, ds *svcapitypes.ProvisionedProduct, input *svcsdk.UpdateProvisionedProductInput) error {
-	metrics.MetricAWSAPIRecCalls.WithLabelValues(ds.GetObjectKind().GroupVersionKind().Kind, ds.GetObjectKind().GroupVersionKind().Group, ds.Name, "update").Inc()
 	input.UpdateToken = aws.String(genIdempotencyToken())
 	if ds.GetName() == meta.GetExternalName(ds) {
 		input.ProvisionedProductName = aws.String(meta.GetExternalName(ds))
 	} else {
 		input.ProvisionedProductId = aws.String(meta.GetExternalName(ds))
 	}
+	c.metrics.update.Inc()
 	return nil
 }
 
@@ -191,7 +207,7 @@ func (c *custom) preObserve(_ context.Context, ds *svcapitypes.ProvisionedProduc
 	} else {
 		input.Id = aws.String(meta.GetExternalName(ds))
 	}
-	metrics.MetricAWSAPIRecCalls.WithLabelValues(ds.GetObjectKind().GroupVersionKind().Kind, ds.GetObjectKind().GroupVersionKind().Group, ds.Name, "observe").Inc()
+	c.metrics.observe.Inc()
 	return nil
 }
 
@@ -206,9 +222,7 @@ func (c *custom) isUpToDate(ctx context.Context, ds *svcapitypes.ProvisionedProd
 
 	getPPOutputInput := &svcsdk.GetProvisionedProductOutputsInput{ProvisionedProductId: resp.ProvisionedProductDetail.Id}
 	getPPOutput, err := c.client.GetProvisionedProductOutputs(getPPOutputInput)
-	c.session.Handlers.Send.PushFront(func(r *requestv1.Request) {
-		metrics.MetricAWSAPIRecCalls.WithLabelValues(ds.GetObjectKind().GroupVersionKind().Kind, ds.GetObjectKind().GroupVersionKind().Group, ds.Name, "observe").Inc()
-	})
+	c.metrics.observe.Inc()
 	if err != nil {
 		// We want to specifically handle this exception, since it will occur when something
 		// is wrong with the provisioned product (error on creation, tainted, etc)
@@ -221,7 +235,7 @@ func (c *custom) isUpToDate(ctx context.Context, ds *svcapitypes.ProvisionedProd
 	}
 	c.cache.getProvisionedProductOutputs = getPPOutput.Outputs
 	cfStackParameters, err := c.client.GetCloudformationStackParameters(getPPOutput.Outputs)
-	metrics.MetricAWSAPIRecCalls.WithLabelValues(ds.GetObjectKind().GroupVersionKind().Kind, ds.GetObjectKind().GroupVersionKind().Group, ds.Name, "observe").Inc()
+	c.metrics.observe.Inc()
 	if err != nil {
 		return false, "", errors.Wrap(err, errCouldNotGetCFParameters)
 	}
@@ -248,7 +262,7 @@ func (c *custom) postObserve(_ context.Context, ds *svcapitypes.ProvisionedProdu
 
 	describeRecordInput := svcsdk.DescribeRecordInput{Id: resp.ProvisionedProductDetail.LastRecordId}
 	describeRecordOutput, err := c.client.DescribeRecord(&describeRecordInput)
-	metrics.MetricAWSAPIRecCalls.WithLabelValues(ds.GetObjectKind().GroupVersionKind().Kind, ds.GetObjectKind().GroupVersionKind().Group, ds.Name, "observe").Inc()
+	c.metrics.observe.Inc()
 	if err != nil {
 		return managed.ExternalObservation{}, errors.Wrap(err, errCouldNotDescribeRecord)
 	}
@@ -289,7 +303,7 @@ func (c *custom) preDelete(_ context.Context, ds *svcapitypes.ProvisionedProduct
 	} else {
 		input.ProvisionedProductId = aws.String(meta.GetExternalName(ds))
 	}
-	metrics.MetricAWSAPIRecCalls.WithLabelValues(ds.GetObjectKind().GroupVersionKind().Kind, ds.GetObjectKind().GroupVersionKind().Group, ds.Name, "delete").Inc()
+	c.metrics.delete.Inc()
 	return false, nil
 }
 
@@ -387,7 +401,7 @@ func (c *custom) getArtifactID(ds *svcapitypes.ProvisionedProduct) (string, erro
 	}
 	// DescribeProvisioningArtifact method fits much better, but it has a bug
 	output, err := c.client.DescribeProduct(&input)
-	metrics.MetricAWSAPIRecCalls.WithLabelValues(ds.GetObjectKind().GroupVersionKind().Kind, ds.GetObjectKind().GroupVersionKind().Group, ds.Name, "observe").Inc()
+	c.metrics.observe.Inc()
 	if err != nil {
 		return "", errors.Wrap(err, errCouldNotLookupProduct)
 	}
