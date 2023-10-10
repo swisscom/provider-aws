@@ -21,14 +21,11 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/prometheus/client_golang/prometheus"
-
 	cfsdkv2 "github.com/aws/aws-sdk-go-v2/service/cloudformation"
 	cfsdkv2types "github.com/aws/aws-sdk-go-v2/service/cloudformation/types"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/awserr"
 	svcsdk "github.com/aws/aws-sdk-go/service/servicecatalog"
-	"github.com/crossplane-contrib/provider-aws/pkg/utils/metrics"
 	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
 	"github.com/crossplane/crossplane-runtime/pkg/connection"
 	"github.com/crossplane/crossplane-runtime/pkg/controller"
@@ -39,6 +36,7 @@ import (
 	cpresource "github.com/crossplane/crossplane-runtime/pkg/resource"
 	"github.com/google/uuid"
 	"github.com/pkg/errors"
+	"github.com/prometheus/client_golang/prometheus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/utils/pointer"
@@ -50,6 +48,7 @@ import (
 	awsclient "github.com/crossplane-contrib/provider-aws/pkg/clients"
 	clientset "github.com/crossplane-contrib/provider-aws/pkg/clients/servicecatalog"
 	"github.com/crossplane-contrib/provider-aws/pkg/features"
+	"github.com/crossplane-contrib/provider-aws/pkg/utils/metrics"
 )
 
 const (
@@ -134,12 +133,12 @@ func (c *customConnector) Connect(ctx context.Context, mg cpresource.Managed) (m
 		postUpdate: nopPostUpdate,
 	}
 
-	customResourceApiVersion := fmt.Sprintf("%s/%s", cr.GetObjectKind().GroupVersionKind().Group, cr.GetObjectKind().GroupVersionKind().Version)
-	metrics.MetricManagedResRec.WithLabelValues(customResourceApiVersion, cr.GetObjectKind().GroupVersionKind().Kind, cr.Name).Inc()
-	cust.metrics.create = metrics.MetricAWSAPICallsRec.WithLabelValues(customResourceApiVersion, cr.GetObjectKind().GroupVersionKind().Kind, cr.Name, "create")
-	cust.metrics.observe = metrics.MetricAWSAPICallsRec.WithLabelValues(customResourceApiVersion, cr.GetObjectKind().GroupVersionKind().Kind, cr.Name, "observe")
-	cust.metrics.update = metrics.MetricAWSAPICallsRec.WithLabelValues(customResourceApiVersion, cr.GetObjectKind().GroupVersionKind().Kind, cr.Name, "update")
-	cust.metrics.delete = metrics.MetricAWSAPICallsRec.WithLabelValues(customResourceApiVersion, cr.GetObjectKind().GroupVersionKind().Kind, cr.Name, "delete")
+	customResourceAPIVersion := fmt.Sprintf("%s/%s", cr.GetObjectKind().GroupVersionKind().Group, cr.GetObjectKind().GroupVersionKind().Version)
+	metrics.MetricManagedResRec.WithLabelValues(customResourceAPIVersion, cr.GetObjectKind().GroupVersionKind().Kind, cr.Name).Inc()
+	cust.metrics.create = metrics.MetricAWSAPICallsRec.WithLabelValues(customResourceAPIVersion, cr.GetObjectKind().GroupVersionKind().Kind, cr.Name, "create")
+	cust.metrics.observe = metrics.MetricAWSAPICallsRec.WithLabelValues(customResourceAPIVersion, cr.GetObjectKind().GroupVersionKind().Kind, cr.Name, "observe")
+	cust.metrics.update = metrics.MetricAWSAPICallsRec.WithLabelValues(customResourceAPIVersion, cr.GetObjectKind().GroupVersionKind().Kind, cr.Name, "update")
+	cust.metrics.delete = metrics.MetricAWSAPICallsRec.WithLabelValues(customResourceAPIVersion, cr.GetObjectKind().GroupVersionKind().Kind, cr.Name, "delete")
 
 	return cust.external, nil
 }
@@ -318,7 +317,7 @@ func setConditions(describeRecordOutput *svcsdk.DescribeRecordOutput, resp *svcs
 		case recordType == "PROVISION_PRODUCT":
 			cr.SetConditions(xpv1.Creating())
 		case recordType == "UPDATE_PROVISIONED_PRODUCT":
-			cr.SetConditions(xpv1.Available().WithMessage(msgProvisionedProductStatusSdkUnderChange))
+			cr.SetConditions(xpv1.Unavailable().WithMessage(msgProvisionedProductStatusSdkUnderChange))
 		case recordType == "TERMINATE_PROVISIONED_PRODUCT":
 			cr.SetConditions(xpv1.Deleting())
 		}
