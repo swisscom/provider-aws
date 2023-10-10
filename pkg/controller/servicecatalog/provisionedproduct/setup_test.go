@@ -21,6 +21,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/crossplane-contrib/provider-aws/pkg/utils/metrics"
+
 	cfsdkv2types "github.com/aws/aws-sdk-go-v2/service/cloudformation/types"
 	svcsdk "github.com/aws/aws-sdk-go/service/servicecatalog"
 	svcsdkapi "github.com/aws/aws-sdk-go/service/servicecatalog/servicecatalogiface"
@@ -87,14 +89,14 @@ func describeProvisionedProduct(m ...describeProvisionedProductOutputModifier) *
 	return output
 }
 
-func prepareFakeExternal(fakeClient clientset.Client, kube client.Client) func(*external) {
+func setupFakeExternal(fakeClient clientset.Client, kube client.Client, metrics metricsRec) func(*external) {
 	return func(e *external) {
-		c := &custom{client: fakeClient, kube: kube}
+		c := &custom{client: fakeClient, kube: kube, metrics: metrics}
 		e.isUpToDate = c.isUpToDate
 		e.lateInitialize = c.lateInitialize
 		e.postObserve = c.postObserve
-		e.preCreate = preCreate
-		e.preDelete = preDelete
+		e.preCreate = c.preCreate
+		e.preDelete = c.preDelete
 		e.preUpdate = c.preUpdate
 	}
 }
@@ -652,7 +654,7 @@ func TestIsUpToDate(t *testing.T) {
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			opts := []option{prepareFakeExternal(tc.args.customClient, tc.args.kube)}
+			opts := []option{setupFakeExternal(tc.args.customClient, tc.args.kube, metricsRec{observe: metrics.MetricAWSAPICallsRec.WithLabelValues("servicecatalog.aws.crossplane.io/v1alpha1", "ProvisionedProduct", "fake", "observe")})}
 			e := newExternal(tc.args.kube, tc.args.client, opts)
 			result, _, err := e.isUpToDate(context.TODO(), tc.args.provisionedProduct, tc.args.describeProvisionedProductOutput)
 			if diff := cmp.Diff(err, tc.want.err, test.EquateErrors()); diff != "" {
@@ -700,7 +702,7 @@ func TestLateInitialize(t *testing.T) {
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			opts := []option{prepareFakeExternal(tc.args.customClient, tc.args.kube)}
+			opts := []option{setupFakeExternal(tc.args.customClient, tc.args.kube, metricsRec{observe: metrics.MetricAWSAPICallsRec.WithLabelValues("servicecatalog.aws.crossplane.io/v1alpha1", "ProvisionedProduct", "fake", "observe")})}
 			e := newExternal(tc.args.kube, tc.args.client, opts)
 			_ = e.lateInitialize(&tc.args.provisionedProduct.Spec.ForProvider, tc.args.describeProvisionedProductOutput)
 			if diff := cmp.Diff(tc.want.acceptLanguage, *tc.args.provisionedProduct.Spec.ForProvider.AcceptLanguage); diff != "" {
@@ -769,7 +771,7 @@ func TestPostObserve(t *testing.T) {
 				},
 			},
 			want: want{
-				status: xpv1.Available().WithMessage(msgProvisionedProductStatusSdkUnderChange),
+				status: xpv1.Unavailable().WithMessage(msgProvisionedProductStatusSdkUnderChange),
 			},
 		},
 		"StatusReconcileErrorProductError": {
@@ -823,7 +825,7 @@ func TestPostObserve(t *testing.T) {
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			opts := []option{prepareFakeExternal(tc.args.customClient, tc.args.kube)}
+			opts := []option{setupFakeExternal(tc.args.customClient, tc.args.kube, metricsRec{observe: metrics.MetricAWSAPICallsRec.WithLabelValues("servicecatalog.aws.crossplane.io/v1alpha1", "ProvisionedProduct", "fake", "observe")})}
 			e := newExternal(tc.args.kube, tc.args.client, opts)
 			_, _ = e.postObserve(context.TODO(), tc.args.provisionedProduct, tc.args.describeProvisionedProductOutput, managed.ExternalObservation{}, nil)
 			conditions := tc.args.provisionedProduct.Status.Conditions
@@ -873,7 +875,7 @@ func TestPreDelete(t *testing.T) {
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			opts := []option{prepareFakeExternal(tc.args.customClient, tc.args.kube)}
+			opts := []option{setupFakeExternal(tc.args.customClient, tc.args.kube, metricsRec{delete: metrics.MetricAWSAPICallsRec.WithLabelValues("servicecatalog.aws.crossplane.io/v1alpha1", "ProvisionedProduct", "fake", "delete")})}
 			e := newExternal(tc.args.kube, tc.args.client, opts)
 			ignore, _ := e.preDelete(context.TODO(), tc.args.provisionedProduct, &svcsdk.TerminateProvisionedProductInput{})
 			if diff := cmp.Diff(tc.want.ignoreDeletion, ignore); diff != "" {
