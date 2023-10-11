@@ -124,7 +124,7 @@ func main() {
 		log.Info("Alpha feature enabled", "flag", features.EnableAlphaManagementPolicies)
 	}
 
-	metrics.SetupMetrics()
+	kingpin.FatalIfError(metrics.SetupMetrics(), "Cannot setup metrics")
 	kingpin.FatalIfError(controller.Setup(mgr, o), "Cannot setup AWS controllers")
 	kingpin.FatalIfError(mgr.Start(ctrl.SetupSignalHandler()), "Cannot start controller manager")
 
