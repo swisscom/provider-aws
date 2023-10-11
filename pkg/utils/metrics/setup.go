@@ -22,12 +22,25 @@ var (
 	}, []string{"api_version", "kind", "resource_name"})
 )
 
+type metric interface {
+	Describe(chan<- *prometheus.Desc)
+	Collect(chan<- prometheus.Metric)
+}
+
 // SetupMetrics will register the known Prometheus metrics with controller-runtime's metrics registry
-func SetupMetrics() {
-	k8smetrics.Registry.MustRegister(
+func SetupMetrics() error {
+	metrics := []metric{
 		metricAWSAPICalls,
 		MetricAWSAPICallsRec,
-		MetricManagedResRec)
+		MetricManagedResRec,
+	}
+	for _, m := range metrics {
+		err := k8smetrics.Registry.Register(m)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // IncAWSAPICall will increment the aws_api_calls_total metric for the specified service, operation, and apiVersion tuple
