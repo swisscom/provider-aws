@@ -215,7 +215,8 @@ func (c *custom) isUpToDate(ctx context.Context, ds *svcapitypes.ProvisionedProd
 	// to be queued for an update (which will be skipped due to UNDER_CHANGE), and once that update fails, we will
 	// recheck the status again. This will allow us to quickly transition from UNDER_CHANGE to AVAILABLE without having
 	// to wait for the entire polling interval to pass before re-checking the status.
-	if pointer.StringDeref(resp.ProvisionedProductDetail.Status, "") == string(svcapitypes.ProvisionedProductStatus_SDK_UNDER_CHANGE) {
+	if pointer.StringDeref(resp.ProvisionedProductDetail.Status, "") == string(svcapitypes.ProvisionedProductStatus_SDK_UNDER_CHANGE) ||
+		pointer.StringDeref(resp.ProvisionedProductDetail.Status, "") == string(svcapitypes.ProvisionedProductStatus_SDK_ERROR) {
 		return true, "", nil
 	}
 
@@ -356,8 +357,6 @@ func (c *custom) provisioningParamsAreChanged(ctx context.Context, cfStackParams
 		// the desired state. Because on cloudformation side spaces are also trimmed
 		if cfv, ok := cfStackKeyValue[*v.Key]; ok && strings.TrimSpace(pointer.StringDeref(v.Value, "")) == cfv {
 			continue
-		} else if !ok {
-			return false, errors.Errorf("provisioning parameter %s is not present in cloud formation stack", *v.Key)
 		} else {
 			return true, nil
 		}
