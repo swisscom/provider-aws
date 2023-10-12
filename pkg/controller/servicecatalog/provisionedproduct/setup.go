@@ -19,7 +19,6 @@ package provisionedproduct
 import (
 	"context"
 	"fmt"
-	"reflect"
 	"strings"
 
 	cfsdkv2 "github.com/aws/aws-sdk-go-v2/service/cloudformation"
@@ -34,6 +33,8 @@ import (
 	"github.com/crossplane/crossplane-runtime/pkg/reconciler/managed"
 	"github.com/crossplane/crossplane-runtime/pkg/resource"
 	cpresource "github.com/crossplane/crossplane-runtime/pkg/resource"
+	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/google/uuid"
 	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
@@ -336,7 +337,11 @@ func (c *custom) provisioningParamsAreChanged(ctx context.Context, ds *svcapityp
 		return false, err
 	}
 	// Compare provisioning params from desired state whits params from previous reconciliation loop(if it exists)
-	if xr.Status.AtProvider.LastProvisioningParameters != nil && !reflect.DeepEqual(xr.Status.AtProvider.LastProvisioningParameters, ds.Spec.ForProvider.ProvisioningParameters) {
+	less := func(a *svcapitypes.ProvisioningParameter, b *svcapitypes.ProvisioningParameter) bool {
+		return awsclient.StringValue(a.Key) < awsclient.StringValue(b.Key)
+	}
+	if xr.Status.AtProvider.LastProvisioningParameters != nil &&
+		!cmp.Equal(xr.Status.AtProvider.LastProvisioningParameters, ds.Spec.ForProvider.ProvisioningParameters, cmpopts.SortSlices(less)) {
 		return true, nil
 	}
 
@@ -396,7 +401,7 @@ func (c *custom) getArtifactID(ds *svcapitypes.ProvisionedProduct) (string, erro
 		Id:   ds.Spec.ForProvider.ProductID,
 		Name: ds.Spec.ForProvider.ProductName,
 	}
-	// DescribeProvisioningArtifact method fits much better, but it has a bug - it returns nothing if a product is a part of imported portfolio.
+	// DescribeProvisioningArtifact method fits much better, but it has a bug - it returns nothing if a product is a part of imported portfolio
 	output, err := c.client.DescribeProduct(&input)
 	c.metrics.observe.Inc()
 	if err != nil {
