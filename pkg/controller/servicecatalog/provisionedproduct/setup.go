@@ -355,9 +355,7 @@ func (c *custom) provisioningParamsAreChanged(ctx context.Context, cfStackParams
 	for _, v := range ds.Spec.ForProvider.ProvisioningParameters {
 		// In this statement/comparison, the provider ignores spaces from the left and right of the parameter value from
 		// the desired state. Because on cloudformation side spaces are also trimmed
-		if cfv, ok := cfStackKeyValue[*v.Key]; ok && strings.TrimSpace(pointer.StringDeref(v.Value, "")) == cfv {
-			continue
-		} else {
+		if cfv, ok := cfStackKeyValue[*v.Key]; ok && strings.TrimSpace(pointer.StringDeref(v.Value, "")) != cfv {
 			return true, nil
 		}
 	}
