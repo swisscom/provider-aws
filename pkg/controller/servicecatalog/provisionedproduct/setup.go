@@ -396,7 +396,7 @@ func (c *custom) getArtifactID(ds *svcapitypes.ProvisionedProduct) (string, erro
 		Id:   ds.Spec.ForProvider.ProductID,
 		Name: ds.Spec.ForProvider.ProductName,
 	}
-	// DescribeProvisioningArtifact method fits much better, but it has a bug
+	// DescribeProvisioningArtifact method fits much better, but it has a bug - it returns nothing if a product is a part of imported portfolio.
 	output, err := c.client.DescribeProduct(&input)
 	c.metrics.observe.Inc()
 	if err != nil {
