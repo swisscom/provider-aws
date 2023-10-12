@@ -19,10 +19,10 @@ package provisionedproduct
 import (
 	"context"
 	"fmt"
+	"reflect"
 	"strings"
 
 	cfsdkv2 "github.com/aws/aws-sdk-go-v2/service/cloudformation"
-	cfsdkv2types "github.com/aws/aws-sdk-go-v2/service/cloudformation/types"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/awserr"
 	svcsdk "github.com/aws/aws-sdk-go/service/servicecatalog"
@@ -234,17 +234,12 @@ func (c *custom) isUpToDate(ctx context.Context, ds *svcapitypes.ProvisionedProd
 		return false, "", errors.Wrap(err, errCouldNotGetProvisionedProductOutputs)
 	}
 	c.cache.getProvisionedProductOutputs = getPPOutput.Outputs
-	cfStackParameters, err := c.client.GetCloudformationStackParameters(getPPOutput.Outputs)
-	c.metrics.observe.Inc()
-	if err != nil {
-		return false, "", errors.Wrap(err, errCouldNotGetCFParameters)
-	}
 
 	productOrArtifactIsChanged, err := c.productOrArtifactIsChanged(ds, resp.ProvisionedProductDetail)
 	if err != nil {
 		return false, "", errors.Wrap(err, "could not discover if product or artifact ids have changed")
 	}
-	provisioningParamsAreChanged, err := c.provisioningParamsAreChanged(ctx, cfStackParameters, ds)
+	provisioningParamsAreChanged, err := c.provisioningParamsAreChanged(ctx, ds)
 	if err != nil {
 		return false, "", errors.Wrap(err, "could not compare provisioning parameters with previous ones")
 	}
@@ -331,7 +326,7 @@ func setConditions(describeRecordOutput *svcsdk.DescribeRecordOutput, resp *svcs
 	}
 }
 
-func (c *custom) provisioningParamsAreChanged(ctx context.Context, cfStackParams []cfsdkv2types.Parameter, ds *svcapitypes.ProvisionedProduct) (bool, error) {
+func (c *custom) provisioningParamsAreChanged(ctx context.Context, ds *svcapitypes.ProvisionedProduct) (bool, error) {
 	nn := types.NamespacedName{
 		Name: ds.GetName(),
 	}
@@ -340,9 +335,15 @@ func (c *custom) provisioningParamsAreChanged(ctx context.Context, cfStackParams
 	if err != nil {
 		return false, err
 	}
-	// Product should be updated if amount of provisioning params from desired stats lesser than the amount from previous reconciliation loop
-	if len(xr.Status.AtProvider.LastProvisioningParameters) > len(ds.Spec.ForProvider.ProvisioningParameters) {
+	// Compare provisioning params from desired state whits params from previous reconciliation loop(if it exists)
+	if xr.Status.AtProvider.LastProvisioningParameters != nil && !reflect.DeepEqual(xr.Status.AtProvider.LastProvisioningParameters, ds.Spec.ForProvider.ProvisioningParameters) {
 		return true, nil
+	}
+
+	cfStackParams, err := c.client.GetCloudformationStackParameters(c.cache.getProvisionedProductOutputs)
+	c.metrics.observe.Inc()
+	if err != nil {
+		return false, errors.Wrap(err, errCouldNotGetCFParameters)
 	}
 
 	cfStackKeyValue := make(map[string]string)
@@ -351,11 +352,11 @@ func (c *custom) provisioningParamsAreChanged(ctx context.Context, cfStackParams
 			cfStackKeyValue[*v.ParameterKey] = pointer.StringDeref(v.ParameterValue, "")
 		}
 	}
-
+	// The config drift detection
 	for _, v := range ds.Spec.ForProvider.ProvisioningParameters {
 		// In this statement/comparison, the provider ignores spaces from the left and right of the parameter value from
 		// the desired state. Because on cloudformation side spaces are also trimmed
-		if cfv, ok := cfStackKeyValue[*v.Key]; ok && strings.TrimSpace(pointer.StringDeref(v.Value, "")) != cfv {
+		if cfv, ok := cfStackKeyValue[*v.Key]; !ok || strings.TrimSpace(pointer.StringDeref(v.Value, "")) != cfv {
 			return true, nil
 		}
 	}
