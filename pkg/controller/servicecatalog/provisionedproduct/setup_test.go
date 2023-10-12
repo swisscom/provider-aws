@@ -640,7 +640,7 @@ func TestIsUpToDate(t *testing.T) {
 						pp.Status.AtProvider.LastProvisioningParameters = []*v1alpha1.ProvisioningParameter{
 							{Key: aws.String("Parameter1"), Value: aws.String("foo")},
 							{Key: aws.String("Parameter2"), Value: aws.String("bar")},
-							{Key: aws.String("Parameter2"), Value: aws.String("baz")},
+							{Key: aws.String("Parameter3"), Value: aws.String("baz")},
 						}
 						return nil
 					},
