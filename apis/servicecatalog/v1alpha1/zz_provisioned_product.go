@@ -31,8 +31,6 @@ type ProvisionedProductParameters struct {
 	Region string `json:"region"`
 	// The language code.
 	//
-	//    * en - English (default)
-	//
 	//    * jp - Japanese
 	//
 	//    * zh - Chinese
@@ -91,7 +89,7 @@ type ProvisionedProductObservation struct {
 	// The record identifier of the last request performed on this provisioned product
 	// of the following types:
 	//
-	//    * ProvisionedProduct
+	//    * ProvisionProduct
 	//
 	//    * UpdateProvisionedProduct
 	//
@@ -107,7 +105,8 @@ type ProvisionedProductObservation struct {
 	ProvisionedProductID *string `json:"provisionedProductID,omitempty"`
 	// The user-friendly name of the provisioned product.
 	ProvisionedProductName *string `json:"provisionedProductName,omitempty"`
-	// The type of provisioned product. The supported values are CFN_STACK and CFN_STACKSET.
+	// The type of provisioned product. The supported values are CFN_STACK, CFN_STACKSET,
+	// TERRAFORM_OPEN_SOURCE, and TERRAFORM_CLOUD.
 	ProvisionedProductType *string `json:"provisionedProductType,omitempty"`
 	// The errors that occurred.
 	RecordErrors []*RecordError `json:"recordErrors,omitempty"`

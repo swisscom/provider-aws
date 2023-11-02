@@ -21,6 +21,8 @@ import (
 	"fmt"
 	"strings"
 
+	"k8s.io/utils/ptr"
+
 	cfsdkv2 "github.com/aws/aws-sdk-go-v2/service/cloudformation"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/awserr"
@@ -40,16 +42,16 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/utils/pointer"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	svcapitypes "github.com/crossplane-contrib/provider-aws/apis/servicecatalog/v1alpha1"
 	"github.com/crossplane-contrib/provider-aws/apis/v1alpha1"
-	awsclient "github.com/crossplane-contrib/provider-aws/pkg/clients"
 	clientset "github.com/crossplane-contrib/provider-aws/pkg/clients/servicecatalog"
 	"github.com/crossplane-contrib/provider-aws/pkg/features"
+	awsclient "github.com/crossplane-contrib/provider-aws/pkg/utils/connect/aws"
 	"github.com/crossplane-contrib/provider-aws/pkg/utils/metrics"
+	"github.com/crossplane-contrib/provider-aws/pkg/utils/pointer"
 )
 
 const (
@@ -176,7 +178,7 @@ func SetupProvisionedProduct(mgr ctrl.Manager, o controller.Options) error {
 
 func (c *custom) lateInitialize(spec *svcapitypes.ProvisionedProductParameters, _ *svcsdk.DescribeProvisionedProductOutput) error {
 	acceptLanguageEnglish := acceptLanguageEnglish
-	spec.AcceptLanguage = awsclient.LateInitializeStringPtr(spec.AcceptLanguage, &acceptLanguageEnglish)
+	spec.AcceptLanguage = pointer.LateInitialize(spec.AcceptLanguage, &acceptLanguageEnglish)
 	return nil
 }
 
@@ -216,8 +218,8 @@ func (c *custom) isUpToDate(ctx context.Context, ds *svcapitypes.ProvisionedProd
 	// to be queued for an update (which will be skipped due to UNDER_CHANGE), and once that update fails, we will
 	// recheck the status again. This will allow us to quickly transition from UNDER_CHANGE to AVAILABLE without having
 	// to wait for the entire polling interval to pass before re-checking the status.
-	if pointer.StringDeref(resp.ProvisionedProductDetail.Status, "") == string(svcapitypes.ProvisionedProductStatus_SDK_UNDER_CHANGE) ||
-		pointer.StringDeref(resp.ProvisionedProductDetail.Status, "") == string(svcapitypes.ProvisionedProductStatus_SDK_ERROR) {
+	if ptr.Deref(resp.ProvisionedProductDetail.Status, "") == string(svcapitypes.ProvisionedProductStatus_SDK_UNDER_CHANGE) ||
+		ptr.Deref(resp.ProvisionedProductDetail.Status, "") == string(svcapitypes.ProvisionedProductStatus_SDK_ERROR) {
 		return true, "", nil
 	}
 
@@ -290,7 +292,7 @@ func (c *custom) postObserve(_ context.Context, ds *svcapitypes.ProvisionedProdu
 }
 
 func (c *custom) preDelete(_ context.Context, ds *svcapitypes.ProvisionedProduct, input *svcsdk.TerminateProvisionedProductInput) (bool, error) {
-	if pointer.StringDeref(ds.Status.AtProvider.Status, "") == string(svcapitypes.ProvisionedProductStatus_SDK_UNDER_CHANGE) {
+	if ptr.Deref(ds.Status.AtProvider.Status, "") == string(svcapitypes.ProvisionedProductStatus_SDK_UNDER_CHANGE) {
 		return true, nil
 	}
 	input.TerminateToken = aws.String(genIdempotencyToken())
@@ -309,7 +311,7 @@ func setConditions(describeRecordOutput *svcsdk.DescribeRecordOutput, resp *svcs
 	case ppStatus == string(svcapitypes.ProvisionedProductStatus_SDK_AVAILABLE):
 		cr.SetConditions(xpv1.Available())
 	case ppStatus == string(svcapitypes.ProvisionedProductStatus_SDK_UNDER_CHANGE):
-		recordType := pointer.StringDeref(describeRecordOutput.RecordDetail.RecordType, "UPDATE_PROVISIONED_PRODUCT")
+		recordType := ptr.Deref(describeRecordOutput.RecordDetail.RecordType, "UPDATE_PROVISIONED_PRODUCT")
 		switch {
 		case recordType == "PROVISION_PRODUCT":
 			cr.SetConditions(xpv1.Creating())
@@ -338,7 +340,7 @@ func (c *custom) provisioningParamsAreChanged(ctx context.Context, ds *svcapityp
 	}
 	// Compare provisioning params from desired state whits params from previous reconciliation loop(if it exists)
 	less := func(a *svcapitypes.ProvisioningParameter, b *svcapitypes.ProvisioningParameter) bool {
-		return awsclient.StringValue(a.Key) < awsclient.StringValue(b.Key)
+		return pointer.StringValue(a.Key) < pointer.StringValue(b.Key)
 	}
 	if xr.Status.AtProvider.LastProvisioningParameters != nil &&
 		!cmp.Equal(xr.Status.AtProvider.LastProvisioningParameters, ds.Spec.ForProvider.ProvisioningParameters, cmpopts.SortSlices(less)) {
@@ -354,14 +356,14 @@ func (c *custom) provisioningParamsAreChanged(ctx context.Context, ds *svcapityp
 	cfStackKeyValue := make(map[string]string)
 	for _, v := range cfStackParams {
 		if v.ParameterKey != nil {
-			cfStackKeyValue[*v.ParameterKey] = pointer.StringDeref(v.ParameterValue, "")
+			cfStackKeyValue[*v.ParameterKey] = ptr.Deref(v.ParameterValue, "")
 		}
 	}
 	// The config drift detection
 	for _, v := range ds.Spec.ForProvider.ProvisioningParameters {
 		// In this statement/comparison, the provider ignores spaces from the left and right of the parameter value from
 		// the desired state. Because on cloudformation side spaces are also trimmed
-		if cfv, ok := cfStackKeyValue[*v.Key]; !ok || strings.TrimSpace(pointer.StringDeref(v.Value, "")) != cfv {
+		if cfv, ok := cfStackKeyValue[*v.Key]; !ok || strings.TrimSpace(ptr.Deref(v.Value, "")) != cfv {
 			return true, nil
 		}
 	}
@@ -409,8 +411,8 @@ func (c *custom) getArtifactID(ds *svcapitypes.ProvisionedProduct) (string, erro
 	}
 
 	for _, artifact := range output.ProvisioningArtifacts {
-		if pointer.StringDeref(ds.Spec.ForProvider.ProvisioningArtifactName, "") == *artifact.Name ||
-			pointer.StringDeref(ds.Spec.ForProvider.ProvisioningArtifactID, "") == *artifact.Id {
+		if ptr.Deref(ds.Spec.ForProvider.ProvisioningArtifactName, "") == *artifact.Name ||
+			ptr.Deref(ds.Spec.ForProvider.ProvisioningArtifactID, "") == *artifact.Id {
 			return *artifact.Id, nil
 		}
 	}

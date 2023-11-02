@@ -65,6 +65,13 @@ const (
 	DescribePortfolioShareType_ORGANIZATION_MEMBER_ACCOUNT DescribePortfolioShareType = "ORGANIZATION_MEMBER_ACCOUNT"
 )
 
+type EngineWorkflowStatus string
+
+const (
+	EngineWorkflowStatus_SUCCEEDED EngineWorkflowStatus = "SUCCEEDED"
+	EngineWorkflowStatus_FAILED    EngineWorkflowStatus = "FAILED"
+)
+
 type EvaluationType string
 
 const (
@@ -113,6 +120,8 @@ type ProductType string
 const (
 	ProductType_CLOUD_FORMATION_TEMPLATE ProductType = "CLOUD_FORMATION_TEMPLATE"
 	ProductType_MARKETPLACE              ProductType = "MARKETPLACE"
+	ProductType_TERRAFORM_OPEN_SOURCE    ProductType = "TERRAFORM_OPEN_SOURCE"
+	ProductType_TERRAFORM_CLOUD          ProductType = "TERRAFORM_CLOUD"
 )
 
 type ProductViewFilterBy string
@@ -191,6 +200,8 @@ const (
 	ProvisioningArtifactType_CLOUD_FORMATION_TEMPLATE ProvisioningArtifactType = "CLOUD_FORMATION_TEMPLATE"
 	ProvisioningArtifactType_MARKETPLACE_AMI          ProvisioningArtifactType = "MARKETPLACE_AMI"
 	ProvisioningArtifactType_MARKETPLACE_CAR          ProvisioningArtifactType = "MARKETPLACE_CAR"
+	ProvisioningArtifactType_TERRAFORM_OPEN_SOURCE    ProvisioningArtifactType = "TERRAFORM_OPEN_SOURCE"
+	ProvisioningArtifactType_TERRAFORM_CLOUD          ProvisioningArtifactType = "TERRAFORM_CLOUD"
 )
 
 type RecordStatus string
@@ -238,6 +249,7 @@ const (
 	ServiceActionAssociationErrorCode_LIMIT_EXCEEDED     ServiceActionAssociationErrorCode = "LIMIT_EXCEEDED"
 	ServiceActionAssociationErrorCode_RESOURCE_NOT_FOUND ServiceActionAssociationErrorCode = "RESOURCE_NOT_FOUND"
 	ServiceActionAssociationErrorCode_THROTTLING         ServiceActionAssociationErrorCode = "THROTTLING"
+	ServiceActionAssociationErrorCode_INVALID_PARAMETER  ServiceActionAssociationErrorCode = "INVALID_PARAMETER"
 )
 
 type ServiceActionDefinitionKey string

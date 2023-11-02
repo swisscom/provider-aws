@@ -33,9 +33,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/crossplane-contrib/provider-aws/apis/servicecatalog/v1alpha1"
-	aws "github.com/crossplane-contrib/provider-aws/pkg/clients"
 	clientset "github.com/crossplane-contrib/provider-aws/pkg/clients/servicecatalog"
 	"github.com/crossplane-contrib/provider-aws/pkg/clients/servicecatalog/fake"
+	"github.com/crossplane-contrib/provider-aws/pkg/utils/pointer"
 )
 
 const (
@@ -120,26 +120,26 @@ func TestIsUpToDate(t *testing.T) {
 			args: args{
 				provisionedProduct: provisionedProduct([]provisionedProductModifier{
 					withSpec(v1alpha1.ProvisionedProductParameters{
-						ProvisioningArtifactName: aws.String(provisioningArtifactName),
-						ProductName:              aws.String("s3-product"),
+						ProvisioningArtifactName: pointer.ToOrNilIfZeroValue(provisioningArtifactName),
+						ProductName:              pointer.ToOrNilIfZeroValue("s3-product"),
 						ProvisioningParameters: []*v1alpha1.ProvisioningParameter{
-							{Key: aws.String("Parameter"), Value: aws.String("foo")}},
+							{Key: pointer.ToOrNilIfZeroValue("Parameter"), Value: pointer.ToOrNilIfZeroValue("foo")}},
 					}),
 					withStatus(v1alpha1.ProvisionedProductStatus{
 						AtProvider: v1alpha1.ProvisionedProductObservation{
-							Status: aws.String(string(v1alpha1.ProvisionedProductStatus_SDK_AVAILABLE))},
+							Status: pointer.ToOrNilIfZeroValue(string(v1alpha1.ProvisionedProductStatus_SDK_AVAILABLE))},
 					}),
 				}...),
 				describeProvisionedProductOutput: describeProvisionedProduct([]describeProvisionedProductOutputModifier{
 					withDetails(svcsdk.ProvisionedProductDetail{
-						Id:                     aws.String("pp-fake"),
-						ProductId:              aws.String(productID),
-						ProvisioningArtifactId: aws.String(provisioningArtifactID),
+						Id:                     pointer.ToOrNilIfZeroValue("pp-fake"),
+						ProductId:              pointer.ToOrNilIfZeroValue(productID),
+						ProvisioningArtifactId: pointer.ToOrNilIfZeroValue(provisioningArtifactID),
 					}),
 				}...),
 				customClient: &fake.MockCustomServiceCatalogClient{
 					MockGetCloudformationStackParameters: func(provisionedProductOutputs []*svcsdk.RecordOutput) ([]cfsdkv2types.Parameter, error) {
-						return []cfsdkv2types.Parameter{{ParameterKey: aws.String("Parameter"), ParameterValue: aws.String("foo")}}, nil
+						return []cfsdkv2types.Parameter{{ParameterKey: pointer.ToOrNilIfZeroValue("Parameter"), ParameterValue: pointer.ToOrNilIfZeroValue("foo")}}, nil
 					},
 					MockGetProvisionedProductOutputs: func(getPPInput *svcsdk.GetProvisionedProductOutputsInput) (*svcsdk.GetProvisionedProductOutputsOutput, error) {
 						return &svcsdk.GetProvisionedProductOutputsOutput{}, nil
@@ -148,12 +148,12 @@ func TestIsUpToDate(t *testing.T) {
 						return &svcsdk.DescribeProductOutput{
 							ProductViewSummary: &svcsdk.ProductViewSummary{
 								ProductId: dpInput.Id,
-								Name:      aws.String("fake-product"),
+								Name:      pointer.ToOrNilIfZeroValue("fake-product"),
 							},
 							ProvisioningArtifacts: []*svcsdk.ProvisioningArtifact{
 								{
-									Id:   aws.String(newProvisioningArtifactID),
-									Name: aws.String(provisioningArtifactName),
+									Id:   pointer.ToOrNilIfZeroValue(newProvisioningArtifactID),
+									Name: pointer.ToOrNilIfZeroValue(provisioningArtifactName),
 								},
 							},
 						}, nil
@@ -176,26 +176,26 @@ func TestIsUpToDate(t *testing.T) {
 			args: args{
 				provisionedProduct: provisionedProduct([]provisionedProductModifier{
 					withSpec(v1alpha1.ProvisionedProductParameters{
-						ProvisioningArtifactName: aws.String(provisioningArtifactName),
-						ProductID:                aws.String(newProductID),
+						ProvisioningArtifactName: pointer.ToOrNilIfZeroValue(provisioningArtifactName),
+						ProductID:                pointer.ToOrNilIfZeroValue(newProductID),
 						ProvisioningParameters: []*v1alpha1.ProvisioningParameter{
-							{Key: aws.String("Parameter"), Value: aws.String("foo")}},
+							{Key: pointer.ToOrNilIfZeroValue("Parameter"), Value: pointer.ToOrNilIfZeroValue("foo")}},
 					}),
 					withStatus(v1alpha1.ProvisionedProductStatus{
 						AtProvider: v1alpha1.ProvisionedProductObservation{
-							Status: aws.String(string(v1alpha1.ProvisionedProductStatus_SDK_AVAILABLE))},
+							Status: pointer.ToOrNilIfZeroValue(string(v1alpha1.ProvisionedProductStatus_SDK_AVAILABLE))},
 					}),
 				}...),
 				describeProvisionedProductOutput: describeProvisionedProduct([]describeProvisionedProductOutputModifier{
 					withDetails(svcsdk.ProvisionedProductDetail{
-						Id:                     aws.String("pp-fake"),
-						ProductId:              aws.String(productID),
-						ProvisioningArtifactId: aws.String(provisioningArtifactID),
+						Id:                     pointer.ToOrNilIfZeroValue("pp-fake"),
+						ProductId:              pointer.ToOrNilIfZeroValue(productID),
+						ProvisioningArtifactId: pointer.ToOrNilIfZeroValue(provisioningArtifactID),
 					}),
 				}...),
 				customClient: &fake.MockCustomServiceCatalogClient{
 					MockGetCloudformationStackParameters: func(provisionedProductOutputs []*svcsdk.RecordOutput) ([]cfsdkv2types.Parameter, error) {
-						return []cfsdkv2types.Parameter{{ParameterKey: aws.String("Parameter"), ParameterValue: aws.String("foo")}}, nil
+						return []cfsdkv2types.Parameter{{ParameterKey: pointer.ToOrNilIfZeroValue("Parameter"), ParameterValue: pointer.ToOrNilIfZeroValue("foo")}}, nil
 					},
 					MockGetProvisionedProductOutputs: func(getPPInput *svcsdk.GetProvisionedProductOutputsInput) (*svcsdk.GetProvisionedProductOutputsOutput, error) {
 						return &svcsdk.GetProvisionedProductOutputsOutput{}, nil
@@ -204,12 +204,12 @@ func TestIsUpToDate(t *testing.T) {
 						return &svcsdk.DescribeProductOutput{
 							ProductViewSummary: &svcsdk.ProductViewSummary{
 								ProductId: dpInput.Id,
-								Name:      aws.String("fake-product"),
+								Name:      pointer.ToOrNilIfZeroValue("fake-product"),
 							},
 							ProvisioningArtifacts: []*svcsdk.ProvisioningArtifact{
 								{
-									Id:   aws.String(newProvisioningArtifactID),
-									Name: aws.String(provisioningArtifactName),
+									Id:   pointer.ToOrNilIfZeroValue(newProvisioningArtifactID),
+									Name: pointer.ToOrNilIfZeroValue(provisioningArtifactName),
 								},
 							},
 						}, nil
@@ -232,26 +232,26 @@ func TestIsUpToDate(t *testing.T) {
 			args: args{
 				provisionedProduct: provisionedProduct([]provisionedProductModifier{
 					withSpec(v1alpha1.ProvisionedProductParameters{
-						ProvisioningArtifactName: aws.String(provisioningArtifactName),
-						ProductID:                aws.String(productID),
+						ProvisioningArtifactName: pointer.ToOrNilIfZeroValue(provisioningArtifactName),
+						ProductID:                pointer.ToOrNilIfZeroValue(productID),
 						ProvisioningParameters: []*v1alpha1.ProvisioningParameter{
-							{Key: aws.String("Parameter"), Value: aws.String("foo")}},
+							{Key: pointer.ToOrNilIfZeroValue("Parameter"), Value: pointer.ToOrNilIfZeroValue("foo")}},
 					}),
 					withStatus(v1alpha1.ProvisionedProductStatus{
 						AtProvider: v1alpha1.ProvisionedProductObservation{
-							Status: aws.String(string(v1alpha1.ProvisionedProductStatus_SDK_AVAILABLE))},
+							Status: pointer.ToOrNilIfZeroValue(string(v1alpha1.ProvisionedProductStatus_SDK_AVAILABLE))},
 					}),
 				}...),
 				describeProvisionedProductOutput: describeProvisionedProduct([]describeProvisionedProductOutputModifier{
 					withDetails(svcsdk.ProvisionedProductDetail{
-						Id:                     aws.String("pp-fake"),
-						ProductId:              aws.String(productID),
-						ProvisioningArtifactId: aws.String(provisioningArtifactID),
+						Id:                     pointer.ToOrNilIfZeroValue("pp-fake"),
+						ProductId:              pointer.ToOrNilIfZeroValue(productID),
+						ProvisioningArtifactId: pointer.ToOrNilIfZeroValue(provisioningArtifactID),
 					}),
 				}...),
 				customClient: &fake.MockCustomServiceCatalogClient{
 					MockGetCloudformationStackParameters: func(provisionedProductOutputs []*svcsdk.RecordOutput) ([]cfsdkv2types.Parameter, error) {
-						return []cfsdkv2types.Parameter{{ParameterKey: aws.String("Parameter"), ParameterValue: aws.String("foo")}}, nil
+						return []cfsdkv2types.Parameter{{ParameterKey: pointer.ToOrNilIfZeroValue("Parameter"), ParameterValue: pointer.ToOrNilIfZeroValue("foo")}}, nil
 					},
 					MockGetProvisionedProductOutputs: func(getPPInput *svcsdk.GetProvisionedProductOutputsInput) (*svcsdk.GetProvisionedProductOutputsOutput, error) {
 						return &svcsdk.GetProvisionedProductOutputsOutput{}, nil
@@ -260,12 +260,12 @@ func TestIsUpToDate(t *testing.T) {
 						return &svcsdk.DescribeProductOutput{
 							ProductViewSummary: &svcsdk.ProductViewSummary{
 								ProductId: dpInput.Id,
-								Name:      aws.String("fake-product"),
+								Name:      pointer.ToOrNilIfZeroValue("fake-product"),
 							},
 							ProvisioningArtifacts: []*svcsdk.ProvisioningArtifact{
 								{
-									Name: aws.String(provisioningArtifactName),
-									Id:   aws.String(newProvisioningArtifactID),
+									Name: pointer.ToOrNilIfZeroValue(provisioningArtifactName),
+									Id:   pointer.ToOrNilIfZeroValue(newProvisioningArtifactID),
 								},
 							},
 						}, nil
@@ -288,26 +288,26 @@ func TestIsUpToDate(t *testing.T) {
 			args: args{
 				provisionedProduct: provisionedProduct([]provisionedProductModifier{
 					withSpec(v1alpha1.ProvisionedProductParameters{
-						ProvisioningArtifactID: aws.String(newProvisioningArtifactID),
-						ProductID:              aws.String(productID),
+						ProvisioningArtifactID: pointer.ToOrNilIfZeroValue(newProvisioningArtifactID),
+						ProductID:              pointer.ToOrNilIfZeroValue(productID),
 						ProvisioningParameters: []*v1alpha1.ProvisioningParameter{
-							{Key: aws.String("Parameter"), Value: aws.String("foo")}},
+							{Key: pointer.ToOrNilIfZeroValue("Parameter"), Value: pointer.ToOrNilIfZeroValue("foo")}},
 					}),
 					withStatus(v1alpha1.ProvisionedProductStatus{
 						AtProvider: v1alpha1.ProvisionedProductObservation{
-							Status: aws.String(string(v1alpha1.ProvisionedProductStatus_SDK_AVAILABLE))},
+							Status: pointer.ToOrNilIfZeroValue(string(v1alpha1.ProvisionedProductStatus_SDK_AVAILABLE))},
 					}),
 				}...),
 				describeProvisionedProductOutput: describeProvisionedProduct([]describeProvisionedProductOutputModifier{
 					withDetails(svcsdk.ProvisionedProductDetail{
-						Id:                     aws.String("pp-fake"),
-						ProductId:              aws.String(productID),
-						ProvisioningArtifactId: aws.String(provisioningArtifactName),
+						Id:                     pointer.ToOrNilIfZeroValue("pp-fake"),
+						ProductId:              pointer.ToOrNilIfZeroValue(productID),
+						ProvisioningArtifactId: pointer.ToOrNilIfZeroValue(provisioningArtifactName),
 					}),
 				}...),
 				customClient: &fake.MockCustomServiceCatalogClient{
 					MockGetCloudformationStackParameters: func(provisionedProductOutputs []*svcsdk.RecordOutput) ([]cfsdkv2types.Parameter, error) {
-						return []cfsdkv2types.Parameter{{ParameterKey: aws.String("Parameter"), ParameterValue: aws.String("foo")}}, nil
+						return []cfsdkv2types.Parameter{{ParameterKey: pointer.ToOrNilIfZeroValue("Parameter"), ParameterValue: pointer.ToOrNilIfZeroValue("foo")}}, nil
 					},
 					MockGetProvisionedProductOutputs: func(getPPInput *svcsdk.GetProvisionedProductOutputsInput) (*svcsdk.GetProvisionedProductOutputsOutput, error) {
 						return &svcsdk.GetProvisionedProductOutputsOutput{}, nil
@@ -316,11 +316,11 @@ func TestIsUpToDate(t *testing.T) {
 						return &svcsdk.DescribeProductOutput{
 							ProductViewSummary: &svcsdk.ProductViewSummary{
 								ProductId: dpInput.Id,
-								Name:      aws.String("fake product"),
+								Name:      pointer.ToOrNilIfZeroValue("fake product"),
 							},
 							ProvisioningArtifacts: []*svcsdk.ProvisioningArtifact{
 								{
-									Id: aws.String(newProvisioningArtifactID),
+									Id: pointer.ToOrNilIfZeroValue(newProvisioningArtifactID),
 								},
 							},
 						}, nil
@@ -343,28 +343,28 @@ func TestIsUpToDate(t *testing.T) {
 			args: args{
 				provisionedProduct: provisionedProduct([]provisionedProductModifier{
 					withSpec(v1alpha1.ProvisionedProductParameters{
-						ProvisioningArtifactID: aws.String(provisioningArtifactID),
+						ProvisioningArtifactID: pointer.ToOrNilIfZeroValue(provisioningArtifactID),
 						ProvisioningParameters: []*v1alpha1.ProvisioningParameter{
-							{Key: aws.String("Parameter1"), Value: aws.String("bar")}},
+							{Key: pointer.ToOrNilIfZeroValue("Parameter1"), Value: pointer.ToOrNilIfZeroValue("bar")}},
 					}),
 					withStatus(v1alpha1.ProvisionedProductStatus{
 						AtProvider: v1alpha1.ProvisionedProductObservation{
-							Status: aws.String(string(v1alpha1.ProvisionedProductStatus_SDK_AVAILABLE))},
+							Status: pointer.ToOrNilIfZeroValue(string(v1alpha1.ProvisionedProductStatus_SDK_AVAILABLE))},
 					}),
 				}...),
 				describeProvisionedProductOutput: describeProvisionedProduct([]describeProvisionedProductOutputModifier{
 					withDetails(svcsdk.ProvisionedProductDetail{
-						Id:                     aws.String("pp-fake"),
-						ProvisioningArtifactId: aws.String(provisioningArtifactID),
+						Id:                     pointer.ToOrNilIfZeroValue("pp-fake"),
+						ProvisioningArtifactId: pointer.ToOrNilIfZeroValue(provisioningArtifactID),
 					}),
 				}...),
 				customClient: &fake.MockCustomServiceCatalogClient{
 					MockGetCloudformationStackParameters: func(provisionedProductOutputs []*svcsdk.RecordOutput) ([]cfsdkv2types.Parameter, error) {
 						return []cfsdkv2types.Parameter{
-							{ParameterKey: aws.String("Parameter1"), ParameterValue: aws.String("foo")},
-							{ParameterKey: aws.String("Parameter2"), ParameterValue: aws.String("product_default_value")},
-							{ParameterKey: aws.String("Parameter3"), ParameterValue: aws.String("product_default_value")},
-							{ParameterKey: aws.String("Parameter4"), ParameterValue: aws.String("product_default_value")},
+							{ParameterKey: pointer.ToOrNilIfZeroValue("Parameter1"), ParameterValue: pointer.ToOrNilIfZeroValue("foo")},
+							{ParameterKey: pointer.ToOrNilIfZeroValue("Parameter2"), ParameterValue: pointer.ToOrNilIfZeroValue("product_default_value")},
+							{ParameterKey: pointer.ToOrNilIfZeroValue("Parameter3"), ParameterValue: pointer.ToOrNilIfZeroValue("product_default_value")},
+							{ParameterKey: pointer.ToOrNilIfZeroValue("Parameter4"), ParameterValue: pointer.ToOrNilIfZeroValue("product_default_value")},
 						}, nil
 					},
 					MockGetProvisionedProductOutputs: func(getPPInput *svcsdk.GetProvisionedProductOutputsInput) (*svcsdk.GetProvisionedProductOutputsOutput, error) {
@@ -374,11 +374,11 @@ func TestIsUpToDate(t *testing.T) {
 						return &svcsdk.DescribeProductOutput{
 							ProductViewSummary: &svcsdk.ProductViewSummary{
 								ProductId: dpInput.Id,
-								Name:      aws.String("fake product"),
+								Name:      pointer.ToOrNilIfZeroValue("fake product"),
 							},
 							ProvisioningArtifacts: []*svcsdk.ProvisioningArtifact{
 								{
-									Id: aws.String(provisioningArtifactID),
+									Id: pointer.ToOrNilIfZeroValue(provisioningArtifactID),
 								},
 							},
 						}, nil
@@ -388,7 +388,7 @@ func TestIsUpToDate(t *testing.T) {
 					MockGet: func(ctx context.Context, key client.ObjectKey, obj client.Object) error {
 						pp := obj.(*v1alpha1.ProvisionedProduct)
 						pp.Status.AtProvider.LastProvisioningParameters = []*v1alpha1.ProvisioningParameter{
-							{Key: aws.String("Parameter1"), Value: aws.String("foo")},
+							{Key: pointer.ToOrNilIfZeroValue("Parameter1"), Value: pointer.ToOrNilIfZeroValue("foo")},
 						}
 						return nil
 					},
@@ -403,30 +403,30 @@ func TestIsUpToDate(t *testing.T) {
 			args: args{
 				provisionedProduct: provisionedProduct([]provisionedProductModifier{
 					withSpec(v1alpha1.ProvisionedProductParameters{
-						ProvisioningArtifactID: aws.String(provisioningArtifactID),
+						ProvisioningArtifactID: pointer.ToOrNilIfZeroValue(provisioningArtifactID),
 						ProvisioningParameters: []*v1alpha1.ProvisioningParameter{
-							{Key: aws.String("Parameter1"), Value: aws.String("foo")},
-							{Key: aws.String("Parameter2"), Value: aws.String("quux")},
+							{Key: pointer.ToOrNilIfZeroValue("Parameter1"), Value: pointer.ToOrNilIfZeroValue("foo")},
+							{Key: pointer.ToOrNilIfZeroValue("Parameter2"), Value: pointer.ToOrNilIfZeroValue("quux")},
 						},
 					}),
 					withStatus(v1alpha1.ProvisionedProductStatus{
 						AtProvider: v1alpha1.ProvisionedProductObservation{
-							Status: aws.String(string(v1alpha1.ProvisionedProductStatus_SDK_AVAILABLE))},
+							Status: pointer.ToOrNilIfZeroValue(string(v1alpha1.ProvisionedProductStatus_SDK_AVAILABLE))},
 					}),
 				}...),
 				describeProvisionedProductOutput: describeProvisionedProduct([]describeProvisionedProductOutputModifier{
 					withDetails(svcsdk.ProvisionedProductDetail{
-						Id:                     aws.String("pp-fake"),
-						ProvisioningArtifactId: aws.String(provisioningArtifactID),
+						Id:                     pointer.ToOrNilIfZeroValue("pp-fake"),
+						ProvisioningArtifactId: pointer.ToOrNilIfZeroValue(provisioningArtifactID),
 					}),
 				}...),
 				customClient: &fake.MockCustomServiceCatalogClient{
 					MockGetCloudformationStackParameters: func(provisionedProductOutputs []*svcsdk.RecordOutput) ([]cfsdkv2types.Parameter, error) {
 						return []cfsdkv2types.Parameter{
-							{ParameterKey: aws.String("Parameter1"), ParameterValue: aws.String("foo")},
-							{ParameterKey: aws.String("Parameter2"), ParameterValue: aws.String("product_default_value")},
-							{ParameterKey: aws.String("Parameter3"), ParameterValue: aws.String("product_default_value")},
-							{ParameterKey: aws.String("Parameter4"), ParameterValue: aws.String("product_default_value")},
+							{ParameterKey: pointer.ToOrNilIfZeroValue("Parameter1"), ParameterValue: pointer.ToOrNilIfZeroValue("foo")},
+							{ParameterKey: pointer.ToOrNilIfZeroValue("Parameter2"), ParameterValue: pointer.ToOrNilIfZeroValue("product_default_value")},
+							{ParameterKey: pointer.ToOrNilIfZeroValue("Parameter3"), ParameterValue: pointer.ToOrNilIfZeroValue("product_default_value")},
+							{ParameterKey: pointer.ToOrNilIfZeroValue("Parameter4"), ParameterValue: pointer.ToOrNilIfZeroValue("product_default_value")},
 						}, nil
 					},
 					MockGetProvisionedProductOutputs: func(getPPInput *svcsdk.GetProvisionedProductOutputsInput) (*svcsdk.GetProvisionedProductOutputsOutput, error) {
@@ -435,12 +435,12 @@ func TestIsUpToDate(t *testing.T) {
 					MockDescribeProduct: func(dpInput *svcsdk.DescribeProductInput) (*svcsdk.DescribeProductOutput, error) {
 						return &svcsdk.DescribeProductOutput{
 							ProductViewSummary: &svcsdk.ProductViewSummary{
-								ProductId: aws.String("prod-fake"),
-								Name:      aws.String("fake product"),
+								ProductId: pointer.ToOrNilIfZeroValue("prod-fake"),
+								Name:      pointer.ToOrNilIfZeroValue("fake product"),
 							},
 							ProvisioningArtifacts: []*svcsdk.ProvisioningArtifact{
 								{
-									Id: aws.String(provisioningArtifactID),
+									Id: pointer.ToOrNilIfZeroValue(provisioningArtifactID),
 								},
 							},
 						}, nil
@@ -450,7 +450,7 @@ func TestIsUpToDate(t *testing.T) {
 					MockGet: func(ctx context.Context, key client.ObjectKey, obj client.Object) error {
 						pp := obj.(*v1alpha1.ProvisionedProduct)
 						pp.Status.AtProvider.LastProvisioningParameters = []*v1alpha1.ProvisioningParameter{
-							{Key: aws.String("Parameter1"), Value: aws.String("foo")},
+							{Key: pointer.ToOrNilIfZeroValue("Parameter1"), Value: pointer.ToOrNilIfZeroValue("foo")},
 						}
 						return nil
 					},
@@ -465,30 +465,30 @@ func TestIsUpToDate(t *testing.T) {
 			args: args{
 				provisionedProduct: provisionedProduct([]provisionedProductModifier{
 					withSpec(v1alpha1.ProvisionedProductParameters{
-						ProvisioningArtifactID: aws.String(provisioningArtifactID),
+						ProvisioningArtifactID: pointer.ToOrNilIfZeroValue(provisioningArtifactID),
 						ProvisioningParameters: []*v1alpha1.ProvisioningParameter{
-							{Key: aws.String("Parameter1"), Value: aws.String("foo")},
-							{Key: aws.String("Parameter2"), Value: aws.String("product_default_value")},
+							{Key: pointer.ToOrNilIfZeroValue("Parameter1"), Value: pointer.ToOrNilIfZeroValue("foo")},
+							{Key: pointer.ToOrNilIfZeroValue("Parameter2"), Value: pointer.ToOrNilIfZeroValue("product_default_value")},
 						},
 					}),
 					withStatus(v1alpha1.ProvisionedProductStatus{
 						AtProvider: v1alpha1.ProvisionedProductObservation{
-							Status: aws.String(string(v1alpha1.ProvisionedProductStatus_SDK_AVAILABLE))},
+							Status: pointer.ToOrNilIfZeroValue(string(v1alpha1.ProvisionedProductStatus_SDK_AVAILABLE))},
 					}),
 				}...),
 				describeProvisionedProductOutput: describeProvisionedProduct([]describeProvisionedProductOutputModifier{
 					withDetails(svcsdk.ProvisionedProductDetail{
-						Id:                     aws.String("pp-fake"),
-						ProvisioningArtifactId: aws.String(provisioningArtifactID),
+						Id:                     pointer.ToOrNilIfZeroValue("pp-fake"),
+						ProvisioningArtifactId: pointer.ToOrNilIfZeroValue(provisioningArtifactID),
 					}),
 				}...),
 				customClient: &fake.MockCustomServiceCatalogClient{
 					MockGetCloudformationStackParameters: func(provisionedProductOutputs []*svcsdk.RecordOutput) ([]cfsdkv2types.Parameter, error) {
 						return []cfsdkv2types.Parameter{
-							{ParameterKey: aws.String("Parameter1"), ParameterValue: aws.String("foo")},
-							{ParameterKey: aws.String("Parameter2"), ParameterValue: aws.String("product_default_value")},
-							{ParameterKey: aws.String("Parameter3"), ParameterValue: aws.String("product_default_value")},
-							{ParameterKey: aws.String("Parameter4"), ParameterValue: aws.String("product_default_value")},
+							{ParameterKey: pointer.ToOrNilIfZeroValue("Parameter1"), ParameterValue: pointer.ToOrNilIfZeroValue("foo")},
+							{ParameterKey: pointer.ToOrNilIfZeroValue("Parameter2"), ParameterValue: pointer.ToOrNilIfZeroValue("product_default_value")},
+							{ParameterKey: pointer.ToOrNilIfZeroValue("Parameter3"), ParameterValue: pointer.ToOrNilIfZeroValue("product_default_value")},
+							{ParameterKey: pointer.ToOrNilIfZeroValue("Parameter4"), ParameterValue: pointer.ToOrNilIfZeroValue("product_default_value")},
 						}, nil
 					},
 					MockGetProvisionedProductOutputs: func(getPPInput *svcsdk.GetProvisionedProductOutputsInput) (*svcsdk.GetProvisionedProductOutputsOutput, error) {
@@ -497,12 +497,12 @@ func TestIsUpToDate(t *testing.T) {
 					MockDescribeProduct: func(dpInput *svcsdk.DescribeProductInput) (*svcsdk.DescribeProductOutput, error) {
 						return &svcsdk.DescribeProductOutput{
 							ProductViewSummary: &svcsdk.ProductViewSummary{
-								ProductId: aws.String("prod-fake"),
-								Name:      aws.String("fake product"),
+								ProductId: pointer.ToOrNilIfZeroValue("prod-fake"),
+								Name:      pointer.ToOrNilIfZeroValue("fake product"),
 							},
 							ProvisioningArtifacts: []*svcsdk.ProvisioningArtifact{
 								{
-									Id: aws.String(provisioningArtifactID),
+									Id: pointer.ToOrNilIfZeroValue(provisioningArtifactID),
 								},
 							},
 						}, nil
@@ -512,8 +512,8 @@ func TestIsUpToDate(t *testing.T) {
 					MockGet: func(ctx context.Context, key client.ObjectKey, obj client.Object) error {
 						pp := obj.(*v1alpha1.ProvisionedProduct)
 						pp.Status.AtProvider.LastProvisioningParameters = []*v1alpha1.ProvisioningParameter{
-							{Key: aws.String("Parameter1"), Value: aws.String("foo")},
-							{Key: aws.String("Parameter2"), Value: aws.String("product_default_value")},
+							{Key: pointer.ToOrNilIfZeroValue("Parameter1"), Value: pointer.ToOrNilIfZeroValue("foo")},
+							{Key: pointer.ToOrNilIfZeroValue("Parameter2"), Value: pointer.ToOrNilIfZeroValue("product_default_value")},
 						}
 						return nil
 					},
@@ -528,29 +528,29 @@ func TestIsUpToDate(t *testing.T) {
 			args: args{
 				provisionedProduct: provisionedProduct([]provisionedProductModifier{
 					withSpec(v1alpha1.ProvisionedProductParameters{
-						ProvisioningArtifactID: aws.String(provisioningArtifactID),
+						ProvisioningArtifactID: pointer.ToOrNilIfZeroValue(provisioningArtifactID),
 						ProvisioningParameters: []*v1alpha1.ProvisioningParameter{
-							{Key: aws.String("Parameter1"), Value: aws.String("foo")},
+							{Key: pointer.ToOrNilIfZeroValue("Parameter1"), Value: pointer.ToOrNilIfZeroValue("foo")},
 						},
 					}),
 					withStatus(v1alpha1.ProvisionedProductStatus{
 						AtProvider: v1alpha1.ProvisionedProductObservation{
-							Status: aws.String(string(v1alpha1.ProvisionedProductStatus_SDK_AVAILABLE))},
+							Status: pointer.ToOrNilIfZeroValue(string(v1alpha1.ProvisionedProductStatus_SDK_AVAILABLE))},
 					}),
 				}...),
 				describeProvisionedProductOutput: describeProvisionedProduct([]describeProvisionedProductOutputModifier{
 					withDetails(svcsdk.ProvisionedProductDetail{
-						Id:                     aws.String("pp-fake"),
-						ProvisioningArtifactId: aws.String(provisioningArtifactID),
+						Id:                     pointer.ToOrNilIfZeroValue("pp-fake"),
+						ProvisioningArtifactId: pointer.ToOrNilIfZeroValue(provisioningArtifactID),
 					}),
 				}...),
 				customClient: &fake.MockCustomServiceCatalogClient{
 					MockGetCloudformationStackParameters: func(provisionedProductOutputs []*svcsdk.RecordOutput) ([]cfsdkv2types.Parameter, error) {
 						return []cfsdkv2types.Parameter{
-							{ParameterKey: aws.String("Parameter1"), ParameterValue: aws.String("foo")},
-							{ParameterKey: aws.String("Parameter2"), ParameterValue: aws.String("no_ways_to_determine_is_it_default_value_or_not")},
-							{ParameterKey: aws.String("Parameter3"), ParameterValue: aws.String("product_default_value")},
-							{ParameterKey: aws.String("Parameter4"), ParameterValue: aws.String("product_default_value")},
+							{ParameterKey: pointer.ToOrNilIfZeroValue("Parameter1"), ParameterValue: pointer.ToOrNilIfZeroValue("foo")},
+							{ParameterKey: pointer.ToOrNilIfZeroValue("Parameter2"), ParameterValue: pointer.ToOrNilIfZeroValue("no_ways_to_determine_is_it_default_value_or_not")},
+							{ParameterKey: pointer.ToOrNilIfZeroValue("Parameter3"), ParameterValue: pointer.ToOrNilIfZeroValue("product_default_value")},
+							{ParameterKey: pointer.ToOrNilIfZeroValue("Parameter4"), ParameterValue: pointer.ToOrNilIfZeroValue("product_default_value")},
 						}, nil
 					},
 					MockGetProvisionedProductOutputs: func(getPPInput *svcsdk.GetProvisionedProductOutputsInput) (*svcsdk.GetProvisionedProductOutputsOutput, error) {
@@ -560,11 +560,11 @@ func TestIsUpToDate(t *testing.T) {
 						return &svcsdk.DescribeProductOutput{
 							ProductViewSummary: &svcsdk.ProductViewSummary{
 								ProductId: dpInput.Id,
-								Name:      aws.String("fake product"),
+								Name:      pointer.ToOrNilIfZeroValue("fake product"),
 							},
 							ProvisioningArtifacts: []*svcsdk.ProvisioningArtifact{
 								{
-									Id: aws.String(provisioningArtifactID),
+									Id: pointer.ToOrNilIfZeroValue(provisioningArtifactID),
 								},
 							},
 						}, nil
@@ -574,8 +574,8 @@ func TestIsUpToDate(t *testing.T) {
 					MockGet: func(ctx context.Context, key client.ObjectKey, obj client.Object) error {
 						pp := obj.(*v1alpha1.ProvisionedProduct)
 						pp.Status.AtProvider.LastProvisioningParameters = []*v1alpha1.ProvisioningParameter{
-							{Key: aws.String("Parameter1"), Value: aws.String("foo")},
-							{Key: aws.String("Parameter2"), Value: aws.String("no_ways_to_determine_is_it_default_value_or_not")},
+							{Key: pointer.ToOrNilIfZeroValue("Parameter1"), Value: pointer.ToOrNilIfZeroValue("foo")},
+							{Key: pointer.ToOrNilIfZeroValue("Parameter2"), Value: pointer.ToOrNilIfZeroValue("no_ways_to_determine_is_it_default_value_or_not")},
 						}
 						return nil
 					},
@@ -590,31 +590,31 @@ func TestIsUpToDate(t *testing.T) {
 			args: args{
 				provisionedProduct: provisionedProduct([]provisionedProductModifier{
 					withSpec(v1alpha1.ProvisionedProductParameters{
-						ProvisioningArtifactID: aws.String(provisioningArtifactID),
+						ProvisioningArtifactID: pointer.ToOrNilIfZeroValue(provisioningArtifactID),
 						ProvisioningParameters: []*v1alpha1.ProvisioningParameter{
-							{Key: aws.String("Parameter1"), Value: aws.String("foo")},
-							{Key: aws.String("Parameter2"), Value: aws.String("bar")},
-							{Key: aws.String("Parameter3"), Value: aws.String("baz")},
+							{Key: pointer.ToOrNilIfZeroValue("Parameter1"), Value: pointer.ToOrNilIfZeroValue("foo")},
+							{Key: pointer.ToOrNilIfZeroValue("Parameter2"), Value: pointer.ToOrNilIfZeroValue("bar")},
+							{Key: pointer.ToOrNilIfZeroValue("Parameter3"), Value: pointer.ToOrNilIfZeroValue("baz")},
 						},
 					}),
 					withStatus(v1alpha1.ProvisionedProductStatus{
 						AtProvider: v1alpha1.ProvisionedProductObservation{
-							Status: aws.String(string(v1alpha1.ProvisionedProductStatus_SDK_AVAILABLE))},
+							Status: pointer.ToOrNilIfZeroValue(string(v1alpha1.ProvisionedProductStatus_SDK_AVAILABLE))},
 					}),
 				}...),
 				describeProvisionedProductOutput: describeProvisionedProduct([]describeProvisionedProductOutputModifier{
 					withDetails(svcsdk.ProvisionedProductDetail{
-						Id:                     aws.String("pp-fake"),
-						ProvisioningArtifactId: aws.String(provisioningArtifactID),
+						Id:                     pointer.ToOrNilIfZeroValue("pp-fake"),
+						ProvisioningArtifactId: pointer.ToOrNilIfZeroValue(provisioningArtifactID),
 					}),
 				}...),
 				customClient: &fake.MockCustomServiceCatalogClient{
 					MockGetCloudformationStackParameters: func(provisionedProductOutputs []*svcsdk.RecordOutput) ([]cfsdkv2types.Parameter, error) {
 						return []cfsdkv2types.Parameter{
-							{ParameterKey: aws.String("Parameter1"), ParameterValue: aws.String("foo")},
-							{ParameterKey: aws.String("Parameter2"), ParameterValue: aws.String("bar")},
-							{ParameterKey: aws.String("Parameter3"), ParameterValue: aws.String("baz")},
-							{ParameterKey: aws.String("Parameter4"), ParameterValue: aws.String("product_default_value")},
+							{ParameterKey: pointer.ToOrNilIfZeroValue("Parameter1"), ParameterValue: pointer.ToOrNilIfZeroValue("foo")},
+							{ParameterKey: pointer.ToOrNilIfZeroValue("Parameter2"), ParameterValue: pointer.ToOrNilIfZeroValue("bar")},
+							{ParameterKey: pointer.ToOrNilIfZeroValue("Parameter3"), ParameterValue: pointer.ToOrNilIfZeroValue("baz")},
+							{ParameterKey: pointer.ToOrNilIfZeroValue("Parameter4"), ParameterValue: pointer.ToOrNilIfZeroValue("product_default_value")},
 						}, nil
 					},
 					MockGetProvisionedProductOutputs: func(getPPInput *svcsdk.GetProvisionedProductOutputsInput) (*svcsdk.GetProvisionedProductOutputsOutput, error) {
@@ -624,11 +624,11 @@ func TestIsUpToDate(t *testing.T) {
 						return &svcsdk.DescribeProductOutput{
 							ProductViewSummary: &svcsdk.ProductViewSummary{
 								ProductId: dpInput.Id,
-								Name:      aws.String("fake product"),
+								Name:      pointer.ToOrNilIfZeroValue("fake product"),
 							},
 							ProvisioningArtifacts: []*svcsdk.ProvisioningArtifact{
 								{
-									Id: aws.String(provisioningArtifactID),
+									Id: pointer.ToOrNilIfZeroValue(provisioningArtifactID),
 								},
 							},
 						}, nil
@@ -638,9 +638,9 @@ func TestIsUpToDate(t *testing.T) {
 					MockGet: func(ctx context.Context, key client.ObjectKey, obj client.Object) error {
 						pp := obj.(*v1alpha1.ProvisionedProduct)
 						pp.Status.AtProvider.LastProvisioningParameters = []*v1alpha1.ProvisioningParameter{
-							{Key: aws.String("Parameter1"), Value: aws.String("foo")},
-							{Key: aws.String("Parameter2"), Value: aws.String("bar")},
-							{Key: aws.String("Parameter3"), Value: aws.String("baz")},
+							{Key: pointer.ToOrNilIfZeroValue("Parameter1"), Value: pointer.ToOrNilIfZeroValue("foo")},
+							{Key: pointer.ToOrNilIfZeroValue("Parameter2"), Value: pointer.ToOrNilIfZeroValue("bar")},
+							{Key: pointer.ToOrNilIfZeroValue("Parameter3"), Value: pointer.ToOrNilIfZeroValue("baz")},
 						}
 						return nil
 					},
@@ -679,7 +679,7 @@ func TestLateInitialize(t *testing.T) {
 			args: args{
 				provisionedProduct: provisionedProduct([]provisionedProductModifier{
 					withSpec(v1alpha1.ProvisionedProductParameters{
-						AcceptLanguage: aws.String(""),
+						AcceptLanguage: pointer.ToOrNilIfZeroValue(""),
 					}),
 				}...),
 			},
@@ -691,7 +691,7 @@ func TestLateInitialize(t *testing.T) {
 			args: args{
 				provisionedProduct: provisionedProduct([]provisionedProductModifier{
 					withSpec(v1alpha1.ProvisionedProductParameters{
-						AcceptLanguage: aws.String(acceptLanguage),
+						AcceptLanguage: pointer.ToOrNilIfZeroValue(acceptLanguage),
 					}),
 				}...),
 			},
@@ -731,18 +731,18 @@ func TestPostObserve(t *testing.T) {
 				provisionedProduct: provisionedProduct([]provisionedProductModifier{provisionedProductStatus}...),
 				describeProvisionedProductOutput: describeProvisionedProduct([]describeProvisionedProductOutputModifier{
 					withDetails(svcsdk.ProvisionedProductDetail{
-						Status:                             aws.String(string(v1alpha1.ProvisionedProductStatus_SDK_AVAILABLE)),
-						Arn:                                aws.String("arn:aws:servicecatalog:fake"),
+						Status:                             pointer.ToOrNilIfZeroValue(string(v1alpha1.ProvisionedProductStatus_SDK_AVAILABLE)),
+						Arn:                                pointer.ToOrNilIfZeroValue("arn:aws:servicecatalog:fake"),
 						CreatedTime:                        &testStaringTime,
-						LastSuccessfulProvisioningRecordId: aws.String("rec-fake"),
-						LaunchRoleArn:                      aws.String("arn:aws:iam::fake"),
-						StatusMessage:                      aws.String("fake"),
-						Type:                               aws.String("CFN_STACK"),
+						LastSuccessfulProvisioningRecordId: pointer.ToOrNilIfZeroValue("rec-fake"),
+						LaunchRoleArn:                      pointer.ToOrNilIfZeroValue("arn:aws:iam::fake"),
+						StatusMessage:                      pointer.ToOrNilIfZeroValue("fake"),
+						Type:                               pointer.ToOrNilIfZeroValue("CFN_STACK"),
 					}),
 				}...),
 				customClient: &fake.MockCustomServiceCatalogClient{
 					MockDescribeRecord: func(describeRecordInput *svcsdk.DescribeRecordInput) (*svcsdk.DescribeRecordOutput, error) {
-						return &svcsdk.DescribeRecordOutput{RecordDetail: &svcsdk.RecordDetail{RecordType: aws.String("PROVISION_PRODUCT")}}, nil
+						return &svcsdk.DescribeRecordOutput{RecordDetail: &svcsdk.RecordDetail{RecordType: pointer.ToOrNilIfZeroValue("PROVISION_PRODUCT")}}, nil
 					},
 				},
 			},
@@ -755,18 +755,18 @@ func TestPostObserve(t *testing.T) {
 				provisionedProduct: provisionedProduct([]provisionedProductModifier{provisionedProductStatus}...),
 				describeProvisionedProductOutput: describeProvisionedProduct([]describeProvisionedProductOutputModifier{
 					withDetails(svcsdk.ProvisionedProductDetail{
-						Status:                             aws.String(string(v1alpha1.ProvisionedProductStatus_SDK_UNDER_CHANGE)),
-						Arn:                                aws.String("arn:aws:servicecatalog:fake"),
+						Status:                             pointer.ToOrNilIfZeroValue(string(v1alpha1.ProvisionedProductStatus_SDK_UNDER_CHANGE)),
+						Arn:                                pointer.ToOrNilIfZeroValue("arn:aws:servicecatalog:fake"),
 						CreatedTime:                        &testStaringTime,
-						LastSuccessfulProvisioningRecordId: aws.String("rec-fake"),
-						LaunchRoleArn:                      aws.String("arn:aws:iam::fake"),
-						StatusMessage:                      aws.String("fake"),
-						Type:                               aws.String("CFN_STACK"),
+						LastSuccessfulProvisioningRecordId: pointer.ToOrNilIfZeroValue("rec-fake"),
+						LaunchRoleArn:                      pointer.ToOrNilIfZeroValue("arn:aws:iam::fake"),
+						StatusMessage:                      pointer.ToOrNilIfZeroValue("fake"),
+						Type:                               pointer.ToOrNilIfZeroValue("CFN_STACK"),
 					}),
 				}...),
 				customClient: &fake.MockCustomServiceCatalogClient{
 					MockDescribeRecord: func(describeRecordInput *svcsdk.DescribeRecordInput) (*svcsdk.DescribeRecordOutput, error) {
-						return &svcsdk.DescribeRecordOutput{RecordDetail: &svcsdk.RecordDetail{RecordType: aws.String("UPDATE_PROVISIONED_PRODUCT")}}, nil
+						return &svcsdk.DescribeRecordOutput{RecordDetail: &svcsdk.RecordDetail{RecordType: pointer.ToOrNilIfZeroValue("UPDATE_PROVISIONED_PRODUCT")}}, nil
 					},
 				},
 			},
@@ -779,18 +779,18 @@ func TestPostObserve(t *testing.T) {
 				provisionedProduct: provisionedProduct([]provisionedProductModifier{provisionedProductStatus}...),
 				describeProvisionedProductOutput: describeProvisionedProduct([]describeProvisionedProductOutputModifier{
 					withDetails(svcsdk.ProvisionedProductDetail{
-						Status:                             aws.String(string(v1alpha1.ProvisionedProductStatus_SDK_ERROR)),
-						Arn:                                aws.String("arn:aws:servicecatalog:fake"),
+						Status:                             pointer.ToOrNilIfZeroValue(string(v1alpha1.ProvisionedProductStatus_SDK_ERROR)),
+						Arn:                                pointer.ToOrNilIfZeroValue("arn:aws:servicecatalog:fake"),
 						CreatedTime:                        &testStaringTime,
-						LastSuccessfulProvisioningRecordId: aws.String("rec-fake"),
-						LaunchRoleArn:                      aws.String("arn:aws:iam::fake"),
-						StatusMessage:                      aws.String("fake"),
-						Type:                               aws.String("CFN_STACK"),
+						LastSuccessfulProvisioningRecordId: pointer.ToOrNilIfZeroValue("rec-fake"),
+						LaunchRoleArn:                      pointer.ToOrNilIfZeroValue("arn:aws:iam::fake"),
+						StatusMessage:                      pointer.ToOrNilIfZeroValue("fake"),
+						Type:                               pointer.ToOrNilIfZeroValue("CFN_STACK"),
 					}),
 				}...),
 				customClient: &fake.MockCustomServiceCatalogClient{
 					MockDescribeRecord: func(describeRecordInput *svcsdk.DescribeRecordInput) (*svcsdk.DescribeRecordOutput, error) {
-						return &svcsdk.DescribeRecordOutput{RecordDetail: &svcsdk.RecordDetail{RecordType: aws.String("PROVISION_PRODUCT")}}, nil
+						return &svcsdk.DescribeRecordOutput{RecordDetail: &svcsdk.RecordDetail{RecordType: pointer.ToOrNilIfZeroValue("PROVISION_PRODUCT")}}, nil
 					},
 				},
 			},
@@ -803,18 +803,18 @@ func TestPostObserve(t *testing.T) {
 				provisionedProduct: provisionedProduct([]provisionedProductModifier{provisionedProductStatus}...),
 				describeProvisionedProductOutput: describeProvisionedProduct([]describeProvisionedProductOutputModifier{
 					withDetails(svcsdk.ProvisionedProductDetail{
-						Status:                             aws.String(string(v1alpha1.ProvisionedProductStatus_SDK_TAINTED)),
-						Arn:                                aws.String("arn:aws:servicecatalog:fake"),
+						Status:                             pointer.ToOrNilIfZeroValue(string(v1alpha1.ProvisionedProductStatus_SDK_TAINTED)),
+						Arn:                                pointer.ToOrNilIfZeroValue("arn:aws:servicecatalog:fake"),
 						CreatedTime:                        &testStaringTime,
-						LastSuccessfulProvisioningRecordId: aws.String("rec-fake"),
-						LaunchRoleArn:                      aws.String("arn:aws:iam::fake"),
-						StatusMessage:                      aws.String("fake"),
-						Type:                               aws.String("CFN_STACK"),
+						LastSuccessfulProvisioningRecordId: pointer.ToOrNilIfZeroValue("rec-fake"),
+						LaunchRoleArn:                      pointer.ToOrNilIfZeroValue("arn:aws:iam::fake"),
+						StatusMessage:                      pointer.ToOrNilIfZeroValue("fake"),
+						Type:                               pointer.ToOrNilIfZeroValue("CFN_STACK"),
 					}),
 				}...),
 				customClient: &fake.MockCustomServiceCatalogClient{
 					MockDescribeRecord: func(describeRecordInput *svcsdk.DescribeRecordInput) (*svcsdk.DescribeRecordOutput, error) {
-						return &svcsdk.DescribeRecordOutput{RecordDetail: &svcsdk.RecordDetail{RecordType: aws.String("PROVISION_PRODUCT")}}, nil
+						return &svcsdk.DescribeRecordOutput{RecordDetail: &svcsdk.RecordDetail{RecordType: pointer.ToOrNilIfZeroValue("PROVISION_PRODUCT")}}, nil
 					},
 				},
 			},
@@ -851,7 +851,7 @@ func TestPreDelete(t *testing.T) {
 				provisionedProduct: provisionedProduct([]provisionedProductModifier{
 					withStatus(v1alpha1.ProvisionedProductStatus{
 						AtProvider: v1alpha1.ProvisionedProductObservation{
-							Status: aws.String(string(v1alpha1.ProvisionedProductStatus_SDK_UNDER_CHANGE))},
+							Status: pointer.ToOrNilIfZeroValue(string(v1alpha1.ProvisionedProductStatus_SDK_UNDER_CHANGE))},
 					}),
 				}...),
 			},
@@ -864,7 +864,7 @@ func TestPreDelete(t *testing.T) {
 				provisionedProduct: provisionedProduct([]provisionedProductModifier{
 					withStatus(v1alpha1.ProvisionedProductStatus{
 						AtProvider: v1alpha1.ProvisionedProductObservation{
-							Status: aws.String("NOT_UNDER_CHANGE")},
+							Status: pointer.ToOrNilIfZeroValue("NOT_UNDER_CHANGE")},
 					}),
 				}...),
 			},
