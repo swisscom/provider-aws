@@ -53,9 +53,10 @@ func main() {
 		leaderElection   = app.Flag("leader-election", "Use leader election for the conroller manager.").Short('l').Default("false").OverrideDefaultFromEnvar("LEADER_ELECTION").Bool()
 		maxReconcileRate = app.Flag("max-reconcile-rate", "The global maximum rate per second at which resources may checked for drift from the desired state.").Default("10").Int()
 
-		namespace                  = app.Flag("namespace", "Namespace used to set as default scope in default secret store config.").Default("crossplane-system").Envar("POD_NAMESPACE").String()
-		enableExternalSecretStores = app.Flag("enable-external-secret-stores", "Enable support for ExternalSecretStores.").Default("false").Envar("ENABLE_EXTERNAL_SECRET_STORES").Bool()
-		enableManagementPolicies   = app.Flag("enable-management-policies", "Enable support for Management Policies.").Default("false").Envar("ENABLE_MANAGEMENT_POLICIES").Bool()
+		namespace                                  = app.Flag("namespace", "Namespace used to set as default scope in default secret store config.").Default("crossplane-system").Envar("POD_NAMESPACE").String()
+		enableExternalSecretStores                 = app.Flag("enable-external-secret-stores", "Enable support for ExternalSecretStores.").Default("false").Envar("ENABLE_EXTERNAL_SECRET_STORES").Bool()
+		enableManagementPolicies                   = app.Flag("enable-management-policies", "Enable support for Management Policies.").Default("false").Envar("ENABLE_MANAGEMENT_POLICIES").Bool()
+		enablePrometheusMetricsGroupReconciliation = app.Flag("enable-prom-metric-group-reconciliation", "Enable prometheus reconciliation metrics").Default("false").Envar("ENABLE_PROM_METRIC_GROUP_RECONCILIATION").Bool()
 	)
 	kingpin.MustParse(app.Parse(os.Args[1:]))
 
@@ -126,7 +127,12 @@ func main() {
 		log.Info("Alpha feature enabled", "flag", features.EnableAlphaManagementPolicies)
 	}
 
-	kingpin.FatalIfError(metrics.SetupMetrics(), "Cannot setup AWS metrics hook")
+	if *enablePrometheusMetricsGroupReconciliation {
+		o.Features.Enable(features.EnableReconciliationMetrics)
+		log.Info("Alpha feature enabled", "flag", features.EnableReconciliationMetrics)
+	}
+
+	kingpin.FatalIfError(metrics.SetupMetrics(o.Features), "Cannot setup AWS metrics")
 	kingpin.FatalIfError(controller.Setup(mgr, o), "Cannot setup AWS controllers")
 	kingpin.FatalIfError(mgr.Start(ctrl.SetupSignalHandler()), "Cannot start controller manager")
 
