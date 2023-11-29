@@ -3,7 +3,7 @@ package metrics
 import (
 	"github.com/crossplane/crossplane-runtime/pkg/feature"
 	"github.com/prometheus/client_golang/prometheus"
-	k8smetrics "sigs.k8s.io/controller-runtime/pkg/metrics"
+	"sigs.k8s.io/controller-runtime/pkg/metrics"
 
 	"github.com/crossplane-contrib/provider-aws/pkg/features"
 )
@@ -31,21 +31,19 @@ type metric interface {
 }
 
 // SetupMetrics will register the known Prometheus metrics with controller-runtime's metrics registry
-func SetupMetrics(ff *feature.Flags) error {
-	metrics := []metric{
+func SetupMetrics(flags *feature.Flags) error {
+	metricsList := []metric{
 		metricAWSAPICalls,
 	}
-	reconciliationMetrics := []metric{
+	reconciliationMetricsList := []metric{
 		MetricAWSAPICallsRec,
 		MetricManagedResRec,
 	}
-
-	if ff.Enabled(features.EnableReconciliationMetrics) {
-		metrics = append(metrics, reconciliationMetrics...)
+	if flags.Enabled(features.EnableReconciliationMetrics) {
+		metricsList = append(metricsList, reconciliationMetricsList...)
 	}
-
-	for _, m := range metrics {
-		err := k8smetrics.Registry.Register(m)
+	for _, m := range metricsList {
+		err := metrics.Registry.Register(m)
 		if err != nil {
 			return err
 		}

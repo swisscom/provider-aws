@@ -455,10 +455,10 @@ func (c *custom) getProductID(productName *string) (string, error) {
 	if output == nil {
 		// DescribeProvisioningArtifact method fits much better, but it has a bug - it returns nothing if a product is a part of imported portfolio
 		o, err := c.client.DescribeProduct(&input)
-		output = o
 		if c.metrics.enabled {
 			c.metrics.observe.Inc()
 		}
+		output = o
 		if err != nil {
 			return "", errors.Wrap(err, errCouldNotLookupProduct)
 		}
