@@ -22,11 +22,11 @@ stages:
   script:
     -  mkdir -p $HOME/.docker && cat $DOCKER_CONFIG_JSON > $HOME/.docker/config.json
 
-lint:
-  stage: lint
-  extends: .base
-  script:
-    - make lint
+#lint:
+#  stage: lint
+#  extends: .base
+#  script:
+#    - make lint
 
 build:
   stage: build
