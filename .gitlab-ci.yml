@@ -42,5 +42,5 @@ build:
       fi
       echo "this build classified as ${BUILD_TYPE} based on tag ${CI_COMMIT_TAG}"
     - git config --global --add safe.directory $CI_PROJECT_DIR
-    - make build.all VERSION=$CI_COMMIT_TAG PLATFORMS=linux_amd64git d
+    - make build.all VERSION=$CI_COMMIT_TAG PLATFORMS=linux_amd64
     - make publish.artifacts PLATFORMS=linux_amd64 XPKG_REG_ORGS=${DESTINATION_REGISTRY}/provider-aws VERSION=${CI_COMMIT_TAG}
