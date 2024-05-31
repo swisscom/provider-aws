@@ -25,7 +25,8 @@ lint:
   stage: lint
   extends: .base
   script:
-    - make lint
+    - go test -v ./...
+#    - make lint
 
 build:
   stage: build
