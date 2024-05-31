@@ -41,6 +41,6 @@ build:
         BUILD_TYPE=development
       fi
       echo "this build classified as ${BUILD_TYPE} based on tag ${CI_COMMIT_TAG}"
-
-    - make build VERSION=$CI_COMMIT_TAG
+    - make vendor vendor.check
+    - make build.all VERSION=$CI_COMMIT_TAG
     - make publish.artifacts PLATFORMS=linux_amd64 XPKG_REG_ORGS=${DESTINATION_REGISTRY}/provider-aws VERSION=${CI_COMMIT_TAG}
