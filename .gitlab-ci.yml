@@ -1,0 +1,49 @@
+---
+workflow:
+  rules:
+    # Run on tags
+    - if: $CI_COMMIT_TAG
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+
+stages:
+  - lint
+  - build
+
+.base:
+  image: swisscom-docker-local.artifactory.swisscom.com/golang:1.21-bookworm
+  variables:
+    http_proxy: http://server-proxy.corproot.net:8080
+    https_proxy: http://server-proxy.corproot.net:8080
+    noproxy: '127.0.0.1,localhost,code.swisscom.com,git.swisscom.com,artifactory.swisscom.com,bin.swisscom.com,icp.swisscom.com'
+    GOPROXY: "https://artifactory.swisscom.com/artifactory/api/go/proxy-golang-go-virtual"
+    GOFLAGS: '-buildvcs=false'
+  script:
+    -  mkdir -p $HOME/.docker && cat $DOCKER_CONFIG_JSON > $HOME/.docker/config.json
+
+lint:
+  stage: lint
+  extends: .base
+  script:
+    - make lint
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event" || $FORCE_LINT == "true"
+
+build:
+  stage: build
+  extends: .base
+  script:
+    - |
+      if [[ $CI_COMMIT_TAG =~ ^v?[0-9]{1,4}.[0-9]{1,4}.[0-9]{1,4}$ ]]; then
+        export DESTINATION_REGISTRY=tde-green-public-docker-local.artifactory.swisscom.com
+        BUILD_TYPE=release
+      else
+        export DESTINATION_REGISTRY=crossplane-dev-docker-local.artifactory.swisscom.com
+        BUILD_TYPE=development
+      fi
+      echo "this build classified as ${BUILD_TYPE} based on tag ${CI_COMMIT_TAG}"
+
+    - make build VERSION=$CI_COMMIT_TAG
+    - make publish.artifacts PLATFORMS=linux_amd64 XPKG_REG_ORGS=${DESTINATION_REGISTRY}/provider-aws VERSION=${CI_COMMIT_TAG}
+
+  rules:
+    - if: $CI_COMMIT_TAG
