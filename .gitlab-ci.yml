@@ -17,7 +17,7 @@ stages:
     noproxy: '127.0.0.1,localhost,code.swisscom.com,git.swisscom.com,artifactory.swisscom.com,bin.swisscom.com,icp.swisscom.com'
     GOPROXY: "https://artifactory.swisscom.com/artifactory/api/go/proxy-golang-go-virtual"
     GOFLAGS: '-buildvcs=false'
-    GOPATH: /go
+    GOPATH: '/go'
   script:
     -  mkdir -p $HOME/.docker && cat $DOCKER_CONFIG_JSON > $HOME/.docker/config.json
 
@@ -25,9 +25,7 @@ lint:
   stage: lint
   extends: .base
   script:
-    - ls /go
-    - curl -fsSL https://github.com/golangci/golangci-lint/releases/download/v1.54.0/golangci-lint-1.54.0-linux-amd64.tar.gz  | tar -xz --strip-components=1 -C /tmp
-    - /tmp/golangci-lint run -v -c .golangci.yml
+    - make lint
 
 build:
   stage: build
