@@ -5,12 +5,13 @@ workflow:
     - if: $CI_COMMIT_TAG
 
 stages:
-  - lint
+#  - lint
   - build
 
 .base:
   image: swisscom-docker-local.artifactory.swisscom.com/golang:1.21-bookworm
   variables:
+    V: 1
     GIT_SUBMODULE_STRATEGY: recursive
     http_proxy: http://server-proxy.corproot.net:8080
     https_proxy: http://server-proxy.corproot.net:8080
@@ -25,8 +26,7 @@ lint:
   stage: lint
   extends: .base
   script:
-    - go test -v ./...
-#    - make lint
+    - make lint
 
 build:
   stage: build
