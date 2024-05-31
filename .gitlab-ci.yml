@@ -20,7 +20,8 @@ stages:
     GOFLAGS: '-buildvcs=false'
     GOPATH: '/go'
   script:
-    -  mkdir -p $HOME/.docker && cat $DOCKER_CONFIG_JSON > $HOME/.docker/config.json
+    - mkdir -p $HOME/.docker && cat $DOCKER_CONFIG_JSON > $HOME/.docker/config.json
+    - git config --global --add safe.directory CI_PROJECT_DIR
 
 #lint:
 #  stage: lint
