@@ -5,7 +5,7 @@ workflow:
     - if: $CI_COMMIT_TAG
 
 stages:
-#  - lint
+  - lint
   - build
 
 .base:
@@ -21,12 +21,12 @@ stages:
   script:
     - mkdir -p $HOME/.docker && cat $DOCKER_CONFIG_JSON > $HOME/.docker/config.json
 
-#lint:
-#  stage: lint
-#  extends: .base
-#  script:
-#    - git config --global --add safe.directory $CI_PROJECT_DIR
-#    - make lint
+lint:
+  stage: lint
+  extends: .base
+  script:
+    - git config --global --add safe.directory $CI_PROJECT_DIR
+    - make lint
 
 build:
   stage: build
