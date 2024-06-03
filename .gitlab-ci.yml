@@ -20,13 +20,13 @@ stages:
   script:
     - mkdir -p $HOME/.docker && cat $DOCKER_CONFIG_JSON > $HOME/.docker/config.json
     - git config --global --add safe.directory $CI_PROJECT_DIR
-    - make submodules
-    - make vendor vendor.check
 
 lint:
   stage: lint
   extends: .base
   script:
+    - make submodules
+    - make vendor vendor.check
     - make lint
 
 build:
