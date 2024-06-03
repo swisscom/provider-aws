@@ -26,6 +26,7 @@ lint:
   extends: .base
   script:
     - make submodules
+    - make tidy
     - make vendor vendor.check
     - make lint
 
