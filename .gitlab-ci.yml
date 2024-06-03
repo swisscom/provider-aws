@@ -26,9 +26,13 @@ lint:
   extends: .base
   allow_failure: true
   script:
+    - go version
+    - go env
+    - go clean -modcache
+    - go clean -cache
     - make submodules
     - make vendor vendor.check
-    - make -j2 lint || ./cache/tools/linux_x86_64/golangci-lint-v1.54.2 cache status
+    - make lint
 
 build:
   stage: build
@@ -46,6 +50,10 @@ build:
         BUILD_TYPE=development
       fi
       echo "this build classified as ${BUILD_TYPE} based on tag ${CI_COMMIT_TAG}"
+    - go version
+    - go env
+    - go clean -modcache
+    - go clean -cache
     - make submodules
     - make vendor vendor.check
     - make -j2 build.all VERSION=${CI_COMMIT_TAG} PLATFORMS=linux_amd64
