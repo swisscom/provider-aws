@@ -27,6 +27,8 @@ lint:
   extends: .base
   script:
     - go env
+    - pwd
+    - ls -lah .
     - make vendor vendor.check
     - make lint
 
