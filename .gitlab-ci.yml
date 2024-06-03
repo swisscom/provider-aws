@@ -30,7 +30,7 @@ lint:
     - make submodules
     - make vendor vendor.check
     - .cache/tools/linux_x86_64/golangci-lint-v1.54.2 cache status
-    - make lint
+    - make -j2 lint
 
 build:
   stage: build
@@ -46,5 +46,5 @@ build:
       fi
       echo "this build classified as ${BUILD_TYPE} based on tag ${CI_COMMIT_TAG}"
     - make submodules
-    - make build.all VERSION=$CI_COMMIT_TAG PLATFORMS=linux_amd64
-    - make publish.artifacts PLATFORMS=linux_amd64 XPKG_REG_ORGS=${DESTINATION_REGISTRY}/provider-aws VERSION=${CI_COMMIT_TAG}
+    - make -j2 build.all VERSION=$CI_COMMIT_TAG PLATFORMS=linux_amd64
+    - make -j2 publish.artifacts PLATFORMS=linux_amd64 XPKG_REG_ORGS=${DESTINATION_REGISTRY}/provider-aws VERSION=${CI_COMMIT_TAG}
