@@ -12,7 +12,6 @@ stages:
   image: tde-green-public-docker-local.artifactory.swisscom.com/golang:1.21.2-bookworm
   variables:
 #    GIT_SUBMODULE_STRATEGY: recursive
-    HTTP_PROXY: http://server-proxy.corproot.net:8080
     HTTPS_PROXY: http://server-proxy.corproot.net:8080
     NO_PROXY: '127.0.0.1,localhost,code.swisscom.com,git.swisscom.com,artifactory.swisscom.com,bin.swisscom.com,icp.swisscom.com'
     GOPROXY: "https://artifactory.swisscom.com/artifactory/api/go/proxy-golang-go-virtual"
@@ -29,7 +28,7 @@ lint:
   script:
     - make submodules
     - make vendor vendor.check
-    - make -j2 lint || ./cache/tools/linux_x86_64/golangci-lint-v1.54.2 cache statu
+    - make -j2 lint || ./cache/tools/linux_x86_64/golangci-lint-v1.54.2 cache status
 
 build:
   stage: build
@@ -49,5 +48,5 @@ build:
       echo "this build classified as ${BUILD_TYPE} based on tag ${CI_COMMIT_TAG}"
     - make submodules
     - make vendor vendor.check
-    - make -j2 build.all VERSION=$CI_COMMIT_TAG PLATFORMS=linux_amd64
+    - make -j2 build.all VERSION=${CI_COMMIT_TAG} PLATFORMS=linux_amd64
     - make -j2 publish.artifacts PLATFORMS=linux_amd64 XPKG_REG_ORGS=${DESTINATION_REGISTRY}/provider-aws VERSION=${CI_COMMIT_TAG}
