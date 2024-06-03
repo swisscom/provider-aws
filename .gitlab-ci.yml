@@ -11,7 +11,6 @@ stages:
 .base:
   image: tde-green-public-docker-local.artifactory.swisscom.com/golang:1.21.2-bookworm
   variables:
-    GIT_SUBMODULE_STRATEGY: recursive
     http_proxy: http://server-proxy.corproot.net:8080
     https_proxy: http://server-proxy.corproot.net:8080
     noproxy: '127.0.0.1,localhost,code.swisscom.com,git.swisscom.com,artifactory.swisscom.com,bin.swisscom.com,icp.swisscom.com'
@@ -21,15 +20,13 @@ stages:
   script:
     - mkdir -p $HOME/.docker && cat $DOCKER_CONFIG_JSON > $HOME/.docker/config.json
     - git config --global --add safe.directory $CI_PROJECT_DIR
+    - make submodules
+    - make vendor vendor.check
 
 lint:
   stage: lint
   extends: .base
   script:
-    - go env
-    - pwd
-    - ls -lah .
-    - make vendor vendor.check
     - make lint
 
 build:
