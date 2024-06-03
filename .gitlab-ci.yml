@@ -26,6 +26,8 @@ lint:
   stage: lint
   extends: .base
   script:
+    - go env
+    - make vendor vendor.check
     - make lint
 
 build:
