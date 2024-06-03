@@ -26,10 +26,6 @@ lint:
   extends: .base
   allow_failure: true
   script:
-    - go version
-    - go env
-    - go clean -modcache
-    - go clean -cache
     - make submodules
     - make vendor vendor.check
     - make lint
@@ -50,11 +46,7 @@ build:
         BUILD_TYPE=development
       fi
       echo "this build classified as ${BUILD_TYPE} based on tag ${CI_COMMIT_TAG}"
-    - go version
-    - go env
-    - go clean -modcache
-    - go clean -cache
     - make submodules
     - make vendor vendor.check
-    - make -j2 build.all VERSION=${CI_COMMIT_TAG} PLATFORMS=linux_amd64
+    - make -j2 build.all VERSION=${CI_COMMIT_TAG}
     - make -j2 publish.artifacts PLATFORMS=linux_amd64 XPKG_REG_ORGS=${DESTINATION_REGISTRY}/provider-aws VERSION=${CI_COMMIT_TAG}
