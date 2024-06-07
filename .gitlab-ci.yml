@@ -19,7 +19,7 @@ stages:
     HTTP_PROXY: http://server-proxy.corproot.net:8080
     NO_PROXY: '127.0.0.1,localhost,code.swisscom.com,git.swisscom.com,artifactory.swisscom.com,bin.swisscom.com,icp.swisscom.com'
     GOFLAGS: '-buildvcs=false'
-    GOPROXY: direct
+    GOPROXY: "https://artifactory.swisscom.com/artifactory/api/go/proxy-golang-go-virtual"
     GOARCH: amd64
     CGO_ENABLED: 0
     GOOS: linux
