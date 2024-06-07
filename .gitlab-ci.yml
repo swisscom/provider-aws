@@ -37,15 +37,16 @@ lint:
   extends: .base
   allow_failure: true
   script:
-    - "sed  -i -e '3s/^$/  concurrency\: 6/g' .golangci.yml"
-    - make vendor vendor.check
-    - curl -fsSL https://github.com/golangci/golangci-lint/releases/download/v1.54.0/golangci-lint-1.54.0-linux-amd64.tar.gz  | tar -xz --strip-components=1 -C /tmp
-    - /tmp/golangci-lint run -v -c .golangci.yml
-    - make lint
+    - |
+      sed  -i -e '3s/^$/  concurrency\: 6/g' .golangci.yml
+      cat .golangci.yml
+      make vendor vendor.check
 
 build:
   stage: build
   extends: .base
+  variables:
+    TOOLS_DIR: ${CI_PROJECT_DIR}/.cache/tools/linux_amd64
   script:
     - |
       if [[ $CI_COMMIT_TAG =~ ^v?[0-9]{1,4}.[0-9]{1,4}.[0-9]{1,4}$ ]]; then
@@ -56,6 +57,8 @@ build:
         BUILD_TYPE=development
       fi
       echo "this build classified as ${BUILD_TYPE} based on tag ${CI_COMMIT_TAG}"
-    - go build -o provider-aws-linux-amd64 cmd/provider/main.go
-    - /up xpkg build --package-root="." --examples-root="./examples" --output="./provider-aws.xpkg"
-    - /up xpkg publish ${DESTINATION_REGISTRY}/provider-aws:${CI_COMMIT_TAG} -f ./provider-aws.xpkg
+    - |
+      mkdir -p  ${TOOLS_DIR}
+      cp ./up ${TOOLS_DIR}/up-v0.18.0
+    - make build VERSION=$CI_COMMIT_TAG
+    - make publish.artifacts PLATFORMS=linux_amd64 XPKG_REG_ORGS=${DESTINATION_REGISTRY}/provider-aws VERSION=${CI_COMMIT_TAG}
