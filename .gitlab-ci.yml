@@ -14,8 +14,8 @@ stages:
     GIT_SUBMODULE_STRATEGY: recursive
     KUBERNETES_CPU_REQUEST: "6"
     KUBERNETES_CPU_LIMIT: "6"
-    KUBERNETES_MEMORY_REQUEST: "6Gi"
-    KUBERNETES_MEMORY_LIMIT: "6Gi"
+    KUBERNETES_MEMORY_REQUEST: "8Gi"
+    KUBERNETES_MEMORY_LIMIT: "8Gi"
     HTTPS_PROXY: http://server-proxy.corprouot.net:8080
     HTTP_PROXY: http://server-proxy.corproot.net:8080
     NO_PROXY: '127.0.0.1,localhost,code.swisscom.com,git.swisscom.com,artifactory.swisscom.com,bin.swisscom.com,icp.swisscom.com'
@@ -37,9 +37,11 @@ lint:
   extends: .base
   allow_failure: true
   script:
+    - "sed  -i -e '3s/^$/  concurrency\: 6/g' .golangci.yml"
     - make vendor vendor.check
     - curl -fsSL https://github.com/golangci/golangci-lint/releases/download/v1.54.0/golangci-lint-1.54.0-linux-amd64.tar.gz  | tar -xz --strip-components=1 -C /tmp
     - /tmp/golangci-lint run -v -c .golangci.yml
+    - make lint
 
 build:
   stage: build
@@ -55,8 +57,5 @@ build:
       fi
       echo "this build classified as ${BUILD_TYPE} based on tag ${CI_COMMIT_TAG}"
     - go build -o provider-aws-linux-amd64 cmd/provider/main.go
-    - ls -lah /up
-    - whoami
-    - chmod +x /up
-    - /up xpkg build --package-root="." XPKG_EXAMPLES_DIR --examples-root="./examples" --output="./provider-aws.xpkg"
+    - /up xpkg build --package-root="." --examples-root="./examples" --output="./provider-aws.xpkg"
     - /up xpkg publish ${DESTINATION_REGISTRY}/provider-aws:${CI_COMMIT_TAG} -f ./provider-aws.xpkg
