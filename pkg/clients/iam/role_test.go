@@ -1,6 +1,8 @@
 package iam
 
 import (
+	"net/url"
+	"regexp"
 	"strings"
 	"testing"
 	"time"
@@ -10,10 +12,10 @@ import (
 	"github.com/aws/smithy-go/document"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
+	"k8s.io/utils/ptr"
 
 	"github.com/crossplane-contrib/provider-aws/apis/iam/v1beta1"
 	"github.com/crossplane-contrib/provider-aws/pkg/utils/pointer"
-	legacypolicy "github.com/crossplane-contrib/provider-aws/pkg/utils/policy/old"
 )
 
 var (
@@ -31,8 +33,19 @@ var (
 		  }
 		]
 	   }`
+	assumeRolePolicyDocumentWithArrays = `{
+		"Statement": [
+			{
+				"Effect": "Allow",
+				"Principal": {
+					"Service": ["eks.amazonaws.com"]
+				},
+				"Action": ["sts:AssumeRole"]
+			}
+		],
+		"Version": "2012-10-17"
+	}`
 	assumeRolePolicyDocument2 = `{
-		"Version": "2012-10-17",
 		"Statement": [
 		  {
 			"Effect": "Allow",
@@ -44,8 +57,9 @@ var (
 			  "StringEquals": {"foo": "bar"}
 			}
 		  }
-		]
-	   }`
+		],
+		"Version": "2012-10-17"
+	}`
 	roleID             = "some Id"
 	roleName           = "some name"
 	tagKey             = "key"
@@ -67,14 +81,6 @@ func roleParams(m ...func(*v1beta1.RoleParameters)) *v1beta1.RoleParameters {
 	}
 
 	return o
-}
-
-func escapedPolicyJSON() *string {
-	p, err := legacypolicy.CompactAndEscapeJSON(assumeRolePolicyDocument)
-	if err == nil {
-		return &p
-	}
-	return nil
 }
 
 func role(m ...func(*iamtypes.Role)) *iamtypes.Role {
@@ -256,12 +262,12 @@ func TestIsRoleUpToDate(t *testing.T) {
 	cases := map[string]struct {
 		args     args
 		want     bool
-		wantDiff string
+		wantDiff []*regexp.Regexp
 	}{
 		"SameFields": {
 			args: args{
 				role: iamtypes.Role{
-					AssumeRolePolicyDocument: escapedPolicyJSON(),
+					AssumeRolePolicyDocument: ptr.To(url.QueryEscape(assumeRolePolicyDocument)),
 					Description:              &description,
 					MaxSessionDuration:       pointer.ToIntAsInt32(1),
 					Path:                     pointer.ToOrNilIfZeroValue("/"),
@@ -281,13 +287,37 @@ func TestIsRoleUpToDate(t *testing.T) {
 					}},
 				},
 			},
-			want:     true,
-			wantDiff: "",
+			want: true,
+		},
+		"SameFieldsWithDifferentPolicyFormat": {
+			args: args{
+				role: iamtypes.Role{
+					AssumeRolePolicyDocument: ptr.To(url.QueryEscape(assumeRolePolicyDocumentWithArrays)),
+					Description:              &description,
+					MaxSessionDuration:       pointer.ToIntAsInt32(1),
+					Path:                     pointer.ToOrNilIfZeroValue("/"),
+					Tags: []iamtypes.Tag{{
+						Key:   pointer.ToOrNilIfZeroValue("key1"),
+						Value: pointer.ToOrNilIfZeroValue("value1"),
+					}},
+				},
+				p: v1beta1.RoleParameters{
+					Description:              &description,
+					AssumeRolePolicyDocument: assumeRolePolicyDocument,
+					MaxSessionDuration:       pointer.ToIntAsInt32(1),
+					Path:                     pointer.ToOrNilIfZeroValue("/"),
+					Tags: []v1beta1.Tag{{
+						Key:   "key1",
+						Value: "value1",
+					}},
+				},
+			},
+			want: true,
 		},
 		"AWSInitializedFields": {
 			args: args{
 				role: iamtypes.Role{
-					AssumeRolePolicyDocument: escapedPolicyJSON(),
+					AssumeRolePolicyDocument: ptr.To(url.QueryEscape(assumeRolePolicyDocument)),
 					CreateDate:               &createDate,
 					Description:              &description,
 					MaxSessionDuration:       pointer.ToIntAsInt32(1),
@@ -317,13 +347,12 @@ func TestIsRoleUpToDate(t *testing.T) {
 					}},
 				},
 			},
-			want:     true,
-			wantDiff: "",
+			want: true,
 		},
 		"DifferentPolicy": {
 			args: args{
 				role: iamtypes.Role{
-					AssumeRolePolicyDocument: escapedPolicyJSON(),
+					AssumeRolePolicyDocument: ptr.To(url.QueryEscape(assumeRolePolicyDocument)),
 					Description:              &description,
 					MaxSessionDuration:       pointer.ToIntAsInt32(1),
 					Path:                     pointer.ToOrNilIfZeroValue("/"),
@@ -336,15 +365,16 @@ func TestIsRoleUpToDate(t *testing.T) {
 				},
 			},
 			want: false,
-			wantDiff: `Found observed difference in IAM role
-
-desired assume role policy: %7B%22Version%22%3A%222012-10-17%22%2C%22Statement%22%3A%5B%7B%22Effect%22%3A%22Allow%22%2C%22Principal%22%3A%7B%22Service%22%3A%22eks.amazonaws.com%22%7D%2C%22Action%22%3A%22sts%3AAssumeRole%22%2C%22Condition%22%3A%7B%22StringEquals%22%3A%7B%22foo%22%3A%22bar%22%7D%7D%7D%5D%7D
-observed assume role policy: %7B%22Version%22%3A%222012-10-17%22%2C%22Statement%22%3A%5B%7B%22Effect%22%3A%22Allow%22%2C%22Principal%22%3A%7B%22Service%22%3A%22eks.amazonaws.com%22%7D%2C%22Action%22%3A%22sts%3AAssumeRole%22%7D%5D%7D`,
+			wantDiff: []*regexp.Regexp{
+				regexp.MustCompile("Found observed difference in IAM role"),
+				regexp.MustCompile(`- AssumeRolePolicyDocument: &"(%\w\w)+Statement`),
+				regexp.MustCompile(`\+ AssumeRolePolicyDocument: &"(%\w\w)+Version`),
+			},
 		},
 		"DifferentFields": {
 			args: args{
 				role: iamtypes.Role{
-					AssumeRolePolicyDocument: &assumeRolePolicyDocument,
+					AssumeRolePolicyDocument: ptr.To(url.QueryEscape(assumeRolePolicyDocument)),
 					Description:              &description,
 					MaxSessionDuration:       pointer.ToIntAsInt32(1),
 					Path:                     pointer.ToOrNilIfZeroValue("//"),
@@ -364,8 +394,12 @@ observed assume role policy: %7B%22Version%22%3A%222012-10-17%22%2C%22Statement%
 					}},
 				},
 			},
-			want:     false,
-			wantDiff: "Found observed difference in IAM role",
+			want: false,
+			wantDiff: []*regexp.Regexp{
+				regexp.MustCompile("Found observed difference in IAM role"),
+				regexp.MustCompile(`- Path: &"/"`),
+				regexp.MustCompile(`\+ Path: &"//"`),
+			},
 		},
 	}
 
@@ -378,15 +412,18 @@ observed assume role policy: %7B%22Version%22%3A%222012-10-17%22%2C%22Statement%
 			if diff := cmp.Diff(tc.want, got); diff != "" {
 				t.Errorf("r: -want, +got:\n%s", diff)
 			}
-			if tc.wantDiff == "" {
-				if tc.wantDiff != testDiff {
-					t.Errorf("r: -want, +got:\n%s", testDiff)
+			if tc.wantDiff == nil {
+				if diff := cmp.Diff("", testDiff); diff != "" {
+					t.Errorf("r: -want, +got:\n%s", diff)
 				}
-			}
-
-			if tc.wantDiff == "Found observed difference in IAM role" {
-				if !strings.Contains(testDiff, tc.wantDiff) {
-					t.Errorf("r: -want, +got:\n%s", testDiff)
+			} else {
+				// cmp randomly uses either regular or non-breaking spaces.
+				// Replace them all with regular spaces.
+				compactDiff := strings.Join(strings.Fields(testDiff), " ")
+				for _, wantDiff := range tc.wantDiff {
+					if !wantDiff.MatchString(compactDiff) {
+						t.Errorf("expected:\n%s\nto match:\n%s", testDiff, wantDiff.String())
+					}
 				}
 			}
 		})

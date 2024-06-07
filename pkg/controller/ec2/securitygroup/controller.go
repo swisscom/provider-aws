@@ -51,6 +51,7 @@ const (
 	errUnexpectedObject = "The managed resource is not an SecurityGroup resource"
 
 	errDescribe         = "failed to describe SecurityGroup"
+	errDescribeRules    = "failed to describe SecurityGroupRules"
 	errGetSecurityGroup = "failed to get SecurityGroup based on groupName"
 	errMultipleItems    = "retrieved multiple SecurityGroups for the given securityGroupId"
 	errCreate           = "failed to create the SecurityGroup resource"
@@ -153,12 +154,25 @@ func (e *external) Observe(ctx context.Context, mgd resource.Managed) (managed.E
 		return managed.ExternalObservation{}, errors.New(errMultipleItems)
 	}
 
+	securityGroupRulesResponse, err := e.sg.DescribeSecurityGroupRules(ctx, &awsec2.DescribeSecurityGroupRulesInput{
+		Filters: []awsec2types.Filter{
+			{
+				Name:   aws.String("group-id"),
+				Values: []string{meta.GetExternalName(cr)},
+			},
+		},
+	})
+	if err != nil {
+		return managed.ExternalObservation{}, errorutils.Wrap(resource.Ignore(ec2.IsSecurityGroupNotFoundErr, err), errDescribeRules)
+	}
+
+	observedRules := securityGroupRulesResponse.SecurityGroupRules
 	observed := response.SecurityGroups[0]
 
 	current := cr.Spec.ForProvider.DeepCopy()
 	ec2.LateInitializeSG(&cr.Spec.ForProvider, &observed)
 
-	cr.Status.AtProvider = ec2.GenerateSGObservation(observed)
+	cr.Status.AtProvider = ec2.GenerateSGObservation(observed, observedRules)
 
 	upToDate := ec2.IsSGUpToDate(cr.Spec.ForProvider, observed)
 	// this is to make sure that the security group exists with the specified traffic rules.
@@ -189,6 +203,12 @@ func (e *external) Create(ctx context.Context, mgd resource.Managed) (managed.Ex
 		GroupName:   aws.String(cr.Spec.ForProvider.GroupName),
 		VpcId:       cr.Spec.ForProvider.VPCID,
 		Description: aws.String(cr.Spec.ForProvider.Description),
+		TagSpecifications: []awsec2types.TagSpecification{
+			{
+				ResourceType: awsec2types.ResourceTypeSecurityGroup,
+				Tags:         ec2.GenerateEC2TagsV1Beta1(cr.Spec.ForProvider.Tags),
+			},
+		},
 	})
 	if err != nil {
 		return managed.ExternalCreation{}, errorutils.Wrap(err, errCreate)

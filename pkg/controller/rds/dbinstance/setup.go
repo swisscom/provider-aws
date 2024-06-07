@@ -202,6 +202,14 @@ func (e *custom) preCreate(ctx context.Context, cr *svcapitypes.DBInstance, obj 
 		return errors.Wrap(err, dbinstance.ErrCachePassword)
 	}
 
+	// for storageType gp3 below engine specific allocatedStorage threshold, do not send iops and storageThroughput
+	// to avoid errors like "You can't specify IOPS or storage throughput for engine postgres and a storage size less than 400."
+	// This allows users to set iops/storageThroughput to the default values themselves.
+	if isStorageTypeGP3BelowAllocatedStorageThreshold(cr) {
+		obj.Iops = nil
+		obj.StorageThroughput = nil
+	}
+
 	return nil
 }
 
@@ -251,6 +259,14 @@ func (e *custom) preUpdate(ctx context.Context, cr *svcapitypes.DBInstance, obj 
 		}
 	} else {
 		obj.VpcSecurityGroupIds = nil
+	}
+
+	// for storageType gp3 below engine specific allocatedStorage threshold, do not send iops and storageThroughput
+	// to avoid errors like "You can't specify IOPS or storage throughput for engine postgres and a storage size less than 400."
+	// This allows users to set iops/storageThroughput to the default values themselves.
+	if isStorageTypeGP3BelowAllocatedStorageThreshold(cr) {
+		obj.Iops = nil
+		obj.StorageThroughput = nil
 	}
 
 	return nil
@@ -471,6 +487,12 @@ func (e *custom) isUpToDate(ctx context.Context, cr *svcapitypes.DBInstance, out
 		return false, "", err
 	}
 
+	// Depending on whether the instance was created as gp2 or modified from another type (e.g. gp3) to gp2,
+	// AWS provides different responses for IOPS/StorageThroughput (either 0 or nil).
+	// Therefore, we consider both 0 and nil to be equivalent.
+	iopsChanged := !(pointer.Int64Value(cr.Spec.ForProvider.IOPS) == pointer.Int64Value(db.Iops))
+	storageThroughputChanged := !(pointer.Int64Value(cr.Spec.ForProvider.StorageThroughput) == pointer.Int64Value(db.StorageThroughput))
+
 	versionChanged := !isEngineVersionUpToDate(cr, out)
 
 	vpcSGsChanged := !areVPCSecurityGroupIDsUpToDate(cr, db)
@@ -483,6 +505,8 @@ func (e *custom) isUpToDate(ctx context.Context, cr *svcapitypes.DBInstance, out
 		cmpopts.IgnoreFields(svcapitypes.DBInstanceParameters{}, "AllowMajorVersionUpgrade"),
 		cmpopts.IgnoreFields(svcapitypes.DBInstanceParameters{}, "DBParameterGroupName"),
 		cmpopts.IgnoreFields(svcapitypes.DBInstanceParameters{}, "EngineVersion"),
+		cmpopts.IgnoreFields(svcapitypes.DBInstanceParameters{}, "IOPS"),
+		cmpopts.IgnoreFields(svcapitypes.DBInstanceParameters{}, "StorageThroughput"),
 		cmpopts.IgnoreFields(svcapitypes.DBInstanceParameters{}, "Tags"),
 		cmpopts.IgnoreFields(svcapitypes.DBInstanceParameters{}, "SkipFinalSnapshot"),
 		cmpopts.IgnoreFields(svcapitypes.DBInstanceParameters{}, "FinalDBSnapshotIdentifier"),
@@ -500,15 +524,15 @@ func (e *custom) isUpToDate(ctx context.Context, cr *svcapitypes.DBInstance, out
 	e.cache.addTags, e.cache.removeTags = utils.DiffTags(cr.Spec.ForProvider.Tags, db.TagList)
 	tagsChanged := len(e.cache.addTags) != 0 || len(e.cache.removeTags) != 0
 
-	if diff == "" && !maintenanceWindowChanged && !backupWindowChanged && !versionChanged && !vpcSGsChanged && !dbParameterGroupChanged && !optionGroupChanged && !tagsChanged {
+	if diff == "" && !maintenanceWindowChanged && !backupWindowChanged && !iopsChanged && !storageThroughputChanged && !versionChanged && !vpcSGsChanged && !dbParameterGroupChanged && !optionGroupChanged && !tagsChanged {
 		return true, diff, nil
 	}
 
 	diff = "Found observed difference in dbinstance\n" + diff
 	if maintenanceWindowChanged {
-		diff += "\ndesired maintanaceWindow: "
+		diff += "\ndesired maintenanceWindow: "
 		diff += *cr.Spec.ForProvider.PreferredMaintenanceWindow
-		diff += "\nobserved maintanaceWindow: "
+		diff += "\nobserved maintenanceWindow: "
 		diff += *db.PreferredMaintenanceWindow
 	}
 	if backupWindowChanged {
@@ -516,6 +540,27 @@ func (e *custom) isUpToDate(ctx context.Context, cr *svcapitypes.DBInstance, out
 		diff += *cr.Spec.ForProvider.PreferredBackupWindow
 		diff += "\nobserved backupWindow: "
 		diff += *db.PreferredBackupWindow
+	}
+	if iopsChanged {
+		diff += fmt.Sprintf("\ndesired iops: %d \nobserved iops: %d ", pointer.Int64Value(cr.Spec.ForProvider.IOPS), pointer.Int64Value(db.Iops))
+	}
+	if storageThroughputChanged {
+		diff += fmt.Sprintf("\ndesired storageThroughput: %d \nobserved storageThroughput: %d ", pointer.Int64Value(cr.Spec.ForProvider.StorageThroughput), pointer.Int64Value(db.StorageThroughput))
+	}
+	if versionChanged {
+		diff += fmt.Sprintf("\ndesired engineVersion: %s \nobserved engineVersion: %s ", pointer.StringValue(cr.Spec.ForProvider.EngineVersion), pointer.StringValue(db.EngineVersion))
+	}
+	if vpcSGsChanged {
+		diff += fmt.Sprintf("\ndesired vpcSecurityGroupIDs: %v \nobserved vpcSecurityGroupIDs: ", cr.Spec.ForProvider.VPCSecurityGroupIDs)
+		for _, grp := range db.VpcSecurityGroups {
+			diff += fmt.Sprintf("\n - %s ", pointer.StringValue(grp.VpcSecurityGroupId))
+		}
+	}
+	if dbParameterGroupChanged {
+		diff += fmt.Sprintf("\ndesired dbParameterGroupName: %s \nobserved dbParameterGroupName: %s ", pointer.StringValue(cr.Spec.ForProvider.DBParameterGroupName), pointer.StringValue(db.DBParameterGroups[0].DBParameterGroupName))
+	}
+	if optionGroupChanged {
+		diff += fmt.Sprintf("\ndesired optionGroupName: %s \nobserved optionGroupName: %s ", pointer.StringValue(cr.Spec.ForProvider.OptionGroupName), pointer.StringValue(db.OptionGroupMemberships[0].OptionGroupName))
 	}
 	if tagsChanged {
 		diff += fmt.Sprintf("\nadd %d tag(s) and remove %d tag(s)", len(e.cache.addTags), len(e.cache.removeTags))
@@ -685,4 +730,21 @@ func handleKmsKey(inKey *string, dbKey *string) *string {
 		return &keyID
 	}
 	return dbKey
+}
+
+// isStorageTypeGP3BelowAllocatedStorageThreshold returns true if storageType is gp3 and allocatedStorage is below engine specific threshold
+// See also https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/CHAP_Storage.html#gp3-storage.
+func isStorageTypeGP3BelowAllocatedStorageThreshold(cr *svcapitypes.DBInstance) bool {
+	if pointer.StringValue(cr.Spec.ForProvider.StorageType) != "gp3" {
+		return false
+	}
+
+	switch allocatedStorage, engine := pointer.Int64Value(cr.Spec.ForProvider.AllocatedStorage), pointer.StringValue(cr.Spec.ForProvider.Engine); engine {
+	case "mariadb", "mysql", "postgres":
+		return allocatedStorage < 400
+	case "oracle-ee", "oracle-ee-cdb", "oracle-se2", "oracle-se2-cdb":
+		return allocatedStorage < 200
+	}
+
+	return false
 }

@@ -69,6 +69,7 @@ var (
 	port                               = 123
 	port32                             = int32(port)
 	resourceID                         = "resource"
+	restoreFromSource                  = "PointInTime"
 	retention                          = 2
 	retention32                        = int32(retention)
 	status                             = "testStatus"
@@ -275,6 +276,28 @@ func TestIsUpToDate(t *testing.T) {
 					Spec: v1beta1.RDSInstanceSpec{
 						ForProvider: v1beta1.RDSInstanceParameters{
 							DBName: &dbName,
+						},
+					},
+				},
+			},
+			want: true,
+		},
+		"IgnoresRestoreFrom": {
+			args: args{
+				db: rdstypes.DBInstance{
+					DBName: &dbName,
+				},
+				r: v1beta1.RDSInstance{
+					Spec: v1beta1.RDSInstanceSpec{
+						ForProvider: v1beta1.RDSInstanceParameters{
+							DBName: &dbName,
+							RestoreFrom: &v1beta1.RestoreBackupConfiguration{
+								PointInTime: &v1beta1.PointInTimeRestoreBackupConfiguration{
+									SourceDBInstanceIdentifier: &resourceID,
+									UseLatestRestorableTime:    true,
+								},
+								Source: &restoreFromSource,
+							},
 						},
 					},
 				},
@@ -773,6 +796,7 @@ func TestGenerateObservation(t *testing.T) {
 		LicenseModel:            &name,
 		MultiAZ:                 &multiAZ,
 		Port:                    &port32,
+		StorageThroughput:       &storage32,
 		StorageType:             &storageType,
 	}
 	pendingCloudwatch := rdstypes.PendingCloudwatchLogsExports{
@@ -868,6 +892,7 @@ func TestGenerateObservation(t *testing.T) {
 					LicenseModel:            name,
 					MultiAZ:                 multiAZ,
 					Port:                    port,
+					StorageThroughput:       storage,
 					StorageType:             storageType,
 					PendingCloudwatchLogsExports: v1beta1.PendingCloudwatchLogsExports{
 						LogTypesToDisable: nil,
@@ -1054,6 +1079,7 @@ func TestLateInitialize(t *testing.T) {
 				PromotionTier:                      &tier32,
 				PubliclyAccessible:                 trueFlag,
 				StorageEncrypted:                   trueFlag,
+				StorageThroughput:                  &storage32,
 				StorageType:                        &storageType,
 				Timezone:                           &zone,
 				DBSecurityGroups:                   []rdstypes.DBSecurityGroupMembership{{DBSecurityGroupName: &name, Status: &status}},
@@ -1100,6 +1126,7 @@ func TestLateInitialize(t *testing.T) {
 				PromotionTier:                      &tier,
 				PubliclyAccessible:                 &trueFlag,
 				StorageEncrypted:                   &trueFlag,
+				StorageThroughput:                  &storage,
 				StorageType:                        &storageType,
 				Timezone:                           &zone,
 				DBSecurityGroups:                   []string{name},
@@ -1321,6 +1348,7 @@ func TestGenerateModifyDBInstanceInput(t *testing.T) {
 				PromotionTier:                      &tier,
 				PubliclyAccessible:                 &trueFlag,
 				StorageEncrypted:                   &trueFlag,
+				StorageThroughput:                  &storage,
 				StorageType:                        &storageType,
 				Timezone:                           &zone,
 				DBSecurityGroups:                   dbSecurityGroups,
@@ -1372,6 +1400,7 @@ func TestGenerateModifyDBInstanceInput(t *testing.T) {
 				PreferredMaintenanceWindow:         &window,
 				PromotionTier:                      &tier32,
 				PubliclyAccessible:                 &trueFlag,
+				StorageThroughput:                  &storage32,
 				StorageType:                        &storageType,
 				UseDefaultProcessorFeatures:        &trueFlag,
 				VpcSecurityGroupIds:                vpcIds,
@@ -1450,6 +1479,7 @@ func TestGenerateCreateRDSInstanceInput(t *testing.T) {
 				PromotionTier:                      &tier,
 				PubliclyAccessible:                 &trueFlag,
 				StorageEncrypted:                   &trueFlag,
+				StorageThroughput:                  &storage,
 				StorageType:                        &storageType,
 				Timezone:                           &zone,
 				DBSecurityGroups:                   dbSecurityGroups,
@@ -1501,6 +1531,7 @@ func TestGenerateCreateRDSInstanceInput(t *testing.T) {
 				PromotionTier:                      &tier32,
 				PubliclyAccessible:                 &trueFlag,
 				StorageEncrypted:                   &trueFlag,
+				StorageThroughput:                  &storage32,
 				StorageType:                        &storageType,
 				Timezone:                           &zone,
 				VpcSecurityGroupIds:                vpcIds,
