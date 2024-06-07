@@ -11,17 +11,23 @@ stages:
 .base:
   image: tde-green-public-docker-local.artifactory.swisscom.com/go-with-up-cli:1.21.2-bookworm-0.19.2
   variables:
-    KUBERNETES_CPU_REQUEST: "3"
-    KUBERNETES_CPU_LIMIT: "5"
-    KUBERNETES_MEMORY_REQUEST: "4Gi"
-    KUBERNETES_MEMORY_LIMIT: "4Gi"
-    GIT_SUBMODULE_STRATEGY: recursive
-    HTTPS_PROXY: http://server-proxy.corproot.net:8080
+    KUBERNETES_CPU_REQUEST: "6"
+    KUBERNETES_CPU_LIMIT: "6"
+    KUBERNETES_MEMORY_REQUEST: "6Gi"
+    KUBERNETES_MEMORY_LIMIT: "6Gi"
+    HTTPS_PROXY: http://server-proxy.corprouot.net:8080
+    HTTP_PROXY: http://server-proxy.corproot.net:8080
     NO_PROXY: '127.0.0.1,localhost,code.swisscom.com,git.swisscom.com,artifactory.swisscom.com,bin.swisscom.com,icp.swisscom.com'
     GOFLAGS: '-buildvcs=false'
+    GOPROXY: direct
     GOARCH: amd64
     CGO_ENABLED: 0
     GOOS: linux
+
+    http_proxy: http://server-proxy.corproot.net:8080
+    https_proxy: http://server-proxy.corproot.net:8080
+    noproxy: '127.0.0.1,localhost,code.swisscom.com,git.swisscom.com,artifactory.swisscom.com,bin.swisscom.com,icp.swisscom.com'
+    GOFLAGS: '-buildvcs=false'
   script:
     - mkdir -p $HOME/.docker && cat $DOCKER_CONFIG_JSON > $HOME/.docker/config.json
     - git config --global --add safe.directory $CI_PROJECT_DIR
@@ -38,6 +44,7 @@ build:
   stage: build
   extends: .base
   variables:
+    GIT_SUBMODULE_STRATEGY: recursive
   script:
     - |
       if [[ $CI_COMMIT_TAG =~ ^v?[0-9]{1,4}.[0-9]{1,4}.[0-9]{1,4}$ ]]; then
