@@ -18,7 +18,6 @@ stages:
     GIT_SUBMODULE_STRATEGY: recursive
     HTTPS_PROXY: http://server-proxy.corproot.net:8080
     NO_PROXY: '127.0.0.1,localhost,code.swisscom.com,git.swisscom.com,artifactory.swisscom.com,bin.swisscom.com,icp.swisscom.com'
-    GOPROXY: "https://artifactory.swisscom.com/artifactory/api/go/proxy-golang-go-virtual"
     GOFLAGS: '-buildvcs=false'
     GOARCH: amd64
     CGO_ENABLED: 0
@@ -32,7 +31,8 @@ lint:
   extends: .base
   allow_failure: true
   script:
-    - make lint
+    - curl -fsSL https://github.com/golangci/golangci-lint/releases/download/v1.54.0/golangci-lint-1.54.0-linux-amd64.tar.gz  | tar -xz --strip-components=1 -C /tmp
+    - /tmp/golangci-lint run -v -c .golangci.yml
 
 build:
   stage: build
