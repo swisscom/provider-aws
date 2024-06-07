@@ -11,6 +11,7 @@ stages:
 .base:
   image: tde-green-public-docker-local.artifactory.swisscom.com/go-with-up-cli:1.21.2-bookworm-0.19.2
   variables:
+    GIT_SUBMODULE_STRATEGY: recursive
     KUBERNETES_CPU_REQUEST: "6"
     KUBERNETES_CPU_LIMIT: "6"
     KUBERNETES_MEMORY_REQUEST: "6Gi"
@@ -41,8 +42,6 @@ lint:
 build:
   stage: build
   extends: .base
-  variables:
-    GIT_SUBMODULE_STRATEGY: recursive
   script:
     - |
       if [[ $CI_COMMIT_TAG =~ ^v?[0-9]{1,4}.[0-9]{1,4}.[0-9]{1,4}$ ]]; then
