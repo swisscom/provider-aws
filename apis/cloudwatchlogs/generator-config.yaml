@@ -42,3 +42,14 @@ resources:
         from:
           operation: DescribeLogGroups
           path: LogGroups.StoredBytes
+  ResourcePolicy:
+    fields:
+      PolicyDocument:
+        is_read_only: true
+        from:
+          operation: DescribeResourcePolicy
+          path: ResourcePolicy.PolicyDocument
+      PolicyName:
+        from:
+          operation: DescribeResourcePolicy
+          path: ResourcePolicy.PolicyName
