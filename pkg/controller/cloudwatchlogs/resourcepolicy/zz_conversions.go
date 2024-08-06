@@ -53,9 +53,9 @@ func GenerateResourcePolicy(resp *svcsdk.DescribeResourcePoliciesOutput) *svcapi
 			cr.Spec.ForProvider.PolicyDocument = nil
 		}
 		if elem.PolicyName != nil {
-			cr.Spec.ForProvider.PolicyName = elem.PolicyName
+			cr.Spec.ForProvider.Name = elem.PolicyName
 		} else {
-			cr.Spec.ForProvider.PolicyName = nil
+			cr.Spec.ForProvider.Name = nil
 		}
 		found = true
 		break
@@ -67,15 +67,15 @@ func GenerateResourcePolicy(resp *svcsdk.DescribeResourcePoliciesOutput) *svcapi
 	return cr
 }
 
-// GeneratePutResourcePolicyInput returns a create input.
+// GeneratePutResourcePolicyInput returns a create/update input.
 func GeneratePutResourcePolicyInput(cr *svcapitypes.ResourcePolicy) *svcsdk.PutResourcePolicyInput {
 	res := &svcsdk.PutResourcePolicyInput{}
 
 	if cr.Spec.ForProvider.PolicyDocument != nil {
 		res.SetPolicyDocument(*cr.Spec.ForProvider.PolicyDocument)
 	}
-	if cr.Spec.ForProvider.PolicyName != nil {
-		res.SetPolicyName(*cr.Spec.ForProvider.PolicyName)
+	if cr.Spec.ForProvider.Name != nil {
+		res.SetPolicyName(*cr.Spec.ForProvider.Name)
 	}
 
 	return res
@@ -85,8 +85,8 @@ func GeneratePutResourcePolicyInput(cr *svcapitypes.ResourcePolicy) *svcsdk.PutR
 func GenerateDeleteResourcePolicyInput(cr *svcapitypes.ResourcePolicy) *svcsdk.DeleteResourcePolicyInput {
 	res := &svcsdk.DeleteResourcePolicyInput{}
 
-	if cr.Spec.ForProvider.PolicyName != nil {
-		res.SetPolicyName(*cr.Spec.ForProvider.PolicyName)
+	if cr.Spec.ForProvider.Name != nil {
+		res.SetPolicyName(*cr.Spec.ForProvider.Name)
 	}
 
 	return res

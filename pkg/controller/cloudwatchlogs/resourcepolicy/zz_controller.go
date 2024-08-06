@@ -134,9 +134,9 @@ func (e *external) Create(ctx context.Context, mg cpresource.Managed) (managed.E
 		cr.Spec.ForProvider.PolicyDocument = nil
 	}
 	if resp.ResourcePolicy.PolicyName != nil {
-		cr.Spec.ForProvider.PolicyName = resp.ResourcePolicy.PolicyName
+		cr.Spec.ForProvider.Name = resp.ResourcePolicy.PolicyName
 	} else {
-		cr.Spec.ForProvider.PolicyName = nil
+		cr.Spec.ForProvider.Name = nil
 	}
 
 	return e.postCreate(ctx, cr, resp, managed.ExternalCreation{}, err)
