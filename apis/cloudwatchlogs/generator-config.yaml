@@ -4,6 +4,20 @@ ignore:
     - ExportTask
   field_paths:
     - CreateLogGroupInput.KmsKeyId
+operations:
+  PutResourcePolicy:
+    operation_type:
+      - Create
+      - Update
+    resource_name: ResourcePolicy
+  DescribeResourcePolicies:
+    operation_type:
+      - Read
+    resource_name: ResourcePolicy
+  DeleteResourcePolicy:
+    operation_type:
+      - Delete
+    resource_name: ResourcePolicy
 resources:
   LogGroup:
     fields:
@@ -43,13 +57,7 @@ resources:
           operation: DescribeLogGroups
           path: LogGroups.StoredBytes
   ResourcePolicy:
-    fields:
-      PolicyDocument:
-        is_read_only: true
-        from:
-          operation: DescribeResourcePolicy
-          path: ResourcePolicy.PolicyDocument
-      PolicyName:
-        from:
-          operation: DescribeResourcePolicy
-          path: ResourcePolicy.PolicyName
+    exceptions:
+      errors:
+        404:
+          code: ResourceNotFoundException
