@@ -74,9 +74,6 @@ spec:
                 description: ResourcePolicyParameters defines the desired state of
                   ResourcePolicy
                 properties:
-                  name:
-                    description: Name of the new policy. This parameter is required.
-                    type: string
                   policyDocument:
                     description: |-
                       Details of the new policy, including the identity of the principal that is
@@ -105,6 +102,9 @@ spec:
                       }, "Action": "logs:PutLogEvents", "Resource": "logArn", "Condition": { "ArnLike":
                       { "aws:SourceArn": "myRoute53ResourceArn" }, "StringEquals": { "aws:SourceAccount":
                       "myAwsAccountId" } } } ] }
+                    type: string
+                  policyName:
+                    description: Name of the new policy. This parameter is required.
                     type: string
                   region:
                     description: Region is which region the ResourcePolicy will be

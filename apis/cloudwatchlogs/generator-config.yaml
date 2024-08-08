@@ -61,14 +61,3 @@ resources:
       errors:
         404:
           code: ResourceNotFoundException
-    renames:
-      operations:
-        PutResourcePolicy:
-          input_fields:
-            PolicyName: Name
-        DescribeResourcePolicies:
-          input_fields:
-            PolicyName: Name
-        DeleteResourcePolicy:
-          input_fields:
-            PolicyName: Name

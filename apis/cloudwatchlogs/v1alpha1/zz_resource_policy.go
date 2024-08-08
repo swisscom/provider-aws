@@ -29,8 +29,6 @@ type ResourcePolicyParameters struct {
 	// Region is which region the ResourcePolicy will be created.
 	// +kubebuilder:validation:Required
 	Region string `json:"region"`
-	// Name of the new policy. This parameter is required.
-	Name *string `json:"name,omitempty"`
 	// Details of the new policy, including the identity of the principal that is
 	// enabled to put logs to this account. This is formatted as a JSON string.
 	// This parameter is required.
@@ -53,7 +51,9 @@ type ResourcePolicyParameters struct {
 	// }, "Action": "logs:PutLogEvents", "Resource": "logArn", "Condition": { "ArnLike":
 	// { "aws:SourceArn": "myRoute53ResourceArn" }, "StringEquals": { "aws:SourceAccount":
 	// "myAwsAccountId" } } } ] }
-	PolicyDocument                 *string `json:"policyDocument,omitempty"`
+	PolicyDocument *string `json:"policyDocument,omitempty"`
+	// Name of the new policy. This parameter is required.
+	PolicyName                     *string `json:"policyName,omitempty"`
 	CustomResourcePolicyParameters `json:",inline"`
 }
 
