@@ -1,0 +1,29 @@
+apiVersion: cloudwatchlogs.aws.crossplane.io/v1alpha1
+kind: ResourcePolicy
+metadata:
+  name: sample-resource-policy
+spec:
+  forProvider:
+    region: eu-central-1
+    policyName: my-example-resource-policy
+    policyDocument: |
+      {
+        "Version": "2012-10-17",
+        "Statement": [
+            {
+                "Sid": "",
+                "Effect": "Allow",
+                "Principal": {
+                    "Service": "es.amazonaws.com"
+                },
+                "Action": [
+                    "logs:PutLogEvents",
+                    "logs:PutLogEventsBatch",
+                    "logs:CreateLogStream"
+                ],
+                "Resource": "arn:aws:logs:eu-central-1:123456789012:destination:testDestination"
+            }
+        ]
+      }
+  providerConfigRef:
+    name: providerconfig-aws
