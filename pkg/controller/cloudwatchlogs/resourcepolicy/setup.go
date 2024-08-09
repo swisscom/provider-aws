@@ -33,6 +33,7 @@ func SetupResourcePolicy(mgr ctrl.Manager, o controller.Options) error {
 
 	opts := []option{
 		func(e *external) {
+			e.filterList = filterList
 			e.preCreate = preCreate
 			e.preUpdate = preUpdate
 			e.preDelete = preDelete
@@ -90,4 +91,16 @@ func isUpToDate(_ context.Context, cr *svcapitypes.ResourcePolicy, obj *svcsdk.D
 		}
 	}
 	return false, "", nil
+}
+
+func filterList(cr *svcapitypes.ResourcePolicy, list *svcsdk.DescribeResourcePoliciesOutput) *svcsdk.DescribeResourcePoliciesOutput {
+	resp := &svcsdk.DescribeResourcePoliciesOutput{}
+
+	for _, resourcePolicy := range list.ResourcePolicies {
+		if pointer.StringValue(resourcePolicy.PolicyName) == meta.GetExternalName(cr) {
+			resp.ResourcePolicies = append(resp.ResourcePolicies, resourcePolicy)
+			break
+		}
+	}
+	return resp
 }
