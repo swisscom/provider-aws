@@ -4,6 +4,8 @@ ignore:
     - ExportTask
   field_paths:
     - CreateLogGroupInput.KmsKeyId
+    - PutResourcePolicyInput.PolicyName
+    - DeleteResourcePolicyInput.PolicyName
 operations:
   PutResourcePolicy:
     operation_type:

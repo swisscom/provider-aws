@@ -1,11 +1,10 @@
 apiVersion: cloudwatchlogs.aws.crossplane.io/v1alpha1
 kind: ResourcePolicy
 metadata:
-  name: sample-resource-policy
+  name: my-example-resource-policy
 spec:
   forProvider:
     region: eu-central-1
-    policyName: my-example-resource-policy
     policyDocument: |
       {
         "Version": "2012-10-17",

@@ -103,9 +103,6 @@ spec:
                       { "aws:SourceArn": "myRoute53ResourceArn" }, "StringEquals": { "aws:SourceAccount":
                       "myAwsAccountId" } } } ] }
                     type: string
-                  policyName:
-                    description: Name of the new policy. This parameter is required.
-                    type: string
                   region:
                     description: Region is which region the ResourcePolicy will be
                       created.
@@ -293,6 +290,9 @@ spec:
                       of milliseconds after Jan 1, 1970 00:00:00 UTC.
                     format: int64
                     type: integer
+                  policyName:
+                    description: The name of the resource policy.
+                    type: string
                 type: object
               conditions:
                 description: Conditions of the resource.

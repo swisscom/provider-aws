@@ -6,6 +6,7 @@ import (
 	"github.com/crossplane-contrib/provider-aws/apis/v1alpha1"
 	"github.com/crossplane-contrib/provider-aws/pkg/clients/iam"
 	"github.com/crossplane-contrib/provider-aws/pkg/features"
+	"github.com/crossplane-contrib/provider-aws/pkg/utils/pointer"
 	"github.com/crossplane/crossplane-runtime/pkg/connection"
 	"github.com/crossplane/crossplane-runtime/pkg/controller"
 	"github.com/crossplane/crossplane-runtime/pkg/event"
@@ -32,10 +33,9 @@ func SetupResourcePolicy(mgr ctrl.Manager, o controller.Options) error {
 
 	opts := []option{
 		func(e *external) {
-			// e.preObserve = preObserve
-			// e.preCreate = preCreate
-			// e.preUpdate = preUpdate
-			// e.preDelete = preDelete
+			e.preCreate = preCreate
+			e.preUpdate = preUpdate
+			e.preDelete = preDelete
 			e.postObserve = postObserve
 			e.isUpToDate = isUpToDate
 		},
@@ -55,25 +55,20 @@ func SetupResourcePolicy(mgr ctrl.Manager, o controller.Options) error {
 			managed.WithConnectionPublishers(cps...)))
 }
 
-// func preObserve(_ context.Context, cr *svcapitypes.ResourcePolicy, obj *svcsdk.DescribeResourcePoliciesInput) error {
-// 	obj.PolicyName = pointer.ToOrNilIfZeroValue(meta.GetExternalName(cr))
-// 	return nil
-// }
+func preCreate(_ context.Context, cr *svcapitypes.ResourcePolicy, obj *svcsdk.PutResourcePolicyInput) error {
+	obj.PolicyName = pointer.ToOrNilIfZeroValue(meta.GetExternalName(cr))
+	return nil
+}
 
-// func preCreate(_ context.Context, cr *svcapitypes.ResourcePolicy, obj *svcsdk.PutResourcePolicyInput) error {
-// 	obj.PolicyName = pointer.ToOrNilIfZeroValue(meta.GetExternalName(cr))
-// 	return nil
-// }
+func preUpdate(_ context.Context, cr *svcapitypes.ResourcePolicy, obj *svcsdk.PutResourcePolicyInput) error {
+	obj.PolicyName = pointer.ToOrNilIfZeroValue(meta.GetExternalName(cr))
+	return nil
+}
 
-// func preUpdate(_ context.Context, cr *svcapitypes.ResourcePolicy, obj *svcsdk.PutResourcePolicyInput) error {
-// 	obj.PolicyName = pointer.ToOrNilIfZeroValue(meta.GetExternalName(cr))
-// 	return nil
-// }
-
-// func preDelete(_ context.Context, cr *svcapitypes.ResourcePolicy, obj *svcsdk.DeleteResourcePolicyInput) (bool, error) {
-// 	obj.PolicyName = pointer.ToOrNilIfZeroValue(meta.GetExternalName(cr))
-// 	return true, nil
-// }
+func preDelete(_ context.Context, cr *svcapitypes.ResourcePolicy, obj *svcsdk.DeleteResourcePolicyInput) (bool, error) {
+	obj.PolicyName = pointer.ToOrNilIfZeroValue(meta.GetExternalName(cr))
+	return true, nil
+}
 
 func postObserve(_ context.Context, cr *svcapitypes.ResourcePolicy, _ *svcsdk.DescribeResourcePoliciesOutput, obs managed.ExternalObservation, err error) (managed.ExternalObservation, error) {
 	if err != nil {

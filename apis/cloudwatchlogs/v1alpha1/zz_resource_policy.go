@@ -51,9 +51,7 @@ type ResourcePolicyParameters struct {
 	// }, "Action": "logs:PutLogEvents", "Resource": "logArn", "Condition": { "ArnLike":
 	// { "aws:SourceArn": "myRoute53ResourceArn" }, "StringEquals": { "aws:SourceAccount":
 	// "myAwsAccountId" } } } ] }
-	PolicyDocument *string `json:"policyDocument,omitempty"`
-	// Name of the new policy. This parameter is required.
-	PolicyName                     *string `json:"policyName,omitempty"`
+	PolicyDocument                 *string `json:"policyDocument,omitempty"`
 	CustomResourcePolicyParameters `json:",inline"`
 }
 
@@ -68,6 +66,8 @@ type ResourcePolicyObservation struct {
 	// Timestamp showing when this policy was last updated, expressed as the number
 	// of milliseconds after Jan 1, 1970 00:00:00 UTC.
 	LastUpdatedTime *int64 `json:"lastUpdatedTime,omitempty"`
+	// The name of the resource policy.
+	PolicyName *string `json:"policyName,omitempty"`
 }
 
 // ResourcePolicyStatus defines the observed state of ResourcePolicy.
