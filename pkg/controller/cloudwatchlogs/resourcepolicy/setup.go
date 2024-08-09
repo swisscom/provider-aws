@@ -68,7 +68,7 @@ func preUpdate(_ context.Context, cr *svcapitypes.ResourcePolicy, obj *svcsdk.Pu
 
 func preDelete(_ context.Context, cr *svcapitypes.ResourcePolicy, obj *svcsdk.DeleteResourcePolicyInput) (bool, error) {
 	obj.PolicyName = pointer.ToOrNilIfZeroValue(meta.GetExternalName(cr))
-	return true, nil
+	return false, nil
 }
 
 func postObserve(_ context.Context, cr *svcapitypes.ResourcePolicy, _ *svcsdk.DescribeResourcePoliciesOutput, obs managed.ExternalObservation, err error) (managed.ExternalObservation, error) {
