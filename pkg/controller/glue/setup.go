@@ -17,6 +17,7 @@ limitations under the License.
 package glue
 
 import (
+	"github.com/crossplane-contrib/provider-aws/pkg/controller/glue/trigger"
 	"github.com/crossplane/crossplane-runtime/pkg/controller"
 	ctrl "sigs.k8s.io/controller-runtime"
 
@@ -39,5 +40,6 @@ func Setup(mgr ctrl.Manager, o controller.Options) error {
 		database.SetupDatabase,
 		job.SetupJob,
 		securityconfiguration.SetupSecurityConfiguration,
+		trigger.SetupTrigger,
 	)
 }
