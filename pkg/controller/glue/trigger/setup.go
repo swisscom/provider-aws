@@ -85,7 +85,7 @@ func isUpToDate(_ context.Context, cr *svcapitypes.Trigger, resp *svcsdk.GetTrig
 		state == svcsdk.TriggerStateCreating || state == svcsdk.TriggerStateDeleting {
 		return true, "", nil
 	}
-	patch, err := createPatch(resp, &cr.Spec.ForProvider)
+	patch, err := createPatch(&cr.Spec.ForProvider, resp)
 	if err != nil {
 		return false, "", err
 	}
@@ -115,37 +115,55 @@ func preUpdate(_ context.Context, cr *svcapitypes.Trigger, input *svcsdk.UpdateT
 	return nil
 }
 
-func createPatch(resp *svcsdk.GetTriggerOutput, target *svcapitypes.TriggerParameters) (*svcapitypes.TriggerParameters, error) {
-	currentParams := &svcapitypes.TriggerParameters{}
-	currentParams.Schedule = resp.Trigger.Schedule
+func createPatch(currentParams *svcapitypes.TriggerParameters, resp *svcsdk.GetTriggerOutput) (*svcapitypes.TriggerParameters, error) {
+	targetConfig := currentParams.DeepCopy()
+	externalConfig := &svcapitypes.TriggerParameters{}
+	externalConfig.Schedule = resp.Trigger.Schedule
 	var actions []*svcapitypes.Action
 	for _, action := range resp.Trigger.Actions {
+		notificationProperty := &svcapitypes.NotificationProperty{}
+		if action.NotificationProperty != nil && action.NotificationProperty.NotifyDelayAfter != nil {
+			notificationProperty.NotifyDelayAfter = action.NotificationProperty.NotifyDelayAfter
+		}
 		actions = append(actions, &svcapitypes.Action{
 			Arguments:             action.Arguments,
 			CrawlerName:           action.CrawlerName,
 			JobName:               action.JobName,
-			NotificationProperty:  &svcapitypes.NotificationProperty{NotifyDelayAfter: action.NotificationProperty.NotifyDelayAfter},
+			NotificationProperty:  notificationProperty,
 			SecurityConfiguration: action.SecurityConfiguration,
 		})
 	}
-	currentParams.Actions = actions
-	currentParams.Description = resp.Trigger.Description
-	eventBatchingCondition := &svcapitypes.EventBatchingCondition{
-		BatchSize:   resp.Trigger.EventBatchingCondition.BatchSize,
-		BatchWindow: resp.Trigger.EventBatchingCondition.BatchWindow,
+	externalConfig.Actions = actions
+	externalConfig.Description = resp.Trigger.Description
+	eventBatchingCondition := &svcapitypes.EventBatchingCondition{}
+	if resp.Trigger.EventBatchingCondition != nil {
+		if resp.Trigger.EventBatchingCondition.BatchSize != nil {
+			eventBatchingCondition.BatchSize = resp.Trigger.EventBatchingCondition.BatchSize
+		}
+		if resp.Trigger.EventBatchingCondition.BatchWindow != nil {
+			eventBatchingCondition.BatchWindow = resp.Trigger.EventBatchingCondition.BatchWindow
+		}
 	}
-	currentParams.EventBatchingCondition = eventBatchingCondition
-	for _, predicate := range resp.Trigger.Predicate.Conditions {
-		currentParams.Predicate.Conditions = append(currentParams.Predicate.Conditions, &svcapitypes.Condition{
-			JobName: predicate.JobName,
-			State:   predicate.State,
-		})
+	externalConfig.EventBatchingCondition = eventBatchingCondition
+	predicate := &svcapitypes.Predicate{}
+	if resp.Trigger.Predicate != nil {
+		if resp.Trigger.Predicate.Conditions != nil {
+			for _, condition := range resp.Trigger.Predicate.Conditions {
+				predicate.Conditions = append(predicate.Conditions, &svcapitypes.Condition{
+					JobName: condition.JobName,
+					State:   condition.State,
+				})
+			}
+		}
+		if resp.Trigger.Predicate.Logical != nil {
+			predicate.Logical = resp.Trigger.Predicate.Logical
+		}
 	}
-	currentParams.Predicate.Logical = resp.Trigger.Predicate.Logical
-	currentParams.TriggerType = resp.Trigger.Type
-	currentParams.WorkflowName = resp.Trigger.WorkflowName
+	externalConfig.Predicate = predicate
+	externalConfig.TriggerType = resp.Trigger.Type
+	externalConfig.WorkflowName = resp.Trigger.WorkflowName
 
-	jsonPatch, err := jsonpatch.CreateJSONPatch(currentParams, target)
+	jsonPatch, err := jsonpatch.CreateJSONPatch(externalConfig, targetConfig)
 	if err != nil {
 		return nil, err
 	}

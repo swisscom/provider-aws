@@ -276,5 +276,5 @@ func GenerateDeleteTriggerInput(cr *svcapitypes.Trigger) *svcsdk.DeleteTriggerIn
 // IsNotFound returns whether the given error is of type NotFound or not.
 func IsNotFound(err error) bool {
 	awsErr, ok := err.(awserr.Error)
-	return ok && awsErr.Code() == "ResourceNotFoundException"
+	return ok && awsErr.Code() == "EntityNotFoundException"
 }

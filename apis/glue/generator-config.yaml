@@ -15,8 +15,8 @@ ignore:
     - CustomEntityType
     - DataQualityRuleset
   field_paths:
-    - Action.CrawlerName
-    - Action.JobName
+ #   - Action.CrawlerName
+ #   - Action.JobName
     - CreateJobInput.Name
     - CreateJobInput.Role
     - CreateJobInput.Connections
@@ -36,7 +36,7 @@ ignore:
     - CreateClassifierInput.GrokClassifier
     - CreateConnectionInput.ConnectionInput
     - CreateTriggerInput.Name
-    - CreateTriggerInput.WorkflowName
+#    - CreateTriggerInput.WorkflowName
     - DeleteTriggerInput.Name
     - GetTriggerInput.Name
     - Mapping.Children
@@ -191,7 +191,7 @@ resources:
     exceptions:
       errors:
         404:
-          code: ResourceNotFoundException
+          code: EntityNotFoundException
     fields:
       ID:
         is_read_only: true
