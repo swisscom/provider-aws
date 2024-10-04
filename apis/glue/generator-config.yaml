@@ -15,6 +15,8 @@ ignore:
     - CustomEntityType
     - DataQualityRuleset
   field_paths:
+    - Action.CrawlerName
+    - Action.JobName
     - CreateJobInput.Name
     - CreateJobInput.Role
     - CreateJobInput.Connections
@@ -34,6 +36,7 @@ ignore:
     - CreateClassifierInput.GrokClassifier
     - CreateConnectionInput.ConnectionInput
     - CreateTriggerInput.Name
+    - CreateTriggerInput.WorkflowName
     - DeleteTriggerInput.Name
     - GetTriggerInput.Name
     - Mapping.Children
