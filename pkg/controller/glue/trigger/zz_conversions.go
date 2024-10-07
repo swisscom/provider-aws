@@ -263,6 +263,10 @@ func GenerateCreateTriggerInput(cr *svcapitypes.Trigger) *svcsdk.CreateTriggerIn
 func GenerateUpdateTriggerInput(cr *svcapitypes.Trigger) *svcsdk.UpdateTriggerInput {
 	res := &svcsdk.UpdateTriggerInput{}
 
+	if cr.Status.AtProvider.Name != nil {
+		res.SetName(*cr.Status.AtProvider.Name)
+	}
+
 	return res
 }
 
