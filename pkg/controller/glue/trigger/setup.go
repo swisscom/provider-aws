@@ -3,6 +3,7 @@ package trigger
 import (
 	"context"
 	"encoding/json"
+
 	svcsdk "github.com/aws/aws-sdk-go/service/glue"
 	svcsdkapi "github.com/aws/aws-sdk-go/service/glue/glueiface"
 	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
@@ -67,18 +68,6 @@ func newCustomExternal(kube client.Client, client svcsdkapi.GlueAPI) *customExte
 		},
 	}
 }
-
-//func (e *customExternal) Observe(ctx context.Context, mg cpresource.Managed) (managed.ExternalObservation, error) {
-//	return e.Observe(ctx, mg)
-//}
-//
-//func (e *customExternal) Create(ctx context.Context, mg cpresource.Managed) (managed.ExternalCreation, error) {
-//	return e.Create(ctx, mg)
-//}
-//
-//func (e *customExternal) Delete(ctx context.Context, mg cpresource.Managed) error {
-//	return e.Delete(ctx, mg)
-//}
 
 func (e *customExternal) Update(ctx context.Context, mg cpresource.Managed) (managed.ExternalUpdate, error) {
 	cr, ok := mg.(*svcapitypes.Trigger)
@@ -222,6 +211,7 @@ func isUpToDate(_ context.Context, cr *svcapitypes.Trigger, resp *svcsdk.GetTrig
 		cmpopts.IgnoreFields(svcapitypes.TriggerParameters{}, "Region"),
 		cmpopts.IgnoreFields(svcapitypes.TriggerParameters{}, "Tags"),
 		cmpopts.IgnoreFields(svcapitypes.TriggerParameters{}, "StartOnCreation"),
+		cmpopts.IgnoreFields(svcapitypes.TriggerParameters{}, "TriggerType"), // TriggerType is immutable
 	)
 	if diff != "" {
 		return false, "Found observed difference in glue trigger " + diff, nil
@@ -248,21 +238,58 @@ func createPatch(currentParams *svcapitypes.TriggerParameters, resp *svcsdk.GetT
 	targetConfig := currentParams.DeepCopy()
 	externalConfig := &svcapitypes.TriggerParameters{}
 	externalConfig.Schedule = resp.Trigger.Schedule
-	var actions []*svcapitypes.Action
-	for _, action := range resp.Trigger.Actions {
-		notificationProperty := &svcapitypes.NotificationProperty{}
-		if action.NotificationProperty != nil {
-			notificationProperty.NotifyDelayAfter = action.NotificationProperty.NotifyDelayAfter
+	if resp.Trigger.Predicate != nil {
+		if resp.Trigger.Predicate.Conditions != nil {
+			externalConfig.Predicate.Conditions = make([]*svcapitypes.Condition, 0, len(resp.Trigger.Predicate.Conditions))
+			for _, respCondition := range resp.Trigger.Predicate.Conditions {
+				curCondition := &svcapitypes.Condition{}
+				if respCondition.CrawlState != nil {
+					curCondition.CrawlState = respCondition.CrawlState
+				}
+				if respCondition.CrawlerName != nil {
+					curCondition.CrawlerName = respCondition.CrawlerName
+				}
+				if respCondition.JobName != nil {
+					curCondition.JobName = respCondition.JobName
+				}
+				if respCondition.LogicalOperator != nil {
+					curCondition.LogicalOperator = respCondition.LogicalOperator
+				}
+				if respCondition.State != nil {
+					curCondition.State = respCondition.State
+				}
+				externalConfig.Predicate.Conditions = append(externalConfig.Predicate.Conditions, curCondition)
+			}
 		}
-		actions = append(actions, &svcapitypes.Action{
-			Arguments:             action.Arguments,
-			CrawlerName:           action.CrawlerName,
-			JobName:               action.JobName,
-			NotificationProperty:  notificationProperty,
-			SecurityConfiguration: action.SecurityConfiguration,
-		})
+		if resp.Trigger.Predicate.Logical != nil {
+			externalConfig.Predicate.Logical = resp.Trigger.Predicate.Logical
+		}
 	}
-	externalConfig.Actions = actions
+	if resp.Trigger.Actions != nil {
+		externalConfig.Actions = make([]*svcapitypes.Action, 0, len(resp.Trigger.Actions))
+		for _, respAction := range resp.Trigger.Actions {
+			crAction := &svcapitypes.Action{}
+			if respAction.NotificationProperty != nil && respAction.NotificationProperty.NotifyDelayAfter != nil {
+				crAction.NotificationProperty = &svcapitypes.NotificationProperty{NotifyDelayAfter: respAction.NotificationProperty.NotifyDelayAfter}
+			}
+			if respAction.Arguments != nil {
+				crAction.Arguments = respAction.Arguments
+			}
+			if respAction.CrawlerName != nil {
+				crAction.CrawlerName = respAction.CrawlerName
+			}
+			if respAction.JobName != nil {
+				crAction.JobName = respAction.JobName
+			}
+			if respAction.SecurityConfiguration != nil {
+				crAction.SecurityConfiguration = respAction.SecurityConfiguration
+			}
+			if respAction.Timeout != nil {
+				crAction.Timeout = respAction.Timeout
+			}
+			externalConfig.Actions = append(externalConfig.Actions, crAction)
+		}
+	}
 	externalConfig.Description = resp.Trigger.Description
 	eventBatchingCondition := &svcapitypes.EventBatchingCondition{}
 	if resp.Trigger.EventBatchingCondition != nil {
@@ -270,21 +297,12 @@ func createPatch(currentParams *svcapitypes.TriggerParameters, resp *svcsdk.GetT
 		eventBatchingCondition.BatchWindow = resp.Trigger.EventBatchingCondition.BatchWindow
 	}
 	externalConfig.EventBatchingCondition = eventBatchingCondition
-	predicate := &svcapitypes.Predicate{}
-	if resp.Trigger.Predicate != nil {
-		if resp.Trigger.Predicate.Conditions != nil {
-			for _, condition := range resp.Trigger.Predicate.Conditions {
-				predicate.Conditions = append(predicate.Conditions, &svcapitypes.Condition{
-					JobName: condition.JobName,
-					State:   condition.State,
-				})
-			}
-		}
-		predicate.Logical = resp.Trigger.Predicate.Logical
+	if resp.Trigger.Type != nil {
+		externalConfig.TriggerType = resp.Trigger.Type
 	}
-	externalConfig.Predicate = predicate
-	externalConfig.TriggerType = resp.Trigger.Type
-	externalConfig.WorkflowName = resp.Trigger.WorkflowName
+	if resp.Trigger.WorkflowName != nil {
+		externalConfig.WorkflowName = resp.Trigger.WorkflowName
+	}
 
 	jsonPatch, err := jsonpatch.CreateJSONPatch(externalConfig, targetConfig)
 	if err != nil {
