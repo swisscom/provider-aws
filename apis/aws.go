@@ -18,6 +18,7 @@ limitations under the License.
 package apis
 
 import (
+	wafv2manualv1alpha1 "github.com/crossplane-contrib/provider-aws/apis/wafv2/manualv1alpha1"
 	"k8s.io/apimachinery/pkg/runtime"
 
 	acmv1alpha1 "github.com/crossplane-contrib/provider-aws/apis/acm/v1alpha1"
@@ -175,6 +176,7 @@ func init() {
 		servicecatalogv1alpha1.SchemeBuilder.AddToScheme,
 		s3control.SchemeBuilder.AddToScheme,
 		firehosev1alpha1.SchemeBuilder.AddToScheme,
+		wafv2manualv1alpha1.SchemeBuilder.AddToScheme,
 	)
 }
 
