@@ -1,79 +1,79 @@
-#---
-#ignore:
-#  resource_names:
-#    - APIKey
-#    - IPSet
-#    - RegexPatternSet
-#    - RuleGroup
-#  field_paths:
-#    - CreateWebACLInput.Name
-#    - UpdateWebACLInput.Name
-#    - DeleteWebACLInput.Name
-#    - GetWebACLInput.Name
-#    - RuleGroup.Rules.Statement.AndStatement
-#    - RuleGroup.Rules.Statement.OrStatement
-#    - RuleGroup.Rules.Statement.NotStatement
-#    - RuleGroup.Rules.Statement.ManagedRuleGroupStatement.ScopeDownStatement
-#    - RuleGroup.Rules.Statement.RateBasedStatement.ScopeDownStatement
-#    - WebACL.Rules.Statement.AndStatement
-#    - WebACL.Rules.Statement.OrStatement
-#    - WebACL.Rules.Statement.NotStatement
-#    - WebACL.Rules.Statement.ManagedRuleGroupStatement.ScopeDownStatement
-#    - WebACL.Rules.Statement.RateBasedStatement.ScopeDownStatement
-#empty_shapes:
-#  - All
-#  - Method
-#  - UriPath
-#  - QueryString
-#  - AllQueryArguments
-#  - RateLimitIP
-#  - RateLimitForwardedIP
-#  - RateLimitHTTPMethod
-#  - NoneAction
-#operations:
-#  CreateWebACL:
-#    operation_type:
-#      - Create
-#    resource_name: WebACL
-#  UpdateWebACL:
-#    operation_type:
-#      - Update
-#    resource_name: WebACL
-#  GetWebACL:
-#    operation_type:
-#      - Read
-#    resource_name: WebACL
-#  DeleteWebACL:
-#    operation_type:
-#      - Delete
-#    resource_name: WebACL
-#
-#resources:
-#  WebACL:
-#    fields:
-#      Rules.Statement.AndStatement:
-#        type: string
-#        set:
-#          - ignore: "all"
-#      Rules.Statement.OrStatement:
-#        type: string
-#        set:
-#          - ignore: "all"
-#      Rules.Statement.NotStatement:
-#        type: string
-#        set:
-#          - ignore: "all"
-#      Rules.Statement.ManagedRuleGroupStatement.ScopeDownStatement:
-#        type: string
-#        set:
-#          - ignore: "all"
-#      Rules.Statement.RateBasedStatement.ScopeDownStatement:
-#        type: string
-#        set:
-#          - ignore: "all"
-#      Rules.Statement.ByteMatchStatement.TextTransformations.Type:
-#        go_tag: json:"type,omitempty"
-#    exceptions:
-#      errors:
-#        404:
-#          code: ResourceNotFoundException
+---
+ignore:
+  resource_names:
+    - APIKey
+    - IPSet
+    - RegexPatternSet
+    - RuleGroup
+  field_paths:
+    - CreateWebACLInput.Name
+    - UpdateWebACLInput.Name
+    - DeleteWebACLInput.Name
+    - GetWebACLInput.Name
+    - RuleGroup.Rules.Statement.AndStatement
+    - RuleGroup.Rules.Statement.OrStatement
+    - RuleGroup.Rules.Statement.NotStatement
+    - RuleGroup.Rules.Statement.ManagedRuleGroupStatement.ScopeDownStatement
+    - RuleGroup.Rules.Statement.RateBasedStatement.ScopeDownStatement
+    - WebACL.Rules.Statement.AndStatement
+    - WebACL.Rules.Statement.OrStatement
+    - WebACL.Rules.Statement.NotStatement
+    - WebACL.Rules.Statement.ManagedRuleGroupStatement.ScopeDownStatement
+    - WebACL.Rules.Statement.RateBasedStatement.ScopeDownStatement
+empty_shapes:
+  - All
+  - Method
+  - UriPath
+  - QueryString
+  - AllQueryArguments
+  - RateLimitIP
+  - RateLimitForwardedIP
+  - RateLimitHTTPMethod
+  - NoneAction
+operations:
+  CreateWebACL:
+    operation_type:
+      - Create
+    resource_name: WebACL
+  UpdateWebACL:
+    operation_type:
+      - Update
+    resource_name: WebACL
+  GetWebACL:
+    operation_type:
+      - Read
+    resource_name: WebACL
+  DeleteWebACL:
+    operation_type:
+      - Delete
+    resource_name: WebACL
+
+resources:
+  WebACL:
+    fields:
+      Rules.Statement.AndStatement:
+        type: string
+        set:
+          - ignore: "all"
+      Rules.Statement.OrStatement:
+        type: string
+        set:
+          - ignore: "all"
+      Rules.Statement.NotStatement:
+        type: string
+        set:
+          - ignore: "all"
+      Rules.Statement.ManagedRuleGroupStatement.ScopeDownStatement:
+        type: string
+        set:
+          - ignore: "all"
+      Rules.Statement.RateBasedStatement.ScopeDownStatement:
+        type: string
+        set:
+          - ignore: "all"
+      Rules.Statement.ByteMatchStatement.TextTransformations.Type:
+        go_tag: json:"type,omitempty"
+    exceptions:
+      errors:
+        404:
+          code: ResourceNotFoundException
