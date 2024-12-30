@@ -75,17 +75,13 @@ func (e *external) Observe(ctx context.Context, mg cpresource.Managed) (managed.
 			ResourceExists: false,
 		}, nil
 	}
-	input := GenerateListWebACLsInput(cr)
+	input := GenerateGetWebACLInput(cr)
 	if err := e.preObserve(ctx, cr, input); err != nil {
 		return managed.ExternalObservation{}, errors.Wrap(err, "pre-observe failed")
 	}
-	resp, err := e.client.ListWebACLsWithContext(ctx, input)
+	resp, err := e.client.GetWebACLWithContext(ctx, input)
 	if err != nil {
 		return managed.ExternalObservation{ResourceExists: false}, errorutils.Wrap(cpresource.Ignore(IsNotFound, err), errDescribe)
-	}
-	resp = e.filterList(cr, resp)
-	if len(resp.WebACLs) == 0 {
-		return managed.ExternalObservation{ResourceExists: false}, nil
 	}
 	currentSpec := cr.Spec.ForProvider.DeepCopy()
 	if err := e.lateInitialize(&cr.Spec.ForProvider, resp); err != nil {
@@ -193,7 +189,6 @@ func newExternal(kube client.Client, client svcsdkapi.WAFV2API, opts []option) *
 		postObserve:    nopPostObserve,
 		lateInitialize: nopLateInitialize,
 		isUpToDate:     alwaysUpToDate,
-		filterList:     nopFilterList,
 		preCreate:      nopPreCreate,
 		postCreate:     nopPostCreate,
 		preDelete:      nopPreDelete,
@@ -210,11 +205,10 @@ func newExternal(kube client.Client, client svcsdkapi.WAFV2API, opts []option) *
 type external struct {
 	kube           client.Client
 	client         svcsdkapi.WAFV2API
-	preObserve     func(context.Context, *svcapitypes.WebACL, *svcsdk.ListWebACLsInput) error
-	postObserve    func(context.Context, *svcapitypes.WebACL, *svcsdk.ListWebACLsOutput, managed.ExternalObservation, error) (managed.ExternalObservation, error)
-	filterList     func(*svcapitypes.WebACL, *svcsdk.ListWebACLsOutput) *svcsdk.ListWebACLsOutput
-	lateInitialize func(*svcapitypes.WebACLParameters, *svcsdk.ListWebACLsOutput) error
-	isUpToDate     func(context.Context, *svcapitypes.WebACL, *svcsdk.ListWebACLsOutput) (bool, string, error)
+	preObserve     func(context.Context, *svcapitypes.WebACL, *svcsdk.GetWebACLInput) error
+	postObserve    func(context.Context, *svcapitypes.WebACL, *svcsdk.GetWebACLOutput, managed.ExternalObservation, error) (managed.ExternalObservation, error)
+	lateInitialize func(*svcapitypes.WebACLParameters, *svcsdk.GetWebACLOutput) error
+	isUpToDate     func(context.Context, *svcapitypes.WebACL, *svcsdk.GetWebACLOutput) (bool, string, error)
 	preCreate      func(context.Context, *svcapitypes.WebACL, *svcsdk.CreateWebACLInput) error
 	postCreate     func(context.Context, *svcapitypes.WebACL, *svcsdk.CreateWebACLOutput, managed.ExternalCreation, error) (managed.ExternalCreation, error)
 	preDelete      func(context.Context, *svcapitypes.WebACL, *svcsdk.DeleteWebACLInput) (bool, error)
@@ -223,20 +217,17 @@ type external struct {
 	postUpdate     func(context.Context, *svcapitypes.WebACL, *svcsdk.UpdateWebACLOutput, managed.ExternalUpdate, error) (managed.ExternalUpdate, error)
 }
 
-func nopPreObserve(context.Context, *svcapitypes.WebACL, *svcsdk.ListWebACLsInput) error {
+func nopPreObserve(context.Context, *svcapitypes.WebACL, *svcsdk.GetWebACLInput) error {
 	return nil
-}
-func nopPostObserve(_ context.Context, _ *svcapitypes.WebACL, _ *svcsdk.ListWebACLsOutput, obs managed.ExternalObservation, err error) (managed.ExternalObservation, error) {
-	return obs, err
-}
-func nopFilterList(_ *svcapitypes.WebACL, list *svcsdk.ListWebACLsOutput) *svcsdk.ListWebACLsOutput {
-	return list
 }
 
-func nopLateInitialize(*svcapitypes.WebACLParameters, *svcsdk.ListWebACLsOutput) error {
+func nopPostObserve(_ context.Context, _ *svcapitypes.WebACL, _ *svcsdk.GetWebACLOutput, obs managed.ExternalObservation, err error) (managed.ExternalObservation, error) {
+	return obs, err
+}
+func nopLateInitialize(*svcapitypes.WebACLParameters, *svcsdk.GetWebACLOutput) error {
 	return nil
 }
-func alwaysUpToDate(context.Context, *svcapitypes.WebACL, *svcsdk.ListWebACLsOutput) (bool, string, error) {
+func alwaysUpToDate(context.Context, *svcapitypes.WebACL, *svcsdk.GetWebACLOutput) (bool, string, error) {
 	return true, "", nil
 }
 

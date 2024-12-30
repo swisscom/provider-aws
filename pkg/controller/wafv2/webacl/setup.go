@@ -85,12 +85,12 @@ func SetupLogGroup(mgr ctrl.Manager, o controller.Options) error {
 		Complete(r)
 }
 
-func preCreate(_ context.Context, ds *svcapitypes.WebACL, input *svcsdk.CreateWebACLInput) error {
+func preCreate(_ context.Context, ds *svcapitypes.WebACL, input *svcsdk.GetWebACLInput) error {
 	input.Name = aws.String(meta.GetExternalName(ds))
 	return nil
 }
 
-func preObserve(ctx context.Context, cr *svcapitypes.WebACL, input *svcsdk.ListWebACLsInput) error {
+func preObserve(ctx context.Context, cr *svcapitypes.WebACL, input *svcsdk.GetWebACLInput) error {
 	input.Name = aws.String(meta.GetExternalName(cr))
 	return nil
 }

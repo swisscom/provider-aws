@@ -440,6 +440,10 @@ type FieldToMatch struct {
 
 // +kubebuilder:skipversion
 type FirewallManagerRuleGroup struct {
+	// The processing guidance for an Firewall Manager rule. This is like a regular
+	// rule Statement, but it can only contain a single rule group reference.
+	FirewallManagerStatement *FirewallManagerStatement `json:"firewallManagerStatement,omitempty"`
+
 	Name *string `json:"name,omitempty"`
 	// The action to use in the place of the action that results from the rule group
 	// evaluation. Set the override action to none to leave the result of the rule
@@ -1662,6 +1666,8 @@ type WebACL_SDK struct {
 	// sizes that are larger than the default. For more information, see WAF Pricing
 	// (http://aws.amazon.com/waf/pricing/).
 	AssociationConfig *AssociationConfig `json:"associationConfig,omitempty"`
+
+	Capacity *int64 `json:"capacity,omitempty"`
 	// Specifies how WAF should handle CAPTCHA evaluations. This is available at
 	// the web ACL level and in each rule.
 	CaptchaConfig *CaptchaConfig `json:"captchaConfig,omitempty"`
@@ -1684,6 +1690,10 @@ type WebACL_SDK struct {
 	ManagedByFirewallManager *bool `json:"managedByFirewallManager,omitempty"`
 
 	Name *string `json:"name,omitempty"`
+
+	PostProcessFirewallManagerRuleGroups []*FirewallManagerRuleGroup `json:"postProcessFirewallManagerRuleGroups,omitempty"`
+
+	PreProcessFirewallManagerRuleGroups []*FirewallManagerRuleGroup `json:"preProcessFirewallManagerRuleGroups,omitempty"`
 
 	Rules []*Rule `json:"rules,omitempty"`
 

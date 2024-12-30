@@ -31,22 +31,8 @@ empty_shapes:
   - RateLimitHTTPMethod
   - NoneAction
 operations:
-  CreateWebACL:
-    operation_type:
-      - Create
-    resource_name: WebACL
-  UpdateWebACL:
-    operation_type:
-      - Update
-    resource_name: WebACL
   GetWebACL:
-    operation_type:
-      - Read
-    resource_name: WebACL
-  DeleteWebACL:
-    operation_type:
-      - Delete
-    resource_name: WebACL
+    output_wrapper_field_path: WebACL
 
 resources:
   WebACL:
