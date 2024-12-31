@@ -15,9 +15,8 @@ package webacl
 
 import (
 	"context"
-
-	"github.com/aws/aws-sdk-go-v2/aws"
-	svcsdk "github.com/aws/aws-sdk-go-v2/service/wafv2"
+	"github.com/aws/aws-sdk-go/aws"
+	svcsdk "github.com/aws/aws-sdk-go/service/wafv2"
 	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
 	"github.com/crossplane/crossplane-runtime/pkg/connection"
 	"github.com/crossplane/crossplane-runtime/pkg/controller"
@@ -25,32 +24,24 @@ import (
 	"github.com/crossplane/crossplane-runtime/pkg/meta"
 	"github.com/crossplane/crossplane-runtime/pkg/reconciler/managed"
 	"github.com/crossplane/crossplane-runtime/pkg/resource"
-	"github.com/pkg/errors"
 	ctrl "sigs.k8s.io/controller-runtime"
 
 	"github.com/crossplane-contrib/provider-aws/apis/v1alpha1"
 	svcapitypes "github.com/crossplane-contrib/provider-aws/apis/wafv2/manualv1alpha1"
 	"github.com/crossplane-contrib/provider-aws/pkg/features"
-	"github.com/crossplane-contrib/provider-aws/pkg/utils/pointer"
 	custommanaged "github.com/crossplane-contrib/provider-aws/pkg/utils/reconciler/managed"
-	tagutils "github.com/crossplane-contrib/provider-aws/pkg/utils/tags"
 )
 
-const (
-	errListTags      = "cannot list tags"
-	errTagResource   = "cannot tag resource"
-	errUntagResource = "cannot untag resource"
-)
-
-// SetupLogGroup adds a controller that reconciles LogGroup.
-func SetupLogGroup(mgr ctrl.Manager, o controller.Options) error {
+// SetupWebACL adds a controller that reconciles SetupWebAcl.
+func SetupWebACL(mgr ctrl.Manager, o controller.Options) error {
 	name := managed.ControllerName(svcapitypes.WebACLKind)
 	opts := []option{
 		func(e *external) {
 			e.postObserve = postObserve
 			e.preCreate = preCreate
-			e.isUpToDate = u.isUpToDate
+			e.preUpdate = preUpdate
 			e.preObserve = preObserve
+			e.preDelete = preDelete
 		},
 	}
 
@@ -85,7 +76,7 @@ func SetupLogGroup(mgr ctrl.Manager, o controller.Options) error {
 		Complete(r)
 }
 
-func preCreate(_ context.Context, ds *svcapitypes.WebACL, input *svcsdk.GetWebACLInput) error {
+func preCreate(_ context.Context, ds *svcapitypes.WebACL, input *svcsdk.CreateWebACLInput) error {
 	input.Name = aws.String(meta.GetExternalName(ds))
 	return nil
 }
@@ -95,7 +86,7 @@ func preObserve(ctx context.Context, cr *svcapitypes.WebACL, input *svcsdk.GetWe
 	return nil
 }
 
-func postObserve(_ context.Context, cr *svcapitypes.WebACL, resp *svcsdk.GetWebACLForResourceOutput, obs managed.ExternalObservation, err error) (managed.ExternalObservation, error) {
+func postObserve(_ context.Context, cr *svcapitypes.WebACL, resp *svcsdk.GetWebACLOutput, obs managed.ExternalObservation, err error) (managed.ExternalObservation, error) {
 	if err != nil {
 		return managed.ExternalObservation{}, err
 	}
@@ -111,26 +102,20 @@ func postObserve(_ context.Context, cr *svcapitypes.WebACL, resp *svcsdk.GetWebA
 		}
 
 	}
+
 	return obs, nil
 }
 
-func (u *updater) isUpToDate(_ context.Context, cr *svcapitypes.WebACL, obj *svcsdk.GetWebACLOutput) (bool, string, error) {
-	if pointer.Int64Value(cr.Spec.ForProvider.RetentionInDays) != pointer.Int64Value(obj.LogGroups[0].RetentionInDays) {
-		return false, "", nil
-	}
+func preUpdate(_ context.Context, ds *svcapitypes.WebACL, input *svcsdk.UpdateWebACLInput) error {
+	input.Name = aws.String(meta.GetExternalName(ds))
+	return nil
+}
 
-	if pointer.StringValue(cr.Spec.ForProvider.KMSKeyID) != pointer.StringValue(obj.LogGroups[0].KmsKeyId) {
-		return false, "", nil //TODO: test
-	}
+//func isUpToDate(_ context.Context, ds *svcapitypes.WebACL, input *svcsdk.GetWebACLOutput) (bool, string, error) {
+//
+//}
 
-	trimmedArn := trimArnSuffix(*obj.LogGroups[0].Arn)
-	tags, err := u.client.ListTagsForResource(&svcsdk.ListTagsForResourceInput{
-		ResourceArn: &trimmedArn,
-	})
-	if err != nil {
-		return false, "", errors.Wrap(err, errListTags)
-	}
-	add, remove := tagutils.DiffTagsMapPtr(cr.Spec.ForProvider.Tags, tags.Tags)
-
-	return len(add) == 0 && len(remove) == 0, "", nil
+func preDelete(_ context.Context, ds *svcapitypes.WebACL, input *svcsdk.DeleteWebACLInput) (bool, error) {
+	input.Name = aws.String(meta.GetExternalName(ds))
+	return false, nil
 }
