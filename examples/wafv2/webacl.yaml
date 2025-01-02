@@ -1,0 +1,45 @@
+---
+apiVersion: wafv2.aws.crossplane.io/v1alpha1
+kind: WebACL
+metadata:
+  name: kir-test
+  annotations:
+    crossplane.io/external-name: kir-test
+spec:
+  forProvider:
+    region: eu-central-1
+    rules:
+      - name: rule1
+        visibilityConfig:
+          metricName: 'kir-test'
+          sampledRequestsEnabled: false
+          cloudWatchMetricsEnabled: false
+        priority: 1
+        action:
+          allow: {}
+        statement:
+          andStatement: |
+            {
+              "Statements": [
+                {
+                  "ByteMatchStatement": {
+                    "FieldToMatch": {
+                      "SingleHeader": {
+                        "Name": "User-Agent"
+                      }
+                    },
+                    "PositionalConstraint": "CONTAINS",
+                    "SearchString": "badBot"
+                  }
+                }
+              ]
+            }
+    visibilityConfig:
+      metricName: 'kir-test'
+      sampledRequestsEnabled: false
+      cloudWatchMetricsEnabled: false
+    defaultAction:
+      allow: {}
+    scope: REGIONAL
+  providerConfigRef:
+    name: providerconfig-aws

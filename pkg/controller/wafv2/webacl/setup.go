@@ -15,8 +15,14 @@ package webacl
 
 import (
 	"context"
+	"fmt"
+	errorutils "github.com/crossplane-contrib/provider-aws/pkg/utils/errors"
+	"github.com/google/go-cmp/cmp"
+
 	"github.com/aws/aws-sdk-go/aws"
 	svcsdk "github.com/aws/aws-sdk-go/service/wafv2"
+	svcsdkapi "github.com/aws/aws-sdk-go/service/wafv2/wafv2iface"
+	connectaws "github.com/crossplane-contrib/provider-aws/pkg/utils/connect/aws"
 	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
 	"github.com/crossplane/crossplane-runtime/pkg/connection"
 	"github.com/crossplane/crossplane-runtime/pkg/controller"
@@ -24,7 +30,10 @@ import (
 	"github.com/crossplane/crossplane-runtime/pkg/meta"
 	"github.com/crossplane/crossplane-runtime/pkg/reconciler/managed"
 	"github.com/crossplane/crossplane-runtime/pkg/resource"
+	cpresource "github.com/crossplane/crossplane-runtime/pkg/resource"
+	"github.com/pkg/errors"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/crossplane-contrib/provider-aws/apis/v1alpha1"
 	svcapitypes "github.com/crossplane-contrib/provider-aws/apis/wafv2/manualv1alpha1"
@@ -32,18 +41,13 @@ import (
 	custommanaged "github.com/crossplane-contrib/provider-aws/pkg/utils/reconciler/managed"
 )
 
+const (
+	errCouldNotFindWebACL = "could not find WebACL"
+)
+
 // SetupWebACL adds a controller that reconciles SetupWebAcl.
 func SetupWebACL(mgr ctrl.Manager, o controller.Options) error {
 	name := managed.ControllerName(svcapitypes.WebACLKind)
-	opts := []option{
-		func(e *external) {
-			e.postObserve = postObserve
-			e.preCreate = preCreate
-			e.preUpdate = preUpdate
-			e.preObserve = preObserve
-			e.preDelete = preDelete
-		},
-	}
 
 	cps := []managed.ConnectionPublisher{managed.NewAPISecretPublisher(mgr.GetClient(), mgr.GetScheme())}
 	if o.Features.Enabled(features.EnableAlphaExternalSecretStores) {
@@ -51,9 +55,9 @@ func SetupWebACL(mgr ctrl.Manager, o controller.Options) error {
 	}
 
 	reconcilerOpts := []managed.ReconcilerOption{
-		managed.WithInitializers(),
 		managed.WithCriticalAnnotationUpdater(custommanaged.NewRetryingCriticalAnnotationUpdater(mgr.GetClient())),
-		managed.WithExternalConnecter(&connector{kube: mgr.GetClient(), opts: opts}),
+		managed.WithInitializers(managed.NewNameAsExternalName(mgr.GetClient())),
+		managed.WithExternalConnecter(&customConnector{kube: mgr.GetClient()}),
 		managed.WithPollInterval(o.PollInterval),
 		managed.WithLogger(o.Logger.WithValues("controller", name)),
 		managed.WithRecorder(event.NewAPIRecorder(mgr.GetEventRecorderFor(name))),
@@ -76,27 +80,136 @@ func SetupWebACL(mgr ctrl.Manager, o controller.Options) error {
 		Complete(r)
 }
 
+type customConnector struct {
+	kube client.Client
+}
+
+// customExternal is external connector with overridden Observe method due to ACK v0.38.1 doesn't correctly generate it.
+type customExternal struct {
+	external
+}
+
+//type custom struct {
+//	client svcsdkapi.WAFV2API
+//}
+
+func newCustomExternal(kube client.Client, client svcsdkapi.WAFV2API) *customExternal {
+	return &customExternal{
+		external{
+			kube:           kube,
+			client:         client,
+			preObserve:     preObserve,
+			postObserve:    postObserve,
+			isUpToDate:     alwaysUpToDate,
+			preCreate:      preCreate,
+			preDelete:      preDelete,
+			preUpdate:      preUpdate,
+			lateInitialize: nopLateInitialize,
+			postCreate:     nopPostCreate,
+			postDelete:     nopPostDelete,
+			postUpdate:     nopPostUpdate,
+		},
+	}
+}
+
+func (c *customConnector) Connect(ctx context.Context, mg cpresource.Managed) (managed.ExternalClient, error) {
+	cr, ok := mg.(*svcapitypes.WebACL)
+	if !ok {
+		return nil, errors.New(errUnexpectedObject)
+	}
+	sess, err := connectaws.GetConfigV1(ctx, c.kube, mg, cr.Spec.ForProvider.Region)
+	if err != nil {
+		return nil, errors.Wrap(err, errCreateSession)
+	}
+	return newCustomExternal(c.kube, svcsdk.New(sess)), nil
+}
+
 func preCreate(_ context.Context, ds *svcapitypes.WebACL, input *svcsdk.CreateWebACLInput) error {
 	input.Name = aws.String(meta.GetExternalName(ds))
 	return nil
 }
 
-func preObserve(ctx context.Context, cr *svcapitypes.WebACL, input *svcsdk.GetWebACLInput) error {
-	input.Name = aws.String(meta.GetExternalName(cr))
-	return nil
-}
+func (e *customExternal) Observe(ctx context.Context, mg cpresource.Managed) (managed.ExternalObservation, error) {
 
-func postObserve(_ context.Context, cr *svcapitypes.WebACL, resp *svcsdk.GetWebACLOutput, obs managed.ExternalObservation, err error) (managed.ExternalObservation, error) {
+	cr, ok := mg.(*svcapitypes.WebACL)
+	if !ok {
+		return managed.ExternalObservation{}, errors.New(errUnexpectedObject)
+	}
+	if meta.GetExternalName(cr) == "" {
+		return managed.ExternalObservation{
+			ResourceExists: false,
+		}, nil
+	}
+	input := GenerateGetWebACLInput(cr)
+	listWebACLInput := svcsdk.ListWebACLsInput{
+		Scope: cr.Spec.ForProvider.Scope,
+	}
+	ls, err := e.client.ListWebACLs(&listWebACLInput)
 	if err != nil {
 		return managed.ExternalObservation{}, err
 	}
+	for n, webACLSummary := range ls.WebACLs {
+		if aws.StringValue(webACLSummary.Name) == meta.GetExternalName(cr) {
+			input.Id = webACLSummary.Id
+			break
+		}
+		if n == len(ls.WebACLs)-1 {
+			return managed.ExternalObservation{
+				ResourceExists: false,
+			}, nil
+		}
+	}
+	if err := e.preObserve(ctx, cr, input); err != nil {
+		return managed.ExternalObservation{}, errors.Wrap(err, "pre-observe failed")
+	}
+	resp, err := e.client.GetWebACLWithContext(ctx, input)
+	if err != nil {
+		return managed.ExternalObservation{ResourceExists: false}, errorutils.Wrap(cpresource.Ignore(IsNotFound, err), errDescribe)
+	}
+	currentSpec := cr.Spec.ForProvider.DeepCopy()
+	if err := e.lateInitialize(&cr.Spec.ForProvider, resp); err != nil {
+		return managed.ExternalObservation{}, errors.Wrap(err, "late-init failed")
+	}
+	GenerateWebACL(resp).Status.AtProvider.DeepCopyInto(&cr.Status.AtProvider)
+	upToDate := true
+	diff := ""
+	if !meta.WasDeleted(cr) { // There is no need to run isUpToDate if the resource is deleted
+		upToDate, diff, err = e.isUpToDate(ctx, cr, resp)
+		if err != nil {
+			return managed.ExternalObservation{}, errors.Wrap(err, "isUpToDate check failed")
+		}
+	}
+	return e.postObserve(ctx, cr, resp, managed.ExternalObservation{
+		ResourceExists:          true,
+		ResourceUpToDate:        upToDate,
+		Diff:                    diff,
+		ResourceLateInitialized: !cmp.Equal(&cr.Spec.ForProvider, currentSpec),
+	}, nil)
+}
 
-	cr.SetConditions(xpv1.Available())
+func preObserve(ctx context.Context, ds *svcapitypes.WebACL, input *svcsdk.GetWebACLInput) error {
+	input.Name = aws.String(meta.GetExternalName(ds))
+	return nil
+}
+
+//func isUpToDate(_ context.Context, ds *svcapitypes.WebACL, input *svcsdk.GetWebACLOutput) (bool, string, error) {
+//}
+
+func postObserve(_ context.Context, ds *svcapitypes.WebACL, resp *svcsdk.GetWebACLOutput, obs managed.ExternalObservation, err error) (managed.ExternalObservation, error) {
+	if err != nil {
+		if err.Error() == fmt.Sprintf("%s %s", errCouldNotFindWebACL, meta.GetExternalName(ds)) {
+			return managed.ExternalObservation{ResourceExists: false}, nil
+		} else {
+			return managed.ExternalObservation{}, err
+		}
+	}
+
+	ds.SetConditions(xpv1.Available())
 
 	if resp == nil {
-		cr.Status.AtProvider = svcapitypes.WebACLObservation{}
+		ds.Status.AtProvider = svcapitypes.WebACLObservation{}
 	} else {
-		cr.Status.AtProvider = svcapitypes.WebACLObservation{
+		ds.Status.AtProvider = svcapitypes.WebACLObservation{
 			ARN: resp.WebACL.ARN,
 			ID:  resp.WebACL.Id,
 		}
@@ -110,10 +223,6 @@ func preUpdate(_ context.Context, ds *svcapitypes.WebACL, input *svcsdk.UpdateWe
 	input.Name = aws.String(meta.GetExternalName(ds))
 	return nil
 }
-
-//func isUpToDate(_ context.Context, ds *svcapitypes.WebACL, input *svcsdk.GetWebACLOutput) (bool, string, error) {
-//
-//}
 
 func preDelete(_ context.Context, ds *svcapitypes.WebACL, input *svcsdk.DeleteWebACLInput) (bool, error) {
 	input.Name = aws.String(meta.GetExternalName(ds))
