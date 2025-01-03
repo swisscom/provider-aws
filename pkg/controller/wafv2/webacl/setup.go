@@ -16,8 +16,6 @@ package webacl
 import (
 	"context"
 	"fmt"
-	errorutils "github.com/crossplane-contrib/provider-aws/pkg/utils/errors"
-	"github.com/google/go-cmp/cmp"
 
 	"github.com/aws/aws-sdk-go/aws"
 	svcsdk "github.com/aws/aws-sdk-go/service/wafv2"
@@ -31,6 +29,7 @@ import (
 	"github.com/crossplane/crossplane-runtime/pkg/reconciler/managed"
 	"github.com/crossplane/crossplane-runtime/pkg/resource"
 	cpresource "github.com/crossplane/crossplane-runtime/pkg/resource"
+	"github.com/google/go-cmp/cmp"
 	"github.com/pkg/errors"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -38,6 +37,7 @@ import (
 	"github.com/crossplane-contrib/provider-aws/apis/v1alpha1"
 	svcapitypes "github.com/crossplane-contrib/provider-aws/apis/wafv2/manualv1alpha1"
 	"github.com/crossplane-contrib/provider-aws/pkg/features"
+	errorutils "github.com/crossplane-contrib/provider-aws/pkg/utils/errors"
 	custommanaged "github.com/crossplane-contrib/provider-aws/pkg/utils/reconciler/managed"
 )
 
@@ -80,21 +80,32 @@ func SetupWebACL(mgr ctrl.Manager, o controller.Options) error {
 		Complete(r)
 }
 
+// customConnector is external connector with overridden Observe method due to ACK v0.38.1 doesn't correctly generate it.
 type customConnector struct {
 	kube client.Client
 }
 
-// customExternal is external connector with overridden Observe method due to ACK v0.38.1 doesn't correctly generate it.
 type customExternal struct {
 	external
+	cache *cache
 }
 
-//type custom struct {
-//	client svcsdkapi.WAFV2API
-//}
+type cachedCustomMethods struct {
+	cache *cache
+}
+
+type cache struct {
+	listWebACLsOutput *svcsdk.ListWebACLsOutput
+}
+
+func createEmptyCache() *cache {
+	return &cache{}
+}
 
 func newCustomExternal(kube client.Client, client svcsdkapi.WAFV2API) *customExternal {
-	return &customExternal{
+	sharedCache := createEmptyCache()
+	c := cachedCustomMethods{cache: sharedCache}
+	e := &customExternal{
 		external{
 			kube:           kube,
 			client:         client,
@@ -102,14 +113,16 @@ func newCustomExternal(kube client.Client, client svcsdkapi.WAFV2API) *customExt
 			postObserve:    postObserve,
 			isUpToDate:     alwaysUpToDate,
 			preCreate:      preCreate,
-			preDelete:      preDelete,
-			preUpdate:      preUpdate,
+			preDelete:      c.preDelete,
+			preUpdate:      c.preUpdate,
 			lateInitialize: nopLateInitialize,
 			postCreate:     nopPostCreate,
 			postDelete:     nopPostDelete,
 			postUpdate:     nopPostUpdate,
 		},
+		cache: sharedCache,
 	}
+	return e
 }
 
 func (c *customConnector) Connect(ctx context.Context, mg cpresource.Managed) (managed.ExternalClient, error) {
@@ -148,6 +161,7 @@ func (e *customExternal) Observe(ctx context.Context, mg cpresource.Managed) (ma
 	if err != nil {
 		return managed.ExternalObservation{}, err
 	}
+	e.cache.listWebACLsOutput = ls
 	for n, webACLSummary := range ls.WebACLs {
 		if aws.StringValue(webACLSummary.Name) == meta.GetExternalName(cr) {
 			input.Id = webACLSummary.Id
@@ -196,14 +210,6 @@ func preObserve(ctx context.Context, ds *svcapitypes.WebACL, input *svcsdk.GetWe
 //}
 
 func postObserve(_ context.Context, ds *svcapitypes.WebACL, resp *svcsdk.GetWebACLOutput, obs managed.ExternalObservation, err error) (managed.ExternalObservation, error) {
-	if err != nil {
-		if err.Error() == fmt.Sprintf("%s %s", errCouldNotFindWebACL, meta.GetExternalName(ds)) {
-			return managed.ExternalObservation{ResourceExists: false}, nil
-		} else {
-			return managed.ExternalObservation{}, err
-		}
-	}
-
 	ds.SetConditions(xpv1.Available())
 
 	if resp == nil {
@@ -219,12 +225,36 @@ func postObserve(_ context.Context, ds *svcapitypes.WebACL, resp *svcsdk.GetWebA
 	return obs, nil
 }
 
-func preUpdate(_ context.Context, ds *svcapitypes.WebACL, input *svcsdk.UpdateWebACLInput) error {
+func (e *cachedCustomMethods) preUpdate(_ context.Context, ds *svcapitypes.WebACL, input *svcsdk.UpdateWebACLInput) error {
 	input.Name = aws.String(meta.GetExternalName(ds))
+	lockToken, err := getLockToken(e.cache.listWebACLsOutput.WebACLs, ds)
+	if err != nil {
+		return err
+	}
+	input.LockToken = lockToken
 	return nil
 }
 
-func preDelete(_ context.Context, ds *svcapitypes.WebACL, input *svcsdk.DeleteWebACLInput) (bool, error) {
+func (e *cachedCustomMethods) preDelete(_ context.Context, ds *svcapitypes.WebACL, input *svcsdk.DeleteWebACLInput) (bool, error) {
 	input.Name = aws.String(meta.GetExternalName(ds))
+	lockToken, err := getLockToken(e.cache.listWebACLsOutput.WebACLs, ds)
+	if err != nil {
+		return false, err
+	}
+	input.LockToken = lockToken
 	return false, nil
+}
+
+func getLockToken(webACLs []*svcsdk.WebACLSummary, ds *svcapitypes.WebACL) (*string, error) {
+	var lockToken *string
+	for n, webACLSummary := range webACLs {
+		if aws.StringValue(webACLSummary.Name) == meta.GetExternalName(ds) {
+			lockToken = webACLSummary.LockToken
+			break
+		}
+		if n == len(webACLs)-1 {
+			return lockToken, errors.New(fmt.Sprintf("%s %s", errCouldNotFindWebACL, meta.GetExternalName(ds)))
+		}
+	}
+	return lockToken, nil
 }
