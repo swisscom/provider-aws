@@ -90,10 +90,6 @@ type customExternal struct {
 	cache *cache
 }
 
-type cachedCustomMethods struct {
-	cache *cache
-}
-
 type cache struct {
 	listWebACLsOutput *svcsdk.ListWebACLsOutput
 }
@@ -104,7 +100,6 @@ func createEmptyCache() *cache {
 
 func newCustomExternal(kube client.Client, client svcsdkapi.WAFV2API) *customExternal {
 	sharedCache := createEmptyCache()
-	c := cachedCustomMethods{cache: sharedCache}
 	e := &customExternal{
 		external{
 			kube:           kube,
@@ -113,14 +108,14 @@ func newCustomExternal(kube client.Client, client svcsdkapi.WAFV2API) *customExt
 			postObserve:    postObserve,
 			isUpToDate:     alwaysUpToDate,
 			preCreate:      preCreate,
-			preDelete:      c.preDelete,
-			preUpdate:      c.preUpdate,
+			preDelete:      sharedCache.preDelete,
+			preUpdate:      sharedCache.preUpdate,
 			lateInitialize: nopLateInitialize,
 			postCreate:     nopPostCreate,
 			postDelete:     nopPostDelete,
 			postUpdate:     nopPostUpdate,
 		},
-		cache: sharedCache,
+		sharedCache,
 	}
 	return e
 }
@@ -225,9 +220,9 @@ func postObserve(_ context.Context, ds *svcapitypes.WebACL, resp *svcsdk.GetWebA
 	return obs, nil
 }
 
-func (e *cachedCustomMethods) preUpdate(_ context.Context, ds *svcapitypes.WebACL, input *svcsdk.UpdateWebACLInput) error {
+func (c *cache) preUpdate(_ context.Context, ds *svcapitypes.WebACL, input *svcsdk.UpdateWebACLInput) error {
 	input.Name = aws.String(meta.GetExternalName(ds))
-	lockToken, err := getLockToken(e.cache.listWebACLsOutput.WebACLs, ds)
+	lockToken, err := getLockToken(c.listWebACLsOutput.WebACLs, ds)
 	if err != nil {
 		return err
 	}
@@ -235,9 +230,9 @@ func (e *cachedCustomMethods) preUpdate(_ context.Context, ds *svcapitypes.WebAC
 	return nil
 }
 
-func (e *cachedCustomMethods) preDelete(_ context.Context, ds *svcapitypes.WebACL, input *svcsdk.DeleteWebACLInput) (bool, error) {
+func (c *cache) preDelete(_ context.Context, ds *svcapitypes.WebACL, input *svcsdk.DeleteWebACLInput) (bool, error) {
 	input.Name = aws.String(meta.GetExternalName(ds))
-	lockToken, err := getLockToken(e.cache.listWebACLsOutput.WebACLs, ds)
+	lockToken, err := getLockToken(c.listWebACLsOutput.WebACLs, ds)
 	if err != nil {
 		return false, err
 	}
