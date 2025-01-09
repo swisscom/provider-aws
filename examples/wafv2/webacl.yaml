@@ -8,32 +8,32 @@ metadata:
 spec:
   forProvider:
     region: eu-central-1
-#    rules:
-#      - name: rule1
-#        visibilityConfig:
-#          metricName: 'kir-test'
-#          sampledRequestsEnabled: false
-#          cloudWatchMetricsEnabled: false
-#        priority: 1
-#        action:
-#          allow: {}
-#        statement:
-#          andStatement: |
-#            {
-#              "Statements": [
-#                {
-#                  "ByteMatchStatement": {
-#                    "FieldToMatch": {
-#                      "SingleHeader": {
-#                        "Name": "User-Agent"
-#                      }
-#                    },
-#                    "PositionalConstraint": "CONTAINS",
-#                    "SearchString": "badBot"
-#                  }
-#                }
-#              ]
-#            }
+    rules:
+      - name: rule1
+        visibilityConfig:
+          metricName: 'kir-test'
+          sampledRequestsEnabled: false
+          cloudWatchMetricsEnabled: false
+        priority: 1
+        action:
+          allow: {}
+        statement:
+          andStatement: |
+            {
+              "Statements": [
+                {
+                  "ByteMatchStatement": {
+                    "FieldToMatch": {
+                      "SingleHeader": {
+                        "Name": "User-Agent"
+                      }
+                    },
+                    "PositionalConstraint": "CONTAINS",
+                    "SearchString": "badBot"
+                  }
+                }
+              ]
+            }
     visibilityConfig:
       metricName: 'kir-test'
       sampledRequestsEnabled: false
