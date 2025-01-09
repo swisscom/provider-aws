@@ -115,12 +115,10 @@ func preCreate(_ context.Context, cr *svcapitypes.WebACL, input *svcsdk.CreateWe
 func (c *custom) preObserve(_ context.Context, cr *svcapitypes.WebACL, input *svcsdk.GetWebACLInput) error {
 	input.Name = aws.String(meta.GetExternalName(cr))
 
-	listWebACLInput := svcsdk.ListWebACLsInput{
-		Scope: cr.Spec.ForProvider.Scope,
-	}
-	ls, err := c.client.ListWebACLs(&listWebACLInput)
+	listWebACLInput := &svcsdk.ListWebACLsInput{Scope: cr.Spec.ForProvider.Scope}
+	ls, err := c.client.ListWebACLs(listWebACLInput)
 	if err != nil {
-		return err
+		return errors.New(fmt.Sprintf("SPEC: %+v, SCOPE: %s ERROR: %s", cr.Spec, *cr.Spec.ForProvider.Scope, err.Error()))
 	}
 	c.cache.listWebACLsOutput = ls
 	for n, webACLSummary := range ls.WebACLs {
