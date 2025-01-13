@@ -17,9 +17,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	errorutils "github.com/crossplane-contrib/provider-aws/pkg/utils/errors"
-	"github.com/google/go-cmp/cmp"
-	"github.com/google/go-cmp/cmp/cmpopts"
 
 	"github.com/aws/aws-sdk-go/aws"
 	svcsdk "github.com/aws/aws-sdk-go/service/wafv2"
@@ -32,6 +29,8 @@ import (
 	"github.com/crossplane/crossplane-runtime/pkg/reconciler/managed"
 	"github.com/crossplane/crossplane-runtime/pkg/resource"
 	cpresource "github.com/crossplane/crossplane-runtime/pkg/resource"
+	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/pkg/errors"
 	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -41,6 +40,7 @@ import (
 	svcapitypes "github.com/crossplane-contrib/provider-aws/apis/wafv2/manualv1alpha1"
 	"github.com/crossplane-contrib/provider-aws/pkg/features"
 	connectaws "github.com/crossplane-contrib/provider-aws/pkg/utils/connect/aws"
+	errorutils "github.com/crossplane-contrib/provider-aws/pkg/utils/errors"
 	custommanaged "github.com/crossplane-contrib/provider-aws/pkg/utils/reconciler/managed"
 )
 
@@ -365,7 +365,7 @@ func createPatch(currentParams *svcapitypes.WebACLParameters, resp *svcsdk.GetWe
 		externalConfig.Description = resp.WebACL.Description
 	}
 	if resp.WebACL.Rules != nil {
-		extRules := []*svcapitypes.Rule{}
+		var extRules []*svcapitypes.Rule
 		for _, v := range resp.WebACL.Rules {
 			extRule := &svcapitypes.Rule{}
 			if v.Name != nil {
@@ -422,17 +422,244 @@ func createPatch(currentParams *svcapitypes.WebACLParameters, resp *svcsdk.GetWe
 			}
 			if v.OverrideAction != nil {
 				extOverrideAction := &svcapitypes.OverrideAction{}
+				var extCountInsertHeaders []*svcapitypes.CustomHTTPHeader
+				for _, v := range v.OverrideAction.Count.CustomRequestHandling.InsertHeaders {
+					extCountInsertHeaders = append(extCountInsertHeaders, &svcapitypes.CustomHTTPHeader{Name: v.Name, Value: v.Value})
+				}
 				if v.OverrideAction.Count != nil {
-					extOverrideAction.Count = &svcapitypes.CountAction{}
+					extOverrideAction.Count = &svcapitypes.CountAction{
+						CustomRequestHandling: &svcapitypes.CustomRequestHandling{
+							InsertHeaders: extCountInsertHeaders,
+						},
+					}
 				}
-				for k, v := range v.OverrideAction.None {
-					extOverrideAction.None[k] = v
+				if v.OverrideAction.None != nil {
+					extOverrideAction.None = map[string]*string{}
 				}
+				extRule.OverrideAction = extOverrideAction
+			}
+			if v.CaptchaConfig != nil {
+				extRule.CaptchaConfig = &svcapitypes.CaptchaConfig{ImmunityTimeProperty: &svcapitypes.ImmunityTimeProperty{
+					ImmunityTime: v.CaptchaConfig.ImmunityTimeProperty.ImmunityTime,
+				}}
+			}
+			if v.ChallengeConfig != nil {
+				extRule.ChallengeConfig = &svcapitypes.ChallengeConfig{ImmunityTimeProperty: &svcapitypes.ImmunityTimeProperty{
+					ImmunityTime: v.ChallengeConfig.ImmunityTimeProperty.ImmunityTime,
+				}}
+			}
+			if v.Priority != nil {
+				extRule.Priority = v.Priority
+			}
+			if v.RuleLabels != nil {
+				var extRuleLabels []*svcapitypes.Label
+				for _, v := range v.RuleLabels {
+					extRuleLabels = append(extRuleLabels, &svcapitypes.Label{Name: v.Name})
+				}
+				extRule.RuleLabels = extRuleLabels
+			}
+			if v.VisibilityConfig != nil {
+				extRule.VisibilityConfig = &svcapitypes.VisibilityConfig{CloudWatchMetricsEnabled: v.VisibilityConfig.CloudWatchMetricsEnabled, MetricName: v.VisibilityConfig.MetricName, SampledRequestsEnabled: v.VisibilityConfig.SampledRequestsEnabled}
+			}
+			if v.Statement != nil {
+				extStatement := &svcapitypes.Statement{}
+				if v.Statement.ByteMatchStatement != nil {
+					var extTextTransformations []*svcapitypes.TextTransformation
+					for _, v := range v.Statement.ByteMatchStatement.TextTransformations {
+						extTextTransformations = append(extTextTransformations, &svcapitypes.TextTransformation{Priority: v.Priority, Type: v.Type})
+					}
+					extStatement.ByteMatchStatement = &svcapitypes.ByteMatchStatement{
+						PositionalConstraint: v.Statement.ByteMatchStatement.PositionalConstraint,
+						SearchString:         v.Statement.ByteMatchStatement.SearchString,
+						TextTransformations:  extTextTransformations,
+					}
+					if v.Statement.ByteMatchStatement.FieldToMatch.AllQueryArguments != nil {
+						extStatement.ByteMatchStatement.FieldToMatch.AllQueryArguments = map[string]*string{}
+					}
+				}
+				if v.Statement.OrStatement != nil {
+					jsonString, err := statementToString[svcsdk.OrStatement](*v.Statement.OrStatement)
+					if err != nil {
+						return nil, err
+					}
+					extRule.Statement.OrStatement = jsonString
+				}
+				if v.Statement.AndStatement != nil {
+					jsonString, err := statementToString[svcsdk.AndStatement](*v.Statement.AndStatement)
+					if err != nil {
+						return nil, err
+					}
+					extRule.Statement.AndStatement = jsonString
+				}
+				if v.Statement.NotStatement != nil {
+					jsonString, err := statementToString[svcsdk.NotStatement](*v.Statement.NotStatement)
+					if err != nil {
+						return nil, err
+					}
+					extRule.Statement.NotStatement = jsonString
+				}
+				if v.Statement.ManagedRuleGroupStatement != nil {
+					var extExcludedRules []*svcapitypes.ExcludedRule
+					var extManagedRuleGroupConfigs []*svcapitypes.ManagedRuleGroupConfig
+					for _, v := range v.Statement.ManagedRuleGroupStatement.ExcludedRules {
+						extExcludedRules = append(extExcludedRules, &svcapitypes.ExcludedRule{Name: v.Name})
+					}
+					for _, v := range v.Statement.ManagedRuleGroupStatement.ManagedRuleGroupConfigs {
+						var extAddressFields []*svcapitypes.AddressField
+						var extPhoneNumberFields []*svcapitypes.PhoneNumberField
+						for _, v := range v.AWSManagedRulesACFPRuleSet.RequestInspection.AddressFields {
+							extAddressFields = append(extAddressFields, &svcapitypes.AddressField{Identifier: v.Identifier})
+						}
+						for _, v := range v.AWSManagedRulesACFPRuleSet.RequestInspection.PhoneNumberFields {
+							extPhoneNumberFields = append(extPhoneNumberFields, &svcapitypes.PhoneNumberField{Identifier: v.Identifier})
+						}
+						extRequestInspection := &svcapitypes.RequestInspectionACFP{
+							AddressFields: extAddressFields,
+							EmailField: &svcapitypes.EmailField{
+								Identifier: v.AWSManagedRulesACFPRuleSet.RequestInspection.EmailField.Identifier,
+							},
+							PasswordField: &svcapitypes.PasswordField{
+								Identifier: v.AWSManagedRulesACFPRuleSet.RequestInspection.PasswordField.Identifier,
+							},
+							PayloadType:       v.AWSManagedRulesACFPRuleSet.RequestInspection.PayloadType,
+							PhoneNumberFields: extPhoneNumberFields,
+							UsernameField: &svcapitypes.UsernameField{
+								Identifier: v.AWSManagedRulesACFPRuleSet.RequestInspection.UsernameField.Identifier,
+							},
+						}
+						extResponseInspectionBodyContains := &svcapitypes.ResponseInspectionBodyContains{
+							FailureStrings: make([]*string, 0),
+							SuccessStrings: make([]*string, 0),
+						}
+						for _, v := range v.AWSManagedRulesACFPRuleSet.ResponseInspection.BodyContains.FailureStrings {
+							extResponseInspectionBodyContains.FailureStrings = append(extResponseInspectionBodyContains.FailureStrings, v)
+						}
+						for _, v := range v.AWSManagedRulesACFPRuleSet.ResponseInspection.BodyContains.SuccessStrings {
+							extResponseInspectionBodyContains.SuccessStrings = append(extResponseInspectionBodyContains.SuccessStrings, v)
+						}
 
+						extResponseInspection := &svcapitypes.ResponseInspection{
+							BodyContains: extResponseInspectionBodyContains,
+							Header: &svcapitypes.ResponseInspectionHeader{
+								Name:          v.AWSManagedRulesACFPRuleSet.ResponseInspection.Header.Name,
+								FailureValues: v.AWSManagedRulesACFPRuleSet.ResponseInspection.Header.FailureValues,
+								SuccessValues: v.AWSManagedRulesACFPRuleSet.ResponseInspection.Header.SuccessValues,
+							},
+							JSON: &svcapitypes.ResponseInspectionJSON{
+								FailureValues: v.AWSManagedRulesACFPRuleSet.ResponseInspection.Json.FailureValues,
+								Identifier:    v.AWSManagedRulesACFPRuleSet.ResponseInspection.Json.Identifier,
+								SuccessValues: v.AWSManagedRulesACFPRuleSet.ResponseInspection.Json.SuccessValues,
+							},
+						}
+
+						extManagedRuleGroupConfigs = append(extManagedRuleGroupConfigs,
+							&svcapitypes.ManagedRuleGroupConfig{
+								AWSManagedRulesACFPRuleSet: &svcapitypes.AWSManagedRulesACFPRuleSet{
+									CreationPath:         v.AWSManagedRulesACFPRuleSet.CreationPath,
+									EnableRegexInPath:    v.AWSManagedRulesACFPRuleSet.EnableRegexInPath,
+									RegistrationPagePath: v.AWSManagedRulesACFPRuleSet.RegistrationPagePath,
+									RequestInspection:    extRequestInspection,
+									ResponseInspection:   extResponseInspection,
+								},
+							},
+						)
+
+					}
+					var extRuleActionOverrides []*svcapitypes.RuleActionOverride
+					for _, v := range v.Statement.ManagedRuleGroupStatement.RuleActionOverrides {
+						var extAllowInsertHeaders []*svcapitypes.CustomHTTPHeader
+						for _, v := range v.ActionToUse.Allow.CustomRequestHandling.InsertHeaders {
+							extAllowInsertHeaders = append(extAllowInsertHeaders, &svcapitypes.CustomHTTPHeader{Name: v.Name, Value: v.Value})
+						}
+						var extBlockResponseHeaders []*svcapitypes.CustomHTTPHeader
+						for _, v := range v.ActionToUse.Block.CustomResponse.ResponseHeaders {
+							extBlockResponseHeaders = append(extBlockResponseHeaders, &svcapitypes.CustomHTTPHeader{Name: v.Name, Value: v.Value})
+						}
+						var extCaptchaInsertHeaders []*svcapitypes.CustomHTTPHeader
+						for _, v := range v.ActionToUse.Captcha.CustomRequestHandling.InsertHeaders {
+							extCaptchaInsertHeaders = append(extCaptchaInsertHeaders, &svcapitypes.CustomHTTPHeader{Name: v.Name, Value: v.Value})
+						}
+						var extChallengeInsertHeaders []*svcapitypes.CustomHTTPHeader
+						for _, v := range v.ActionToUse.Challenge.CustomRequestHandling.InsertHeaders {
+							extChallengeInsertHeaders = append(extChallengeInsertHeaders, &svcapitypes.CustomHTTPHeader{Name: v.Name, Value: v.Value})
+						}
+						var extCountInsertHeaders []*svcapitypes.CustomHTTPHeader
+						for _, v := range v.ActionToUse.Count.CustomRequestHandling.InsertHeaders {
+							extCountInsertHeaders = append(extCountInsertHeaders, &svcapitypes.CustomHTTPHeader{Name: v.Name, Value: v.Value})
+						}
+						extRuleActionOverrides = append(extRuleActionOverrides, &svcapitypes.RuleActionOverride{
+							ActionToUse: &svcapitypes.RuleAction{
+								Allow: &svcapitypes.AllowAction{
+									CustomRequestHandling: &svcapitypes.CustomRequestHandling{
+										InsertHeaders: extAllowInsertHeaders,
+									},
+								},
+								Block: &svcapitypes.BlockAction{
+									CustomResponse: &svcapitypes.CustomResponse{
+										CustomResponseBodyKey: v.ActionToUse.Block.CustomResponse.CustomResponseBodyKey,
+										ResponseCode:          v.ActionToUse.Block.CustomResponse.ResponseCode,
+										ResponseHeaders:       extBlockResponseHeaders,
+									},
+								},
+								Captcha: &svcapitypes.CaptchaAction{
+									CustomRequestHandling: &svcapitypes.CustomRequestHandling{
+										InsertHeaders: extCaptchaInsertHeaders,
+									},
+								},
+								Challenge: &svcapitypes.ChallengeAction{
+									CustomRequestHandling: &svcapitypes.CustomRequestHandling{
+										InsertHeaders: extChallengeInsertHeaders,
+									},
+								},
+								Count: &svcapitypes.CountAction{
+									CustomRequestHandling: &svcapitypes.CustomRequestHandling{
+										InsertHeaders: extCountInsertHeaders,
+									},
+								},
+							},
+							Name: v.Name,
+						})
+					}
+					extStatement.ManagedRuleGroupStatement = &svcapitypes.ManagedRuleGroupStatement{
+						ExcludedRules:           extExcludedRules,
+						ManagedRuleGroupConfigs: extManagedRuleGroupConfigs,
+						Name:                    v.Statement.ManagedRuleGroupStatement.Name,
+						RuleActionOverrides:     extRuleActionOverrides,
+						VendorName:              v.Statement.ManagedRuleGroupStatement.VendorName,
+						Version:                 v.Statement.ManagedRuleGroupStatement.Version,
+					}
+					if v.Statement.ManagedRuleGroupStatement.ScopeDownStatement != nil {
+						jsonString, err := statementToString[svcsdk.Statement](*v.Statement.ManagedRuleGroupStatement.ScopeDownStatement)
+						if err != nil {
+							return nil, err
+						}
+						extStatement.ManagedRuleGroupStatement.ScopeDownStatement = jsonString
+					}
+				}
+				if v.Statement.RateBasedStatement != nil {
+					extForwardedIPConfig := &svcapitypes.ForwardedIPConfig{
+						HeaderName:       v.Statement.RateBasedStatement.ForwardedIPConfig.HeaderName,
+						FallbackBehavior: v.Statement.RateBasedStatement.ForwardedIPConfig.FallbackBehavior,
+					}
+					extRateBasedStatement := &svcapitypes.RateBasedStatement{
+						AggregateKeyType:  v.Statement.RateBasedStatement.AggregateKeyType,
+						ForwardedIPConfig: extForwardedIPConfig,
+					}
+					extRule.Statement.RateBasedStatement = extRateBasedStatement
+				}
 			}
 			extRules = append(extRules, extRule)
 		}
 	}
 
 	return nil, nil
+}
+
+func statementToString[S Statement](statement S) (*string, error) {
+	configBytes, err := json.Marshal(statement)
+	if err != nil {
+		return nil, err
+	}
+	configStr := string(configBytes)
+	return &configStr, nil
 }
