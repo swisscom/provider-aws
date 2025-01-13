@@ -17,9 +17,13 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	errorutils "github.com/crossplane-contrib/provider-aws/pkg/utils/errors"
+	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 
 	"github.com/aws/aws-sdk-go/aws"
 	svcsdk "github.com/aws/aws-sdk-go/service/wafv2"
+	svcsdkapi "github.com/aws/aws-sdk-go/service/wafv2/wafv2iface"
 	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
 	"github.com/crossplane/crossplane-runtime/pkg/connection"
 	"github.com/crossplane/crossplane-runtime/pkg/controller"
@@ -27,12 +31,16 @@ import (
 	"github.com/crossplane/crossplane-runtime/pkg/meta"
 	"github.com/crossplane/crossplane-runtime/pkg/reconciler/managed"
 	"github.com/crossplane/crossplane-runtime/pkg/resource"
+	cpresource "github.com/crossplane/crossplane-runtime/pkg/resource"
 	"github.com/pkg/errors"
+	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/crossplane-contrib/provider-aws/apis/v1alpha1"
 	svcapitypes "github.com/crossplane-contrib/provider-aws/apis/wafv2/manualv1alpha1"
 	"github.com/crossplane-contrib/provider-aws/pkg/features"
+	connectaws "github.com/crossplane-contrib/provider-aws/pkg/utils/connect/aws"
 	custommanaged "github.com/crossplane-contrib/provider-aws/pkg/utils/reconciler/managed"
 )
 
@@ -44,7 +52,6 @@ const (
 func SetupWebACL(mgr ctrl.Manager, o controller.Options) error {
 	name := managed.ControllerName(svcapitypes.WebACLKind)
 
-	opts := []option{customSetupExternal()}
 	cps := []managed.ConnectionPublisher{managed.NewAPISecretPublisher(mgr.GetClient(), mgr.GetScheme())}
 	if o.Features.Enabled(features.EnableAlphaExternalSecretStores) {
 		cps = append(cps, connection.NewDetailsManager(mgr.GetClient(), v1alpha1.StoreConfigGroupVersionKind))
@@ -53,7 +60,7 @@ func SetupWebACL(mgr ctrl.Manager, o controller.Options) error {
 	reconcilerOpts := []managed.ReconcilerOption{
 		managed.WithCriticalAnnotationUpdater(custommanaged.NewRetryingCriticalAnnotationUpdater(mgr.GetClient())),
 		managed.WithInitializers(managed.NewNameAsExternalName(mgr.GetClient())),
-		managed.WithExternalConnecter(&connector{kube: mgr.GetClient(), opts: opts}),
+		managed.WithExternalConnecter(&customConnector{kube: mgr.GetClient()}),
 		managed.WithPollInterval(o.PollInterval),
 		managed.WithLogger(o.Logger.WithValues("controller", name)),
 		managed.WithRecorder(event.NewAPIRecorder(mgr.GetEventRecorderFor(name))),
@@ -80,10 +87,12 @@ type Statement interface {
 	svcsdk.Statement | svcsdk.AndStatement | svcsdk.OrStatement | svcsdk.NotStatement
 }
 
-type CreateOrUpdateInput interface {
-	*svcsdk.CreateWebACLInput | *svcsdk.UpdateWebACLInput
+// customConnector is external connector with overridden Observe method due to ACK v0.38.1 doesn't correctly generate it.
+type customConnector struct {
+	kube client.Client
 }
-type custom struct {
+
+type customExternal struct {
 	external
 	cache *cache
 }
@@ -92,54 +101,117 @@ type cache struct {
 	listWebACLsOutput *svcsdk.ListWebACLsOutput
 }
 
-func customSetupExternal() func(*external) {
-	return func(e *external) {
-		c := &custom{}
-		e.preCreate = preCreate
-		e.preObserve = c.preObserve
-		e.postObserve = postObserve
-		e.preUpdate = c.preUpdate
-		e.preDelete = c.preDelete
+func newCustomExternal(kube client.Client, client svcsdkapi.WAFV2API) *customExternal {
+	sharedCache := &cache{}
+	e := &customExternal{
+		external{
+			kube:           kube,
+			client:         client,
+			preObserve:     preObserve,
+			postObserve:    postObserve,
+			isUpToDate:     isUpToDate,
+			preCreate:      preCreate,
+			preDelete:      sharedCache.preDelete,
+			preUpdate:      sharedCache.preUpdate,
+			lateInitialize: nopLateInitialize,
+			postCreate:     nopPostCreate,
+			postDelete:     nopPostDelete,
+			postUpdate:     nopPostUpdate,
+		},
+		sharedCache,
 	}
+	return e
 }
 
-func preCreate(_ context.Context, cr *svcapitypes.WebACL, input *svcsdk.CreateWebACLInput) error {
-	input.Name = aws.String(meta.GetExternalName(cr))
-	err := setInputStatements(cr, input.Rules)
-	if err != nil {
-		return err
+func (c *customConnector) Connect(ctx context.Context, mg cpresource.Managed) (managed.ExternalClient, error) {
+	cr, ok := mg.(*svcapitypes.WebACL)
+	if !ok {
+		return nil, errors.New(errUnexpectedObject)
 	}
-	return nil
+	sess, err := connectaws.GetConfigV1(ctx, c.kube, mg, cr.Spec.ForProvider.Region)
+	if err != nil {
+		return nil, errors.Wrap(err, errCreateSession)
+	}
+	return newCustomExternal(c.kube, svcsdk.New(sess)), nil
 }
 
-func (c *custom) preObserve(_ context.Context, cr *svcapitypes.WebACL, input *svcsdk.GetWebACLInput) error {
-	input.Name = aws.String(meta.GetExternalName(cr))
+func (e *customExternal) Observe(ctx context.Context, mg cpresource.Managed) (managed.ExternalObservation, error) {
 
-	listWebACLInput := &svcsdk.ListWebACLsInput{Scope: cr.Spec.ForProvider.Scope}
-	ls, err := c.client.ListWebACLs(listWebACLInput)
-	if err != nil {
-		return errors.New(fmt.Sprintf("SPEC: %+v, SCOPE: %s ERROR: %s", cr.Spec, *cr.Spec.ForProvider.Scope, err.Error()))
+	cr, ok := mg.(*svcapitypes.WebACL)
+	if !ok {
+		return managed.ExternalObservation{}, errors.New(errUnexpectedObject)
 	}
-	c.cache.listWebACLsOutput = ls
+	if meta.GetExternalName(cr) == "" {
+		return managed.ExternalObservation{
+			ResourceExists: false,
+		}, nil
+	}
+	input := GenerateGetWebACLInput(cr)
+	listWebACLInput := svcsdk.ListWebACLsInput{
+		Scope: cr.Spec.ForProvider.Scope,
+	}
+	ls, err := e.client.ListWebACLs(&listWebACLInput)
+	if err != nil {
+		return managed.ExternalObservation{}, err
+	}
+	e.cache.listWebACLsOutput = ls
 	for n, webACLSummary := range ls.WebACLs {
 		if aws.StringValue(webACLSummary.Name) == meta.GetExternalName(cr) {
 			input.Id = webACLSummary.Id
 			break
 		}
 		if n == len(ls.WebACLs)-1 {
-			return errors.New(fmt.Sprintf("%s %s", errCouldNotFindWebACL, meta.GetExternalName(cr)))
+			return managed.ExternalObservation{
+				ResourceExists: false,
+			}, nil
 		}
 	}
-	return nil
+	if err := e.preObserve(ctx, cr, input); err != nil {
+		return managed.ExternalObservation{}, errors.Wrap(err, "pre-observe failed")
+	}
+	resp, err := e.client.GetWebACLWithContext(ctx, input)
+	if err != nil {
+		return managed.ExternalObservation{ResourceExists: false}, errorutils.Wrap(cpresource.Ignore(IsNotFound, err), errDescribe)
+	}
+	currentSpec := cr.Spec.ForProvider.DeepCopy()
+	if err := e.lateInitialize(&cr.Spec.ForProvider, resp); err != nil {
+		return managed.ExternalObservation{}, errors.Wrap(err, "late-init failed")
+	}
+	GenerateWebACL(resp).Status.AtProvider.DeepCopyInto(&cr.Status.AtProvider)
+	upToDate := true
+	diff := ""
+	if !meta.WasDeleted(cr) { // There is no need to run isUpToDate if the resource is deleted
+		upToDate, diff, err = e.isUpToDate(ctx, cr, resp)
+		if err != nil {
+			return managed.ExternalObservation{}, errors.Wrap(err, "isUpToDate check failed")
+		}
+	}
+	return e.postObserve(ctx, cr, resp, managed.ExternalObservation{
+		ResourceExists:          true,
+		ResourceUpToDate:        upToDate,
+		Diff:                    diff,
+		ResourceLateInitialized: !cmp.Equal(&cr.Spec.ForProvider, currentSpec),
+	}, nil)
 }
 
-//func isUpToDate(_ context.Context, cr *svcapitypes.WebACL, input *svcsdk.GetWebACLOutput) (bool, string, error) {
-//}
-
-func postObserve(_ context.Context, cr *svcapitypes.WebACL, resp *svcsdk.GetWebACLOutput, obs managed.ExternalObservation, err error) (managed.ExternalObservation, error) {
-	if err.Error() == fmt.Sprintf("%s %s", errCouldNotFindWebACL, meta.GetExternalName(cr)) {
-		obs.ResourceExists = false
+func isUpToDate(_ context.Context, cr *svcapitypes.WebACL, resp *svcsdk.GetWebACLOutput) (upToDate bool, diff string, err error) {
+	patch, err := createPatch(&cr.Spec.ForProvider, resp)
+	if err != nil {
+		return false, "", err
 	}
+	diff = cmp.Diff(&svcapitypes.WebACL{}, patch, cmpopts.EquateEmpty(),
+		cmpopts.IgnoreFields(svcapitypes.WebACL{}, "Region"),
+	)
+
+	if diff != "" {
+		return false, "Found observed difference in wafv2 weback " + diff, nil
+	}
+
+	return true, "", nil
+}
+
+func postObserve(_ context.Context, cr *svcapitypes.WebACL, resp *svcsdk.GetWebACLOutput, obs managed.ExternalObservation, _ error) (managed.ExternalObservation, error) {
+
 	cr.SetConditions(xpv1.Available())
 
 	if resp == nil {
@@ -155,9 +227,24 @@ func postObserve(_ context.Context, cr *svcapitypes.WebACL, resp *svcsdk.GetWebA
 	return obs, nil
 }
 
-func (c *custom) preUpdate(_ context.Context, cr *svcapitypes.WebACL, input *svcsdk.UpdateWebACLInput) error {
+func preCreate(_ context.Context, cr *svcapitypes.WebACL, input *svcsdk.CreateWebACLInput) error {
 	input.Name = aws.String(meta.GetExternalName(cr))
-	lockToken, err := getLockToken(c.cache.listWebACLsOutput.WebACLs, cr)
+	err := setInputStatements(cr, input.Rules)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func preObserve(_ context.Context, cr *svcapitypes.WebACL, input *svcsdk.GetWebACLInput) error {
+	input.Name = aws.String(meta.GetExternalName(cr))
+
+	return nil
+}
+
+func (c *cache) preUpdate(_ context.Context, cr *svcapitypes.WebACL, input *svcsdk.UpdateWebACLInput) error {
+	input.Name = aws.String(meta.GetExternalName(cr))
+	lockToken, err := getLockToken(c.listWebACLsOutput.WebACLs, cr)
 	if err != nil {
 		return err
 	}
@@ -169,9 +256,9 @@ func (c *custom) preUpdate(_ context.Context, cr *svcapitypes.WebACL, input *svc
 	return nil
 }
 
-func (c *custom) preDelete(_ context.Context, cr *svcapitypes.WebACL, input *svcsdk.DeleteWebACLInput) (bool, error) {
+func (c *cache) preDelete(_ context.Context, cr *svcapitypes.WebACL, input *svcsdk.DeleteWebACLInput) (bool, error) {
 	input.Name = aws.String(meta.GetExternalName(cr))
-	lockToken, err := getLockToken(c.cache.listWebACLsOutput.WebACLs, cr)
+	lockToken, err := getLockToken(c.listWebACLsOutput.WebACLs, cr)
 	if err != nil {
 		return false, err
 	}
@@ -193,13 +280,11 @@ func getLockToken(webACLs []*svcsdk.WebACLSummary, cr *svcapitypes.WebACL) (*str
 	return lockToken, nil
 }
 
-func statementFromString[S Statement](jsonConf *string) (*S, error) {
-	if jsonConf == nil {
-		jsonConf = aws.String("")
-	}
+func statementFromString[S Statement](jsonPointer *string) (*S, error) {
+	jsonString := ptr.Deref(jsonPointer, "")
 
 	var statement S
-	err := json.Unmarshal([]byte(*jsonConf), &statement)
+	err := json.Unmarshal([]byte(jsonString), &statement)
 	if err != nil {
 		return nil, err
 	}
@@ -241,4 +326,113 @@ func setInputStatements(cr *svcapitypes.WebACL, rules []*svcsdk.Rule) (err error
 		}
 	}
 	return nil
+}
+
+func createPatch(currentParams *svcapitypes.WebACLParameters, resp *svcsdk.GetWebACLOutput) (*svcapitypes.WebACL, error) {
+	targetConfig := currentParams.DeepCopy()
+	externalConfig := &svcapitypes.WebACLParameters{}
+
+	if resp.WebACL.AssociationConfig != nil {
+		extRequestBody := map[string]*svcapitypes.RequestBodyAssociatedResourceTypeConfig{}
+		for k, v := range resp.WebACL.AssociationConfig.RequestBody {
+			extRequestBody[k] = &svcapitypes.RequestBodyAssociatedResourceTypeConfig{DefaultSizeInspectionLimit: v.DefaultSizeInspectionLimit}
+		}
+		externalConfig.AssociationConfig = &svcapitypes.AssociationConfig{RequestBody: extRequestBody}
+	}
+	if resp.WebACL.CaptchaConfig != nil {
+		externalConfig.CaptchaConfig = &svcapitypes.CaptchaConfig{ImmunityTimeProperty: &svcapitypes.ImmunityTimeProperty{
+			ImmunityTime: resp.WebACL.CaptchaConfig.ImmunityTimeProperty.ImmunityTime,
+		}}
+	}
+	if resp.WebACL.ChallengeConfig != nil {
+		externalConfig.ChallengeConfig = &svcapitypes.ChallengeConfig{ImmunityTimeProperty: &svcapitypes.ImmunityTimeProperty{
+			ImmunityTime: resp.WebACL.ChallengeConfig.ImmunityTimeProperty.ImmunityTime,
+		}}
+	}
+	if resp.WebACL.CustomResponseBodies != nil {
+		for k, v := range resp.WebACL.CustomResponseBodies {
+			externalConfig.CustomResponseBodies[k] = &svcapitypes.CustomResponseBody{Content: v.Content, ContentType: v.ContentType}
+		}
+	}
+	if resp.WebACL.DefaultAction != nil {
+		var extInsertHeader []*svcapitypes.CustomHTTPHeader
+		for _, v := range resp.WebACL.DefaultAction.Allow.CustomRequestHandling.InsertHeaders {
+			extInsertHeader = append(extInsertHeader, &svcapitypes.CustomHTTPHeader{Name: v.Name, Value: v.Value})
+		}
+		externalConfig.DefaultAction = &svcapitypes.DefaultAction{Allow: &svcapitypes.AllowAction{CustomRequestHandling: &svcapitypes.CustomRequestHandling{InsertHeaders: extInsertHeader}}}
+	}
+	if resp.WebACL.Description != nil {
+		externalConfig.Description = resp.WebACL.Description
+	}
+	if resp.WebACL.Rules != nil {
+		extRules := []*svcapitypes.Rule{}
+		for _, v := range resp.WebACL.Rules {
+			extRule := &svcapitypes.Rule{}
+			if v.Name != nil {
+				extRule.Name = v.Name
+			}
+			if v.Action != nil {
+				var extAllowInsertHeaders []*svcapitypes.CustomHTTPHeader
+				var extBlockResponseHeaders []*svcapitypes.CustomHTTPHeader
+				var extCaptchaInsertHeaders []*svcapitypes.CustomHTTPHeader
+				var extChallengeInsertHeaders []*svcapitypes.CustomHTTPHeader
+				var extCountInspectionLimit []*svcapitypes.CustomHTTPHeader
+				for _, v := range v.Action.Allow.CustomRequestHandling.InsertHeaders {
+					extAllowInsertHeaders = append(extAllowInsertHeaders, &svcapitypes.CustomHTTPHeader{Name: v.Name, Value: v.Value})
+				}
+				for _, v := range v.Action.Block.CustomResponse.ResponseHeaders {
+					extBlockResponseHeaders = append(extBlockResponseHeaders, &svcapitypes.CustomHTTPHeader{Name: v.Name, Value: v.Value})
+				}
+				for _, v := range v.Action.Captcha.CustomRequestHandling.InsertHeaders {
+					extCaptchaInsertHeaders = append(extCaptchaInsertHeaders, &svcapitypes.CustomHTTPHeader{Name: v.Name, Value: v.Value})
+				}
+				for _, v := range v.Action.Challenge.CustomRequestHandling.InsertHeaders {
+					extChallengeInsertHeaders = append(extChallengeInsertHeaders, &svcapitypes.CustomHTTPHeader{Name: v.Name, Value: v.Value})
+				}
+				extRule.Action = &svcapitypes.RuleAction{
+					Allow: &svcapitypes.AllowAction{
+						CustomRequestHandling: &svcapitypes.CustomRequestHandling{
+							InsertHeaders: extAllowInsertHeaders,
+						},
+					},
+					Block: &svcapitypes.BlockAction{
+						CustomResponse: &svcapitypes.CustomResponse{
+							CustomResponseBodyKey: v.Action.Block.CustomResponse.CustomResponseBodyKey,
+							ResponseCode:          v.Action.Block.CustomResponse.ResponseCode,
+							ResponseHeaders:       extBlockResponseHeaders,
+						},
+					},
+					Captcha: &svcapitypes.CaptchaAction{
+						CustomRequestHandling: &svcapitypes.CustomRequestHandling{
+							InsertHeaders: extCaptchaInsertHeaders,
+						},
+					},
+					Challenge: &svcapitypes.ChallengeAction{
+						CustomRequestHandling: &svcapitypes.CustomRequestHandling{
+							InsertHeaders: extChallengeInsertHeaders,
+						},
+					},
+					Count: &svcapitypes.CountAction{
+						CustomRequestHandling: &svcapitypes.CustomRequestHandling{
+							InsertHeaders: extCountInspectionLimit,
+						},
+					},
+				}
+
+			}
+			if v.OverrideAction != nil {
+				extOverrideAction := &svcapitypes.OverrideAction{}
+				if v.OverrideAction.Count != nil {
+					extOverrideAction.Count = &svcapitypes.CountAction{}
+				}
+				for k, v := range v.OverrideAction.None {
+					extOverrideAction.None[k] = v
+				}
+
+			}
+			extRules = append(extRules, extRule)
+		}
+	}
+
+	return nil, nil
 }

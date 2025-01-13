@@ -16,21 +16,46 @@ spec:
           cloudWatchMetricsEnabled: false
         priority: 1
         action:
-          allow: {}
+          allow: { }
         statement:
           andStatement: |
             {
               "Statements": [
                 {
-                  "ByteMatchStatement": {
-                    "FieldToMatch": {
-                      "SingleHeader": {
-                        "Name": "User-Agent"
-                      }
-                    },
-                    "PositionalConstraint": "CONTAINS",
-                    "SearchString": "badBot"
-                  }
+                  "ByteMatchStatement":
+                    {
+                      "FieldToMatch": {
+                        "SingleHeader": {
+                          "Name": "User-Agent"
+                        }
+                      },
+                      "PositionalConstraint": "CONTAINS",
+                      "SearchString": "YmFkQm90",
+                      "TextTransformations": [
+                        {
+                          "Priority": 0,
+                          "Type": "NONE"
+                        }
+                      ]
+                    }
+                },
+                {
+                  "ByteMatchStatement":
+                    {
+                      "FieldToMatch": {
+                        "SingleHeader": {
+                          "Name": "User-AgentCustim"
+                        }
+                      },
+                      "PositionalConstraint": "CONTAINS",
+                      "SearchString": "YmFkQm90",
+                      "TextTransformations": [
+                        {
+                          "Priority": 1,
+                          "Type": "NONE"
+                        }
+                      ]
+                    }
                 }
               ]
             }
@@ -39,7 +64,7 @@ spec:
       sampledRequestsEnabled: false
       cloudWatchMetricsEnabled: false
     defaultAction:
-      allow: {}
+      allow: { }
     scope: REGIONAL
   providerConfigRef:
     name: providerconfig-aws
