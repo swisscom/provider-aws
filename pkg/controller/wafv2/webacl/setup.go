@@ -229,7 +229,7 @@ func postObserve(_ context.Context, cr *svcapitypes.WebACL, resp *svcsdk.GetWebA
 
 func preCreate(_ context.Context, cr *svcapitypes.WebACL, input *svcsdk.CreateWebACLInput) error {
 	input.Name = aws.String(meta.GetExternalName(cr))
-	err := setInputStatements(cr, input.Rules)
+	err := setInputRuleStatementsFromJSON(cr, input.Rules)
 	if err != nil {
 		return err
 	}
@@ -249,7 +249,7 @@ func (c *cache) preUpdate(_ context.Context, cr *svcapitypes.WebACL, input *svcs
 		return err
 	}
 	input.LockToken = lockToken
-	err = setInputStatements(cr, input.Rules)
+	err = setInputRuleStatementsFromJSON(cr, input.Rules)
 	if err != nil {
 		return err
 	}
@@ -280,7 +280,7 @@ func getLockToken(webACLs []*svcsdk.WebACLSummary, cr *svcapitypes.WebACL) (*str
 	return lockToken, nil
 }
 
-func statementFromString[S Statement](jsonPointer *string) (*S, error) {
+func statementFromJSONString[S Statement](jsonPointer *string) (*S, error) {
 	jsonString := ptr.Deref(jsonPointer, "")
 
 	var statement S
@@ -292,34 +292,34 @@ func statementFromString[S Statement](jsonPointer *string) (*S, error) {
 	return &statement, nil
 }
 
-func setInputStatements(cr *svcapitypes.WebACL, rules []*svcsdk.Rule) (err error) {
+func setInputRuleStatementsFromJSON(cr *svcapitypes.WebACL, rules []*svcsdk.Rule) (err error) {
 	for i, rule := range cr.Spec.ForProvider.Rules {
 		if rule.Statement.OrStatement != nil {
-			rules[i].Statement.OrStatement, err = statementFromString[svcsdk.OrStatement](rule.Statement.OrStatement)
+			rules[i].Statement.OrStatement, err = statementFromJSONString[svcsdk.OrStatement](rule.Statement.OrStatement)
 			if err != nil {
 				return err
 			}
 		}
 		if rule.Statement.AndStatement != nil {
-			rules[i].Statement.AndStatement, err = statementFromString[svcsdk.AndStatement](rule.Statement.AndStatement)
+			rules[i].Statement.AndStatement, err = statementFromJSONString[svcsdk.AndStatement](rule.Statement.AndStatement)
 			if err != nil {
 				return err
 			}
 		}
 		if rule.Statement.NotStatement != nil {
-			rules[i].Statement.NotStatement, err = statementFromString[svcsdk.NotStatement](rule.Statement.NotStatement)
+			rules[i].Statement.NotStatement, err = statementFromJSONString[svcsdk.NotStatement](rule.Statement.NotStatement)
 			if err != nil {
 				return err
 			}
 		}
 		if rule.Statement.ManagedRuleGroupStatement != nil && rule.Statement.ManagedRuleGroupStatement.ScopeDownStatement != nil {
-			rules[i].Statement.ManagedRuleGroupStatement.ScopeDownStatement, err = statementFromString[svcsdk.Statement](rule.Statement.ManagedRuleGroupStatement.ScopeDownStatement)
+			rules[i].Statement.ManagedRuleGroupStatement.ScopeDownStatement, err = statementFromJSONString[svcsdk.Statement](rule.Statement.ManagedRuleGroupStatement.ScopeDownStatement)
 			if err != nil {
 				return err
 			}
 		}
 		if rule.Statement.ByteMatchStatement != nil && rule.Statement.RateBasedStatement.ScopeDownStatement != nil {
-			rules[i].Statement.RateBasedStatement.ScopeDownStatement, err = statementFromString[svcsdk.Statement](rule.Statement.RateBasedStatement.ScopeDownStatement)
+			rules[i].Statement.RateBasedStatement.ScopeDownStatement, err = statementFromJSONString[svcsdk.Statement](rule.Statement.RateBasedStatement.ScopeDownStatement)
 			if err != nil {
 				return err
 			}
@@ -368,6 +368,7 @@ func createPatch(currentParams *svcapitypes.WebACLParameters, resp *svcsdk.GetWe
 		var extRules []*svcapitypes.Rule
 		for _, v := range resp.WebACL.Rules {
 			extRule := &svcapitypes.Rule{}
+			extRuleStatement := &svcapitypes.Statement{}
 			if v.Name != nil {
 				extRule.Name = v.Name
 			}
@@ -462,19 +463,18 @@ func createPatch(currentParams *svcapitypes.WebACLParameters, resp *svcsdk.GetWe
 				extRule.VisibilityConfig = &svcapitypes.VisibilityConfig{CloudWatchMetricsEnabled: v.VisibilityConfig.CloudWatchMetricsEnabled, MetricName: v.VisibilityConfig.MetricName, SampledRequestsEnabled: v.VisibilityConfig.SampledRequestsEnabled}
 			}
 			if v.Statement != nil {
-				extStatement := &svcapitypes.Statement{}
 				if v.Statement.ByteMatchStatement != nil {
 					var extTextTransformations []*svcapitypes.TextTransformation
 					for _, v := range v.Statement.ByteMatchStatement.TextTransformations {
 						extTextTransformations = append(extTextTransformations, &svcapitypes.TextTransformation{Priority: v.Priority, Type: v.Type})
 					}
-					extStatement.ByteMatchStatement = &svcapitypes.ByteMatchStatement{
+					extRuleStatement.ByteMatchStatement = &svcapitypes.ByteMatchStatement{
 						PositionalConstraint: v.Statement.ByteMatchStatement.PositionalConstraint,
 						SearchString:         v.Statement.ByteMatchStatement.SearchString,
 						TextTransformations:  extTextTransformations,
 					}
 					if v.Statement.ByteMatchStatement.FieldToMatch.AllQueryArguments != nil {
-						extStatement.ByteMatchStatement.FieldToMatch.AllQueryArguments = map[string]*string{}
+						extRuleStatement.ByteMatchStatement.FieldToMatch.AllQueryArguments = map[string]*string{}
 					}
 				}
 				if v.Statement.OrStatement != nil {
@@ -620,7 +620,7 @@ func createPatch(currentParams *svcapitypes.WebACLParameters, resp *svcsdk.GetWe
 							Name: v.Name,
 						})
 					}
-					extStatement.ManagedRuleGroupStatement = &svcapitypes.ManagedRuleGroupStatement{
+					extRuleStatement.ManagedRuleGroupStatement = &svcapitypes.ManagedRuleGroupStatement{
 						ExcludedRules:           extExcludedRules,
 						ManagedRuleGroupConfigs: extManagedRuleGroupConfigs,
 						Name:                    v.Statement.ManagedRuleGroupStatement.Name,
@@ -633,7 +633,7 @@ func createPatch(currentParams *svcapitypes.WebACLParameters, resp *svcsdk.GetWe
 						if err != nil {
 							return nil, err
 						}
-						extStatement.ManagedRuleGroupStatement.ScopeDownStatement = jsonString
+						extRuleStatement.ManagedRuleGroupStatement.ScopeDownStatement = jsonString
 					}
 				}
 				if v.Statement.RateBasedStatement != nil {
@@ -641,12 +641,188 @@ func createPatch(currentParams *svcapitypes.WebACLParameters, resp *svcsdk.GetWe
 						HeaderName:       v.Statement.RateBasedStatement.ForwardedIPConfig.HeaderName,
 						FallbackBehavior: v.Statement.RateBasedStatement.ForwardedIPConfig.FallbackBehavior,
 					}
+					var extCustomKeys []*svcapitypes.RateBasedStatementCustomKey
+					for _, v := range v.Statement.RateBasedStatement.CustomKeys {
+						var extCookieTextTransofrmations []*svcapitypes.TextTransformation
+						for _, v := range v.Cookie.TextTransformations {
+							extCookieTextTransofrmations = append(extCookieTextTransofrmations, &svcapitypes.TextTransformation{Priority: v.Priority, Type: v.Type})
+						}
+						var extHeaderTextTransformations []*svcapitypes.TextTransformation
+						for _, v := range v.Header.TextTransformations {
+							extHeaderTextTransformations = append(extHeaderTextTransformations, &svcapitypes.TextTransformation{Priority: v.Priority, Type: v.Type})
+						}
+						var extQueryArgumentTextTransformations []*svcapitypes.TextTransformation
+						for _, v := range v.QueryArgument.TextTransformations {
+							extQueryArgumentTextTransformations = append(extQueryArgumentTextTransformations, &svcapitypes.TextTransformation{Priority: v.Priority, Type: v.Type})
+						}
+						var extQueryStringTextTransformations []*svcapitypes.TextTransformation
+						for _, v := range v.QueryString.TextTransformations {
+							extQueryStringTextTransformations = append(extQueryStringTextTransformations, &svcapitypes.TextTransformation{Priority: v.Priority, Type: v.Type})
+						}
+						var extURIPathTextTransformations []*svcapitypes.TextTransformation
+						for _, v := range v.UriPath.TextTransformations {
+							extURIPathTextTransformations = append(extURIPathTextTransformations, &svcapitypes.TextTransformation{Priority: v.Priority, Type: v.Type})
+						}
+						extCustomKey := &svcapitypes.RateBasedStatementCustomKey{
+							Cookie:         &svcapitypes.RateLimitCookie{Name: v.Cookie.Name, TextTransformations: extCookieTextTransofrmations},
+							Header:         &svcapitypes.RateLimitHeader{Name: v.Header.Name, TextTransformations: extHeaderTextTransformations},
+							LabelNamespace: &svcapitypes.RateLimitLabelNamespace{Namespace: v.LabelNamespace.Namespace},
+							QueryArgument:  &svcapitypes.RateLimitQueryArgument{Name: v.QueryArgument.Name, TextTransformations: extQueryArgumentTextTransformations},
+							QueryString:    &svcapitypes.RateLimitQueryString{TextTransformations: extQueryStringTextTransformations},
+							URIPath:        &svcapitypes.RateLimitURIPath{TextTransformations: extURIPathTextTransformations},
+						}
+						if v.ForwardedIP != nil {
+							extCustomKey.ForwardedIP = map[string]*string{}
+						}
+						if v.HTTPMethod != nil {
+							extCustomKey.HTTPMethod = map[string]*string{}
+						}
+						if v.IP != nil {
+							extCustomKey.IP = map[string]*string{}
+						}
+						extCustomKeys = append(extCustomKeys, extCustomKey)
+					}
 					extRateBasedStatement := &svcapitypes.RateBasedStatement{
 						AggregateKeyType:  v.Statement.RateBasedStatement.AggregateKeyType,
+						CustomKeys:        extCustomKeys,
 						ForwardedIPConfig: extForwardedIPConfig,
+						Limit:             v.Statement.RateBasedStatement.Limit,
+					}
+					if v.Statement.RateBasedStatement.ScopeDownStatement != nil {
+						jsonString, err := statementToString[svcsdk.Statement](*v.Statement.RateBasedStatement.ScopeDownStatement)
+						if err != nil {
+							return nil, err
+						}
+						extRateBasedStatement.ScopeDownStatement = jsonString
 					}
 					extRule.Statement.RateBasedStatement = extRateBasedStatement
 				}
+				if v.Statement.ByteMatchStatement != nil {
+					var extTextTransformations []*svcapitypes.TextTransformation
+					for _, v := range v.Statement.ByteMatchStatement.TextTransformations {
+						extTextTransformations = append(extTextTransformations, &svcapitypes.TextTransformation{Priority: v.Priority, Type: v.Type})
+					}
+					extCookiesMatchPattern := &svcapitypes.CookieMatchPattern{
+						ExcludedCookies: v.Statement.ByteMatchStatement.FieldToMatch.Cookies.MatchPattern.ExcludedCookies,
+						IncludedCookies: v.Statement.ByteMatchStatement.FieldToMatch.Cookies.MatchPattern.IncludedCookies,
+					}
+					if v.Statement.ByteMatchStatement.FieldToMatch.Cookies.MatchPattern.All != nil {
+						extCookiesMatchPattern.All = map[string]*string{}
+					}
+					extHeadersMatchPattern := &svcapitypes.HeaderMatchPattern{
+						ExcludedHeaders: v.Statement.ByteMatchStatement.FieldToMatch.Headers.MatchPattern.ExcludedHeaders,
+						IncludedHeaders: v.Statement.ByteMatchStatement.FieldToMatch.Headers.MatchPattern.IncludedHeaders,
+					}
+					extFieldToMatchJsonBodyMatchPattern := &svcapitypes.JSONMatchPattern{
+						IncludedPaths: v.Statement.ByteMatchStatement.FieldToMatch.JsonBody.MatchPattern.IncludedPaths,
+					}
+					if v.Statement.ByteMatchStatement.FieldToMatch.JsonBody.MatchPattern.All != nil {
+						extFieldToMatchJsonBodyMatchPattern.All = map[string]*string{}
+					}
+					extFieldToMatch := &svcapitypes.FieldToMatch{
+						Body: &svcapitypes.Body{OversizeHandling: v.Statement.ByteMatchStatement.FieldToMatch.Body.OversizeHandling},
+						Cookies: &svcapitypes.Cookies{
+							MatchPattern:     extCookiesMatchPattern,
+							MatchScope:       v.Statement.ByteMatchStatement.FieldToMatch.Cookies.MatchScope,
+							OversizeHandling: v.Statement.ByteMatchStatement.FieldToMatch.Cookies.OversizeHandling,
+						},
+						HeaderOrder: &svcapitypes.HeaderOrder{OversizeHandling: v.Statement.ByteMatchStatement.FieldToMatch.HeaderOrder.OversizeHandling},
+						Headers: &svcapitypes.Headers{
+							MatchPattern:     extHeadersMatchPattern,
+							MatchScope:       v.Statement.ByteMatchStatement.FieldToMatch.Cookies.MatchScope,
+							OversizeHandling: v.Statement.ByteMatchStatement.FieldToMatch.Cookies.OversizeHandling,
+						},
+						JA3Fingerprint: &svcapitypes.JA3Fingerprint{FallbackBehavior: v.Statement.ByteMatchStatement.FieldToMatch.JA3Fingerprint.FallbackBehavior},
+						JSONBody: &svcapitypes.JSONBody{
+							InvalidFallbackBehavior: v.Statement.ByteMatchStatement.FieldToMatch.JsonBody.InvalidFallbackBehavior,
+							MatchPattern:            extFieldToMatchJsonBodyMatchPattern,
+							MatchScope:              v.Statement.ByteMatchStatement.FieldToMatch.JsonBody.MatchScope,
+							OversizeHandling:        v.Statement.ByteMatchStatement.FieldToMatch.JsonBody.OversizeHandling,
+						},
+						SingleHeader: &svcapitypes.SingleHeader{
+							Name: v.Statement.ByteMatchStatement.FieldToMatch.SingleHeader.Name,
+						},
+						SingleQueryArgument: &svcapitypes.SingleQueryArgument{
+							Name: v.Statement.ByteMatchStatement.FieldToMatch.SingleQueryArgument.Name,
+						},
+					}
+					if v.Statement.ByteMatchStatement.FieldToMatch.AllQueryArguments != nil {
+						extFieldToMatch.AllQueryArguments = map[string]*string{}
+					}
+					if v.Statement.ByteMatchStatement.FieldToMatch.Method != nil {
+						extFieldToMatch.Method = map[string]*string{}
+					}
+					if v.Statement.ByteMatchStatement.FieldToMatch.QueryString != nil {
+						extFieldToMatch.QueryString = map[string]*string{}
+					}
+					if v.Statement.ByteMatchStatement.FieldToMatch.UriPath != nil {
+						extFieldToMatch.URIPath = map[string]*string{}
+					}
+					extRuleStatement.ByteMatchStatement = &svcapitypes.ByteMatchStatement{
+						PositionalConstraint: v.Statement.ByteMatchStatement.PositionalConstraint,
+						SearchString:         v.Statement.ByteMatchStatement.SearchString,
+						TextTransformations:  extTextTransformations,
+						FieldToMatch:         extFieldToMatch,
+					}
+				}
+				if v.Statement.GeoMatchStatement != nil {
+					extRuleStatement.GeoMatchStatement = &svcapitypes.GeoMatchStatement{
+						CountryCodes: v.Statement.GeoMatchStatement.CountryCodes,
+						ForwardedIPConfig: &svcapitypes.ForwardedIPConfig{
+							HeaderName:       v.Statement.GeoMatchStatement.ForwardedIPConfig.HeaderName,
+							FallbackBehavior: v.Statement.GeoMatchStatement.ForwardedIPConfig.FallbackBehavior,
+						},
+					}
+				}
+				if v.Statement.IPSetReferenceStatement != nil {
+					extRuleStatement.IPSetReferenceStatement = &svcapitypes.IPSetReferenceStatement{
+						ARN: v.Statement.IPSetReferenceStatement.ARN,
+						IPSetForwardedIPConfig: &svcapitypes.IPSetForwardedIPConfig{
+							HeaderName:       v.Statement.IPSetReferenceStatement.IPSetForwardedIPConfig.HeaderName,
+							FallbackBehavior: v.Statement.IPSetReferenceStatement.IPSetForwardedIPConfig.FallbackBehavior,
+						},
+					}
+				}
+				if v.Statement.LabelMatchStatement != nil {
+					extRuleStatement.LabelMatchStatement = &svcapitypes.LabelMatchStatement{
+						Key:   v.Statement.LabelMatchStatement.Key,
+						Scope: v.Statement.LabelMatchStatement.Scope,
+					}
+				}
+				if v.Statement.RateBasedStatement != nil {
+					extCustomKeys := []*svcapitypes.RateBasedStatementCustomKey{}
+					for _, v := range v.Statement.RateBasedStatement.CustomKeys {
+						extCookieTextTransformations := []*svcapitypes.TextTransformation{}
+						for _, v := range v.Cookie.TextTransformations {
+							extCookieTextTransformations = append(extCookieTextTransformations, &svcapitypes.TextTransformation{Priority: v.Priority, Type: v.Type})
+						}
+						extCustomKeys = append(extCustomKeys, &svcapitypes.RateBasedStatementCustomKey{
+							Cookie: &svcapitypes.RateLimitCookie{
+								Name:                v.Cookie.Name,
+								TextTransformations: extCookieTextTransformations,
+							},
+						})
+
+					}
+					extRuleStatement.RateBasedStatement = &svcapitypes.RateBasedStatement{
+						AggregateKeyType: v.Statement.RateBasedStatement.AggregateKeyType,
+						Limit:            v.Statement.RateBasedStatement.Limit,
+						CustomKeys:       []*svcapitypes.RateBasedStatementCustomKey{},
+						ForwardedIPConfig: &svcapitypes.ForwardedIPConfig{
+							HeaderName:       v.Statement.RateBasedStatement.ForwardedIPConfig.HeaderName,
+							FallbackBehavior: v.Statement.RateBasedStatement.ForwardedIPConfig.FallbackBehavior,
+						},
+					}
+					if v.Statement.RateBasedStatement.ScopeDownStatement != nil {
+						jsonString, err := statementToString[svcsdk.Statement](*v.Statement.RateBasedStatement.ScopeDownStatement)
+						if err != nil {
+							return nil, err
+						}
+						extRuleStatement.RateBasedStatement.ScopeDownStatement = jsonString
+					}
+
+				}
+				extRule.Statement = extRuleStatement
 			}
 			extRules = append(extRules, extRule)
 		}

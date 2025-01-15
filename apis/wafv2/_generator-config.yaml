@@ -6,10 +6,6 @@ ignore:
     - RegexPatternSet
     - RuleGroup
   field_paths:
-    - CreateWebACLInput.Name
-    - UpdateWebACLInput.Name
-    - DeleteWebACLInput.Name
-    - GetWebACLInput.Name
     - RuleGroup.Rules.Statement.AndStatement
     - RuleGroup.Rules.Statement.OrStatement
     - RuleGroup.Rules.Statement.NotStatement
