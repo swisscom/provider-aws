@@ -201,16 +201,16 @@ func (e *customExternal) Observe(ctx context.Context, mg cpresource.Managed) (ma
 }
 
 func (s *shared) isUpToDate(_ context.Context, cr *svcapitypes.WebACL, resp *svcsdk.GetWebACLOutput) (upToDate bool, diff string, err error) {
-	listTagsOutput, err := s.client.ListTagsForResource(&svcsdk.ListTagsForResourceInput{ResourceARN: cr.Status.AtProvider.ARN})
+	listTagOutput, err := s.client.ListTagsForResource(&svcsdk.ListTagsForResourceInput{ResourceARN: cr.Status.AtProvider.ARN})
 	if err != nil {
 		return false, "", err
 	}
-	patch, err := createPatch(&cr.Spec.ForProvider, resp, listTagsOutput.TagInfoForResource.TagList)
+	patch, err := createPatch(&cr.Spec.ForProvider, resp, listTagOutput.TagInfoForResource.TagList)
 	if err != nil {
 		return false, "", err
 	}
 	diff = cmp.Diff(&svcapitypes.WebACLParameters{}, patch, cmpopts.EquateEmpty(),
-		cmpopts.IgnoreFields(svcapitypes.WebACLParameters{}, "Region"),
+		cmpopts.IgnoreFields(svcapitypes.WebACLParameters{}, "Region", "Tags"),
 	)
 
 	if diff != "" {

@@ -1,5 +1,5 @@
-//package webacl
-//
+package webacl
+
 //import (
 //	svcsdk "github.com/aws/aws-sdk-go/service/wafv2"
 //
