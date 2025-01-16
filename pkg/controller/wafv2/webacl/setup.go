@@ -41,6 +41,7 @@ import (
 	"github.com/crossplane-contrib/provider-aws/pkg/features"
 	connectaws "github.com/crossplane-contrib/provider-aws/pkg/utils/connect/aws"
 	errorutils "github.com/crossplane-contrib/provider-aws/pkg/utils/errors"
+	"github.com/crossplane-contrib/provider-aws/pkg/utils/jsonpatch"
 	custommanaged "github.com/crossplane-contrib/provider-aws/pkg/utils/reconciler/managed"
 )
 
@@ -97,28 +98,33 @@ type customExternal struct {
 	cache *cache
 }
 
+type shared struct {
+	cache  *cache
+	client svcsdkapi.WAFV2API
+}
+
 type cache struct {
 	listWebACLsOutput *svcsdk.ListWebACLsOutput
 }
 
 func newCustomExternal(kube client.Client, client svcsdkapi.WAFV2API) *customExternal {
-	sharedCache := &cache{}
+	shared := &shared{client: client}
 	e := &customExternal{
 		external{
 			kube:           kube,
 			client:         client,
 			preObserve:     preObserve,
 			postObserve:    postObserve,
-			isUpToDate:     isUpToDate,
+			isUpToDate:     shared.isUpToDate,
 			preCreate:      preCreate,
-			preDelete:      sharedCache.preDelete,
-			preUpdate:      sharedCache.preUpdate,
+			preDelete:      shared.preDelete,
+			preUpdate:      shared.preUpdate,
 			lateInitialize: nopLateInitialize,
 			postCreate:     nopPostCreate,
 			postDelete:     nopPostDelete,
 			postUpdate:     nopPostUpdate,
 		},
-		sharedCache,
+		shared.cache,
 	}
 	return e
 }
@@ -194,13 +200,17 @@ func (e *customExternal) Observe(ctx context.Context, mg cpresource.Managed) (ma
 	}, nil)
 }
 
-func isUpToDate(_ context.Context, cr *svcapitypes.WebACL, resp *svcsdk.GetWebACLOutput) (upToDate bool, diff string, err error) {
-	patch, err := createPatch(&cr.Spec.ForProvider, resp)
+func (s *shared) isUpToDate(_ context.Context, cr *svcapitypes.WebACL, resp *svcsdk.GetWebACLOutput) (upToDate bool, diff string, err error) {
+	listTagsOutput, err := s.client.ListTagsForResource(&svcsdk.ListTagsForResourceInput{ResourceARN: cr.Status.AtProvider.ARN})
 	if err != nil {
 		return false, "", err
 	}
-	diff = cmp.Diff(&svcapitypes.WebACL{}, patch, cmpopts.EquateEmpty(),
-		cmpopts.IgnoreFields(svcapitypes.WebACL{}, "Region"),
+	patch, err := createPatch(&cr.Spec.ForProvider, resp, listTagsOutput.TagInfoForResource.TagList)
+	if err != nil {
+		return false, "", err
+	}
+	diff = cmp.Diff(&svcapitypes.WebACLParameters{}, patch, cmpopts.EquateEmpty(),
+		cmpopts.IgnoreFields(svcapitypes.WebACLParameters{}, "Region"),
 	)
 
 	if diff != "" {
@@ -242,9 +252,9 @@ func preObserve(_ context.Context, cr *svcapitypes.WebACL, input *svcsdk.GetWebA
 	return nil
 }
 
-func (c *cache) preUpdate(_ context.Context, cr *svcapitypes.WebACL, input *svcsdk.UpdateWebACLInput) error {
+func (s *shared) preUpdate(_ context.Context, cr *svcapitypes.WebACL, input *svcsdk.UpdateWebACLInput) error {
 	input.Name = aws.String(meta.GetExternalName(cr))
-	lockToken, err := getLockToken(c.listWebACLsOutput.WebACLs, cr)
+	lockToken, err := getLockToken(s.cache.listWebACLsOutput.WebACLs, cr)
 	if err != nil {
 		return err
 	}
@@ -256,9 +266,9 @@ func (c *cache) preUpdate(_ context.Context, cr *svcapitypes.WebACL, input *svcs
 	return nil
 }
 
-func (c *cache) preDelete(_ context.Context, cr *svcapitypes.WebACL, input *svcsdk.DeleteWebACLInput) (bool, error) {
+func (s *shared) preDelete(_ context.Context, cr *svcapitypes.WebACL, input *svcsdk.DeleteWebACLInput) (bool, error) {
 	input.Name = aws.String(meta.GetExternalName(cr))
-	lockToken, err := getLockToken(c.listWebACLsOutput.WebACLs, cr)
+	lockToken, err := getLockToken(s.cache.listWebACLsOutput.WebACLs, cr)
 	if err != nil {
 		return false, err
 	}
@@ -328,57 +338,29 @@ func setInputRuleStatementsFromJSON(cr *svcapitypes.WebACL, rules []*svcsdk.Rule
 	return nil
 }
 
-func createPatch(currentParams *svcapitypes.WebACLParameters, resp *svcsdk.GetWebACLOutput) (*svcapitypes.WebACL, error) {
+func createPatch(currentParams *svcapitypes.WebACLParameters, resp *svcsdk.GetWebACLOutput, respTagList []*svcsdk.Tag) (*svcapitypes.WebACLParameters, error) {
 	targetConfig := currentParams.DeepCopy()
-	externalConfig := &svcapitypes.WebACLParameters{}
-
-	if resp.WebACL.AssociationConfig != nil {
-		extRequestBody := map[string]*svcapitypes.RequestBodyAssociatedResourceTypeConfig{}
-		for k, v := range resp.WebACL.AssociationConfig.RequestBody {
-			extRequestBody[k] = &svcapitypes.RequestBodyAssociatedResourceTypeConfig{DefaultSizeInspectionLimit: v.DefaultSizeInspectionLimit}
-		}
-		externalConfig.AssociationConfig = &svcapitypes.AssociationConfig{RequestBody: extRequestBody}
+	externalConfig := GenerateWebACL(resp).Spec.ForProvider
+	patch := &svcapitypes.WebACLParameters{}
+	for _, v := range respTagList {
+		externalConfig.Tags = append(externalConfig.Tags, &svcapitypes.Tag{Key: v.Key, Value: v.Value})
 	}
-	if resp.WebACL.CaptchaConfig != nil {
-		externalConfig.CaptchaConfig = &svcapitypes.CaptchaConfig{ImmunityTimeProperty: &svcapitypes.ImmunityTimeProperty{
-			ImmunityTime: resp.WebACL.CaptchaConfig.ImmunityTimeProperty.ImmunityTime,
-		}}
-	}
-	if resp.WebACL.ChallengeConfig != nil {
-		externalConfig.ChallengeConfig = &svcapitypes.ChallengeConfig{ImmunityTimeProperty: &svcapitypes.ImmunityTimeProperty{
-			ImmunityTime: resp.WebACL.ChallengeConfig.ImmunityTimeProperty.ImmunityTime,
-		}}
-	}
-	if resp.WebACL.CustomResponseBodies != nil {
-		for k, v := range resp.WebACL.CustomResponseBodies {
-			externalConfig.CustomResponseBodies[k] = &svcapitypes.CustomResponseBody{Content: v.Content, ContentType: v.ContentType}
-		}
-	}
-	if resp.WebACL.DefaultAction != nil {
-		var extInsertHeader []*svcapitypes.CustomHTTPHeader
-		for _, v := range resp.WebACL.DefaultAction.Allow.CustomRequestHandling.InsertHeaders {
-			extInsertHeader = append(extInsertHeader, &svcapitypes.CustomHTTPHeader{Name: v.Name, Value: v.Value})
-		}
-		externalConfig.DefaultAction = &svcapitypes.DefaultAction{Allow: &svcapitypes.AllowAction{CustomRequestHandling: &svcapitypes.CustomRequestHandling{InsertHeaders: extInsertHeader}}}
-	}
-	if resp.WebACL.Description != nil {
-		externalConfig.Description = resp.WebACL.Description
-	}
-	if resp.WebACL.Rules != nil {
-		err := setExternalRules(resp.WebACL.Rules, externalConfig)
-		if err != nil {
-			return acl, err
-		}
-	}
-
-	return nil, nil
-}
-
-func statementToString[S Statement](statement S) (*string, error) {
-	configBytes, err := json.Marshal(statement)
+	jsonPatch, err := jsonpatch.CreateJSONPatch(externalConfig, targetConfig)
 	if err != nil {
-		return nil, err
+		return patch, err
 	}
-	configStr := string(configBytes)
-	return &configStr, nil
+	if err := json.Unmarshal(jsonPatch, patch); err != nil {
+		return patch, err
+	}
+
+	return patch, nil
 }
+
+//func statementToString[S Statement](statement S) (*string, error) {
+//	configBytes, err := json.Marshal(statement)
+//	if err != nil {
+//		return nil, err
+//	}
+//	configStr := string(configBytes)
+//	return &configStr, nil
+//}
