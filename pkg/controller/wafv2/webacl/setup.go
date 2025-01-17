@@ -108,7 +108,7 @@ type cache struct {
 }
 
 func newCustomExternal(kube client.Client, client svcsdkapi.WAFV2API) *customExternal {
-	shared := &shared{client: client}
+	shared := &shared{client: client, cache: &cache{}}
 	e := &customExternal{
 		external{
 			kube:           kube,
@@ -142,7 +142,6 @@ func (c *customConnector) Connect(ctx context.Context, mg cpresource.Managed) (m
 }
 
 func (e *customExternal) Observe(ctx context.Context, mg cpresource.Managed) (managed.ExternalObservation, error) {
-
 	cr, ok := mg.(*svcapitypes.WebACL)
 	if !ok {
 		return managed.ExternalObservation{}, errors.New(errUnexpectedObject)
@@ -210,20 +209,16 @@ func (s *shared) isUpToDate(_ context.Context, cr *svcapitypes.WebACL, resp *svc
 		return false, "", err
 	}
 	diff = cmp.Diff(&svcapitypes.WebACLParameters{}, patch, cmpopts.EquateEmpty(),
-		cmpopts.IgnoreFields(svcapitypes.WebACLParameters{}, "Region", "Tags"),
+		cmpopts.IgnoreFields(svcapitypes.WebACLParameters{}, "Region"),
 	)
-
 	if diff != "" {
 		return false, "Found observed difference in wafv2 weback " + diff, nil
 	}
-
 	return true, "", nil
 }
 
 func postObserve(_ context.Context, cr *svcapitypes.WebACL, resp *svcsdk.GetWebACLOutput, obs managed.ExternalObservation, _ error) (managed.ExternalObservation, error) {
-
 	cr.SetConditions(xpv1.Available())
-
 	if resp == nil {
 		cr.Status.AtProvider = svcapitypes.WebACLObservation{}
 	} else {
@@ -233,7 +228,6 @@ func postObserve(_ context.Context, cr *svcapitypes.WebACL, resp *svcsdk.GetWebA
 		}
 
 	}
-
 	return obs, nil
 }
 
@@ -248,7 +242,6 @@ func preCreate(_ context.Context, cr *svcapitypes.WebACL, input *svcsdk.CreateWe
 
 func preObserve(_ context.Context, cr *svcapitypes.WebACL, input *svcsdk.GetWebACLInput) error {
 	input.Name = aws.String(meta.GetExternalName(cr))
-
 	return nil
 }
 
@@ -263,6 +256,15 @@ func (s *shared) preUpdate(_ context.Context, cr *svcapitypes.WebACL, input *svc
 	if err != nil {
 		return err
 	}
+	var inputTags []*svcsdk.Tag
+	for _, tag := range cr.Spec.ForProvider.Tags {
+		inputTags = append(inputTags, &svcsdk.Tag{Key: tag.Key, Value: tag.Value})
+	}
+	_, err = s.client.TagResource(&svcsdk.TagResourceInput{ResourceARN: cr.Status.AtProvider.ARN, Tags: inputTags})
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -292,13 +294,11 @@ func getLockToken(webACLs []*svcsdk.WebACLSummary, cr *svcapitypes.WebACL) (*str
 
 func statementFromJSONString[S Statement](jsonPointer *string) (*S, error) {
 	jsonString := ptr.Deref(jsonPointer, "")
-
 	var statement S
 	err := json.Unmarshal([]byte(jsonString), &statement)
 	if err != nil {
 		return nil, err
 	}
-
 	return &statement, nil
 }
 
@@ -352,7 +352,6 @@ func createPatch(currentParams *svcapitypes.WebACLParameters, resp *svcsdk.GetWe
 	if err := json.Unmarshal(jsonPatch, patch); err != nil {
 		return patch, err
 	}
-
 	return patch, nil
 }
 
