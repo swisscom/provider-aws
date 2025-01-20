@@ -3,6 +3,7 @@ ignore:
     - LogStream
     - ExportTask
     - Delivery
+    - LogAnomalyDetector
   field_paths:
     - CreateLogGroupInput.KmsKeyId
     - PutResourcePolicyInput.PolicyName

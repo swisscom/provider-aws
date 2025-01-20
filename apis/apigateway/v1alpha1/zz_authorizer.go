@@ -41,7 +41,7 @@ type AuthorizerParameters struct {
 	// caching is disabled. If it is greater than 0, API Gateway will cache authorizer
 	// responses. If this field is not set, the default value is 300. The maximum
 	// value is 3600, or 1 hour.
-	AuthorizerResultTtlInSeconds *int64 `json:"authorizerResultTtlInSeconds,omitempty"`
+	AuthorizerResultTTLInSeconds *int64 `json:"authorizerResultTTLInSeconds,omitempty"`
 	// Specifies the authorizer's Uniform Resource Identifier (URI). For TOKEN or
 	// REQUEST authorizers, this must be a well-formed Lambda function URI, for
 	// example, arn:aws:apigateway:us-west-2:lambda:path/2015-03-31/functions/arn:aws:lambda:us-west-2:{account_id}:function:{lambda_function_name}/invocations.

@@ -134,6 +134,11 @@ type Certificate struct {
 }
 
 // +kubebuilder:skipversion
+type DescribeTrustStoreRevocation struct {
+	TrustStoreARN *string `json:"trustStoreARN,omitempty"`
+}
+
+// +kubebuilder:skipversion
 type FixedResponseActionConfig struct {
 	ContentType *string `json:"contentType,omitempty"`
 
@@ -161,6 +166,8 @@ type Listener_SDK struct {
 	ListenerARN *string `json:"listenerARN,omitempty"`
 
 	LoadBalancerARN *string `json:"loadBalancerARN,omitempty"`
+	// Information about the mutual authentication attributes of a listener.
+	MutualAuthentication *MutualAuthenticationAttributes `json:"mutualAuthentication,omitempty"`
 
 	Port *int64 `json:"port,omitempty"`
 
@@ -173,7 +180,7 @@ type Listener_SDK struct {
 type LoadBalancerAddress struct {
 	AllocationID *string `json:"allocationID,omitempty"`
 
-	IPv6Address *string `json:"iPv6Address,omitempty"`
+	IPv6Address *string `json:"ipv6Address,omitempty"`
 
 	IPAddress *string `json:"ipAddress,omitempty"`
 
@@ -220,9 +227,18 @@ type LoadBalancer_SDK struct {
 
 // +kubebuilder:skipversion
 type Matcher struct {
-	GrpcCode *string `json:"grpcCode,omitempty"`
+	GRPCCode *string `json:"grpcCode,omitempty"`
 
 	HTTPCode *string `json:"httpCode,omitempty"`
+}
+
+// +kubebuilder:skipversion
+type MutualAuthenticationAttributes struct {
+	IgnoreClientCertificateExpiry *bool `json:"ignoreClientCertificateExpiry,omitempty"`
+
+	Mode *string `json:"mode,omitempty"`
+
+	TrustStoreARN *string `json:"trustStoreARN,omitempty"`
 }
 
 // +kubebuilder:skipversion
@@ -254,7 +270,7 @@ type SSLPolicy struct {
 type SubnetMapping struct {
 	AllocationID *string `json:"allocationID,omitempty"`
 
-	IPv6Address *string `json:"iPv6Address,omitempty"`
+	IPv6Address *string `json:"ipv6Address,omitempty"`
 
 	PrivateIPv4Address *string `json:"privateIPv4Address,omitempty"`
 
@@ -338,4 +354,14 @@ type TargetGroup_SDK struct {
 // +kubebuilder:skipversion
 type TargetHealthDescription struct {
 	HealthCheckPort *string `json:"healthCheckPort,omitempty"`
+}
+
+// +kubebuilder:skipversion
+type TrustStore struct {
+	TrustStoreARN *string `json:"trustStoreARN,omitempty"`
+}
+
+// +kubebuilder:skipversion
+type TrustStoreRevocation struct {
+	TrustStoreARN *string `json:"trustStoreARN,omitempty"`
 }

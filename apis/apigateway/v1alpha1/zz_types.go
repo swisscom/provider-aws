@@ -72,7 +72,7 @@ type Authorizer_SDK struct {
 
 	AuthorizerCredentials *string `json:"authorizerCredentials,omitempty"`
 
-	AuthorizerResultTtlInSeconds *int64 `json:"authorizerResultTtlInSeconds,omitempty"`
+	AuthorizerResultTTLInSeconds *int64 `json:"authorizerResultTTLInSeconds,omitempty"`
 
 	AuthorizerURI *string `json:"authorizerURI,omitempty"`
 
@@ -215,7 +215,7 @@ type EndpointConfiguration struct {
 type MethodSetting struct {
 	CacheDataEncrypted *bool `json:"cacheDataEncrypted,omitempty"`
 
-	CacheTtlInSeconds *int64 `json:"cacheTtlInSeconds,omitempty"`
+	CacheTTLInSeconds *int64 `json:"cacheTTLInSeconds,omitempty"`
 
 	CachingEnabled *bool `json:"cachingEnabled,omitempty"`
 

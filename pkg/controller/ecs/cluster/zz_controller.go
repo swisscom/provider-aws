@@ -83,6 +83,10 @@ func (e *external) Observe(ctx context.Context, mg cpresource.Managed) (managed.
 	if err != nil {
 		return managed.ExternalObservation{ResourceExists: false}, errorutils.Wrap(cpresource.Ignore(IsNotFound, err), errDescribe)
 	}
+	resp = e.filterList(cr, resp)
+	if len(resp.Clusters) == 0 {
+		return managed.ExternalObservation{ResourceExists: false}, nil
+	}
 	currentSpec := cr.Spec.ForProvider.DeepCopy()
 	if err := e.lateInitialize(&cr.Spec.ForProvider, resp); err != nil {
 		return managed.ExternalObservation{}, errors.Wrap(err, "late-init failed")
@@ -359,6 +363,7 @@ func newExternal(kube client.Client, client svcsdkapi.ECSAPI, opts []option) *ex
 		postObserve:    nopPostObserve,
 		lateInitialize: nopLateInitialize,
 		isUpToDate:     alwaysUpToDate,
+		filterList:     nopFilterList,
 		preCreate:      nopPreCreate,
 		postCreate:     nopPostCreate,
 		preDelete:      nopPreDelete,
@@ -377,6 +382,7 @@ type external struct {
 	client         svcsdkapi.ECSAPI
 	preObserve     func(context.Context, *svcapitypes.Cluster, *svcsdk.DescribeClustersInput) error
 	postObserve    func(context.Context, *svcapitypes.Cluster, *svcsdk.DescribeClustersOutput, managed.ExternalObservation, error) (managed.ExternalObservation, error)
+	filterList     func(*svcapitypes.Cluster, *svcsdk.DescribeClustersOutput) *svcsdk.DescribeClustersOutput
 	lateInitialize func(*svcapitypes.ClusterParameters, *svcsdk.DescribeClustersOutput) error
 	isUpToDate     func(context.Context, *svcapitypes.Cluster, *svcsdk.DescribeClustersOutput) (bool, string, error)
 	preCreate      func(context.Context, *svcapitypes.Cluster, *svcsdk.CreateClusterInput) error
@@ -390,10 +396,13 @@ type external struct {
 func nopPreObserve(context.Context, *svcapitypes.Cluster, *svcsdk.DescribeClustersInput) error {
 	return nil
 }
-
 func nopPostObserve(_ context.Context, _ *svcapitypes.Cluster, _ *svcsdk.DescribeClustersOutput, obs managed.ExternalObservation, err error) (managed.ExternalObservation, error) {
 	return obs, err
 }
+func nopFilterList(_ *svcapitypes.Cluster, list *svcsdk.DescribeClustersOutput) *svcsdk.DescribeClustersOutput {
+	return list
+}
+
 func nopLateInitialize(*svcapitypes.ClusterParameters, *svcsdk.DescribeClustersOutput) error {
 	return nil
 }

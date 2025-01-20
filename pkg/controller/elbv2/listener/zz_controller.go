@@ -324,6 +324,21 @@ func (e *external) Create(ctx context.Context, mg cpresource.Managed) (managed.E
 		} else {
 			cr.Status.AtProvider.LoadBalancerARN = nil
 		}
+		if elem.MutualAuthentication != nil {
+			f5 := &svcapitypes.MutualAuthenticationAttributes{}
+			if elem.MutualAuthentication.IgnoreClientCertificateExpiry != nil {
+				f5.IgnoreClientCertificateExpiry = elem.MutualAuthentication.IgnoreClientCertificateExpiry
+			}
+			if elem.MutualAuthentication.Mode != nil {
+				f5.Mode = elem.MutualAuthentication.Mode
+			}
+			if elem.MutualAuthentication.TrustStoreArn != nil {
+				f5.TrustStoreARN = elem.MutualAuthentication.TrustStoreArn
+			}
+			cr.Spec.ForProvider.MutualAuthentication = f5
+		} else {
+			cr.Spec.ForProvider.MutualAuthentication = nil
+		}
 		if elem.Port != nil {
 			cr.Spec.ForProvider.Port = elem.Port
 		} else {

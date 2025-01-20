@@ -112,13 +112,13 @@ func GenerateCrawler(resp *svcsdk.GetCrawlerOutput) *svcapitypes.Crawler {
 		cr.Spec.ForProvider.LineageConfiguration = nil
 	}
 	if resp.Crawler.RecrawlPolicy != nil {
-		f12 := &svcapitypes.RecrawlPolicy{}
+		f12 := &svcapitypes.RECRawlPolicy{}
 		if resp.Crawler.RecrawlPolicy.RecrawlBehavior != nil {
-			f12.RecrawlBehavior = resp.Crawler.RecrawlPolicy.RecrawlBehavior
+			f12.RECRawlBehavior = resp.Crawler.RecrawlPolicy.RecrawlBehavior
 		}
-		cr.Spec.ForProvider.RecrawlPolicy = f12
+		cr.Spec.ForProvider.RECRawlPolicy = f12
 	} else {
-		cr.Spec.ForProvider.RecrawlPolicy = nil
+		cr.Spec.ForProvider.RECRawlPolicy = nil
 	}
 	if resp.Crawler.Schedule != nil {
 		cr.Spec.ForProvider.Schedule = resp.Crawler.Schedule.ScheduleExpression
@@ -183,10 +183,10 @@ func GenerateCreateCrawlerInput(cr *svcapitypes.Crawler) *svcsdk.CreateCrawlerIn
 		}
 		res.SetLineageConfiguration(f3)
 	}
-	if cr.Spec.ForProvider.RecrawlPolicy != nil {
+	if cr.Spec.ForProvider.RECRawlPolicy != nil {
 		f4 := &svcsdk.RecrawlPolicy{}
-		if cr.Spec.ForProvider.RecrawlPolicy.RecrawlBehavior != nil {
-			f4.SetRecrawlBehavior(*cr.Spec.ForProvider.RecrawlPolicy.RecrawlBehavior)
+		if cr.Spec.ForProvider.RECRawlPolicy.RECRawlBehavior != nil {
+			f4.SetRecrawlBehavior(*cr.Spec.ForProvider.RECRawlPolicy.RECRawlBehavior)
 		}
 		res.SetRecrawlPolicy(f4)
 	}
@@ -246,10 +246,10 @@ func GenerateUpdateCrawlerInput(cr *svcapitypes.Crawler) *svcsdk.UpdateCrawlerIn
 		}
 		res.SetLineageConfiguration(f6)
 	}
-	if cr.Spec.ForProvider.RecrawlPolicy != nil {
+	if cr.Spec.ForProvider.RECRawlPolicy != nil {
 		f8 := &svcsdk.RecrawlPolicy{}
-		if cr.Spec.ForProvider.RecrawlPolicy.RecrawlBehavior != nil {
-			f8.SetRecrawlBehavior(*cr.Spec.ForProvider.RecrawlPolicy.RecrawlBehavior)
+		if cr.Spec.ForProvider.RECRawlPolicy.RECRawlBehavior != nil {
+			f8.SetRecrawlBehavior(*cr.Spec.ForProvider.RECRawlPolicy.RECRawlBehavior)
 		}
 		res.SetRecrawlPolicy(f8)
 	}

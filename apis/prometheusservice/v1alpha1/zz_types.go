@@ -47,6 +47,12 @@ type AlertManagerDefinitionStatus_SDK struct {
 }
 
 // +kubebuilder:skipversion
+type AmpConfiguration struct {
+	// An ARN identifying a Workspace.
+	WorkspaceARN *string `json:"workspaceARN,omitempty"`
+}
+
+// +kubebuilder:skipversion
 type LoggingConfigurationMetadata struct {
 	CreatedAt *metav1.Time `json:"createdAt,omitempty"`
 
@@ -98,6 +104,24 @@ type RuleGroupsNamespaceSummary struct {
 	Name *string `json:"name,omitempty"`
 	// Represents the status of a namespace.
 	Status *RuleGroupsNamespaceStatus_SDK `json:"status,omitempty"`
+	// The list of tags assigned to the resource.
+	Tags map[string]*string `json:"tags,omitempty"`
+}
+
+// +kubebuilder:skipversion
+type ScraperDescription struct {
+	CreatedAt *metav1.Time `json:"createdAt,omitempty"`
+
+	LastModifiedAt *metav1.Time `json:"lastModifiedAt,omitempty"`
+	// The list of tags assigned to the resource.
+	Tags map[string]*string `json:"tags,omitempty"`
+}
+
+// +kubebuilder:skipversion
+type ScraperSummary struct {
+	CreatedAt *metav1.Time `json:"createdAt,omitempty"`
+
+	LastModifiedAt *metav1.Time `json:"lastModifiedAt,omitempty"`
 	// The list of tags assigned to the resource.
 	Tags map[string]*string `json:"tags,omitempty"`
 }

@@ -130,9 +130,9 @@ func (e *external) Create(ctx context.Context, mg cpresource.Managed) (managed.E
 		cr.Spec.ForProvider.AuthorizerCredentials = nil
 	}
 	if resp.AuthorizerResultTtlInSeconds != nil {
-		cr.Spec.ForProvider.AuthorizerResultTtlInSeconds = resp.AuthorizerResultTtlInSeconds
+		cr.Spec.ForProvider.AuthorizerResultTTLInSeconds = resp.AuthorizerResultTtlInSeconds
 	} else {
-		cr.Spec.ForProvider.AuthorizerResultTtlInSeconds = nil
+		cr.Spec.ForProvider.AuthorizerResultTTLInSeconds = nil
 	}
 	if resp.AuthorizerUri != nil {
 		cr.Spec.ForProvider.AuthorizerURI = resp.AuthorizerUri

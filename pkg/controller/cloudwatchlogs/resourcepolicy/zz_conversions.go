@@ -28,45 +28,6 @@ import (
 // NOTE(muvaf): We return pointers in case the function needs to start with an
 // empty object, hence need to return a new pointer.
 
-// GenerateDescribeResourcePoliciesInput returns input for read
-// operation.
-func GenerateDescribeResourcePoliciesInput(cr *svcapitypes.ResourcePolicy) *svcsdk.DescribeResourcePoliciesInput {
-	res := &svcsdk.DescribeResourcePoliciesInput{}
-
-	return res
-}
-
-// GenerateResourcePolicy returns the current state in the form of *svcapitypes.ResourcePolicy.
-func GenerateResourcePolicy(resp *svcsdk.DescribeResourcePoliciesOutput) *svcapitypes.ResourcePolicy {
-	cr := &svcapitypes.ResourcePolicy{}
-
-	found := false
-	for _, elem := range resp.ResourcePolicies {
-		if elem.LastUpdatedTime != nil {
-			cr.Status.AtProvider.LastUpdatedTime = elem.LastUpdatedTime
-		} else {
-			cr.Status.AtProvider.LastUpdatedTime = nil
-		}
-		if elem.PolicyDocument != nil {
-			cr.Spec.ForProvider.PolicyDocument = elem.PolicyDocument
-		} else {
-			cr.Spec.ForProvider.PolicyDocument = nil
-		}
-		if elem.PolicyName != nil {
-			cr.Status.AtProvider.PolicyName = elem.PolicyName
-		} else {
-			cr.Status.AtProvider.PolicyName = nil
-		}
-		found = true
-		break
-	}
-	if !found {
-		return cr
-	}
-
-	return cr
-}
-
 // GeneratePutResourcePolicyInput returns a create input.
 func GeneratePutResourcePolicyInput(cr *svcapitypes.ResourcePolicy) *svcsdk.PutResourcePolicyInput {
 	res := &svcsdk.PutResourcePolicyInput{}

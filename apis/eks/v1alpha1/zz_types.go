@@ -90,7 +90,31 @@ type Addon_SDK struct {
 	ServiceAccountRoleARN *string `json:"serviceAccountRoleARN,omitempty"`
 
 	Status *string `json:"status,omitempty"`
-
+	// The metadata that you apply to a resource to help you categorize and organize
+	// them. Each tag consists of a key and an optional value. You define them.
+	//
+	// The following basic restrictions apply to tags:
+	//
+	//    * Maximum number of tags per resource – 50
+	//
+	//    * For each resource, each tag key must be unique, and each tag key can
+	//    have only one value.
+	//
+	//    * Maximum key length – 128 Unicode characters in UTF-8
+	//
+	//    * Maximum value length – 256 Unicode characters in UTF-8
+	//
+	//    * If your tagging schema is used across multiple services and resources,
+	//    remember that other services may have restrictions on allowed characters.
+	//    Generally allowed characters are: letters, numbers, and spaces representable
+	//    in UTF-8, and the following characters: + - = . _ : / @.
+	//
+	//    * Tag keys and values are case-sensitive.
+	//
+	//    * Do not use aws:, AWS:, or any upper or lowercase combination of such
+	//    as a prefix for either keys or values as it is reserved for Amazon Web
+	//    Services use. You cannot edit or delete tag keys or values with this prefix.
+	//    Tags with this prefix do not count against your tags per resource limit.
 	Tags map[string]*string `json:"tags,omitempty"`
 }
 
@@ -165,7 +189,31 @@ type EKSAnywhereSubscription struct {
 	LicenseARNs []*string `json:"licenseARNs,omitempty"`
 
 	Status *string `json:"status,omitempty"`
-
+	// The metadata that you apply to a resource to help you categorize and organize
+	// them. Each tag consists of a key and an optional value. You define them.
+	//
+	// The following basic restrictions apply to tags:
+	//
+	//    * Maximum number of tags per resource – 50
+	//
+	//    * For each resource, each tag key must be unique, and each tag key can
+	//    have only one value.
+	//
+	//    * Maximum key length – 128 Unicode characters in UTF-8
+	//
+	//    * Maximum value length – 256 Unicode characters in UTF-8
+	//
+	//    * If your tagging schema is used across multiple services and resources,
+	//    remember that other services may have restrictions on allowed characters.
+	//    Generally allowed characters are: letters, numbers, and spaces representable
+	//    in UTF-8, and the following characters: + - = . _ : / @.
+	//
+	//    * Tag keys and values are case-sensitive.
+	//
+	//    * Do not use aws:, AWS:, or any upper or lowercase combination of such
+	//    as a prefix for either keys or values as it is reserved for Amazon Web
+	//    Services use. You cannot edit or delete tag keys or values with this prefix.
+	//    Tags with this prefix do not count against your tags per resource limit.
 	Tags map[string]*string `json:"tags,omitempty"`
 }
 
@@ -248,7 +296,31 @@ type OIDCIdentityProviderConfig struct {
 	IdentityProviderConfigName *string `json:"identityProviderConfigName,omitempty"`
 
 	IssuerURL *string `json:"issuerURL,omitempty"`
-
+	// The metadata that you apply to a resource to help you categorize and organize
+	// them. Each tag consists of a key and an optional value. You define them.
+	//
+	// The following basic restrictions apply to tags:
+	//
+	//    * Maximum number of tags per resource – 50
+	//
+	//    * For each resource, each tag key must be unique, and each tag key can
+	//    have only one value.
+	//
+	//    * Maximum key length – 128 Unicode characters in UTF-8
+	//
+	//    * Maximum value length – 256 Unicode characters in UTF-8
+	//
+	//    * If your tagging schema is used across multiple services and resources,
+	//    remember that other services may have restrictions on allowed characters.
+	//    Generally allowed characters are: letters, numbers, and spaces representable
+	//    in UTF-8, and the following characters: + - = . _ : / @.
+	//
+	//    * Tag keys and values are case-sensitive.
+	//
+	//    * Do not use aws:, AWS:, or any upper or lowercase combination of such
+	//    as a prefix for either keys or values as it is reserved for Amazon Web
+	//    Services use. You cannot edit or delete tag keys or values with this prefix.
+	//    Tags with this prefix do not count against your tags per resource limit.
 	Tags map[string]*string `json:"tags,omitempty"`
 
 	UsernameClaim *string `json:"usernameClaim,omitempty"`
@@ -285,6 +357,64 @@ type OutpostConfigResponse struct {
 	ControlPlaneInstanceType *string `json:"controlPlaneInstanceType,omitempty"`
 
 	OutpostARNs []*string `json:"outpostARNs,omitempty"`
+}
+
+// +kubebuilder:skipversion
+type PodIdentityAssociation struct {
+	AssociationARN *string `json:"associationARN,omitempty"`
+
+	AssociationID *string `json:"associationID,omitempty"`
+
+	ClusterName *string `json:"clusterName,omitempty"`
+
+	CreatedAt *metav1.Time `json:"createdAt,omitempty"`
+
+	ModifiedAt *metav1.Time `json:"modifiedAt,omitempty"`
+
+	Namespace *string `json:"namespace,omitempty"`
+
+	RoleARN *string `json:"roleARN,omitempty"`
+
+	ServiceAccount *string `json:"serviceAccount,omitempty"`
+	// The metadata that you apply to a resource to help you categorize and organize
+	// them. Each tag consists of a key and an optional value. You define them.
+	//
+	// The following basic restrictions apply to tags:
+	//
+	//    * Maximum number of tags per resource – 50
+	//
+	//    * For each resource, each tag key must be unique, and each tag key can
+	//    have only one value.
+	//
+	//    * Maximum key length – 128 Unicode characters in UTF-8
+	//
+	//    * Maximum value length – 256 Unicode characters in UTF-8
+	//
+	//    * If your tagging schema is used across multiple services and resources,
+	//    remember that other services may have restrictions on allowed characters.
+	//    Generally allowed characters are: letters, numbers, and spaces representable
+	//    in UTF-8, and the following characters: + - = . _ : / @.
+	//
+	//    * Tag keys and values are case-sensitive.
+	//
+	//    * Do not use aws:, AWS:, or any upper or lowercase combination of such
+	//    as a prefix for either keys or values as it is reserved for Amazon Web
+	//    Services use. You cannot edit or delete tag keys or values with this prefix.
+	//    Tags with this prefix do not count against your tags per resource limit.
+	Tags map[string]*string `json:"tags,omitempty"`
+}
+
+// +kubebuilder:skipversion
+type PodIdentityAssociationSummary struct {
+	AssociationARN *string `json:"associationARN,omitempty"`
+
+	AssociationID *string `json:"associationID,omitempty"`
+
+	ClusterName *string `json:"clusterName,omitempty"`
+
+	Namespace *string `json:"namespace,omitempty"`
+
+	ServiceAccount *string `json:"serviceAccount,omitempty"`
 }
 
 // +kubebuilder:skipversion

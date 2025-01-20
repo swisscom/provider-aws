@@ -24,12 +24,10 @@ import (
 	svcapi "github.com/aws/aws-sdk-go/service/cloudwatchlogs"
 	svcsdk "github.com/aws/aws-sdk-go/service/cloudwatchlogs"
 	svcsdkapi "github.com/aws/aws-sdk-go/service/cloudwatchlogs/cloudwatchlogsiface"
-	"github.com/google/go-cmp/cmp"
 	"github.com/pkg/errors"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
-	"github.com/crossplane/crossplane-runtime/pkg/meta"
 	"github.com/crossplane/crossplane-runtime/pkg/reconciler/managed"
 	cpresource "github.com/crossplane/crossplane-runtime/pkg/resource"
 
@@ -66,46 +64,7 @@ func (c *connector) Connect(ctx context.Context, mg cpresource.Managed) (managed
 }
 
 func (e *external) Observe(ctx context.Context, mg cpresource.Managed) (managed.ExternalObservation, error) {
-	cr, ok := mg.(*svcapitypes.ResourcePolicy)
-	if !ok {
-		return managed.ExternalObservation{}, errors.New(errUnexpectedObject)
-	}
-	if meta.GetExternalName(cr) == "" {
-		return managed.ExternalObservation{
-			ResourceExists: false,
-		}, nil
-	}
-	input := GenerateDescribeResourcePoliciesInput(cr)
-	if err := e.preObserve(ctx, cr, input); err != nil {
-		return managed.ExternalObservation{}, errors.Wrap(err, "pre-observe failed")
-	}
-	resp, err := e.client.DescribeResourcePoliciesWithContext(ctx, input)
-	if err != nil {
-		return managed.ExternalObservation{ResourceExists: false}, errorutils.Wrap(cpresource.Ignore(IsNotFound, err), errDescribe)
-	}
-	resp = e.filterList(cr, resp)
-	if len(resp.ResourcePolicies) == 0 {
-		return managed.ExternalObservation{ResourceExists: false}, nil
-	}
-	currentSpec := cr.Spec.ForProvider.DeepCopy()
-	if err := e.lateInitialize(&cr.Spec.ForProvider, resp); err != nil {
-		return managed.ExternalObservation{}, errors.Wrap(err, "late-init failed")
-	}
-	GenerateResourcePolicy(resp).Status.AtProvider.DeepCopyInto(&cr.Status.AtProvider)
-	upToDate := true
-	diff := ""
-	if !meta.WasDeleted(cr) { // There is no need to run isUpToDate if the resource is deleted
-		upToDate, diff, err = e.isUpToDate(ctx, cr, resp)
-		if err != nil {
-			return managed.ExternalObservation{}, errors.Wrap(err, "isUpToDate check failed")
-		}
-	}
-	return e.postObserve(ctx, cr, resp, managed.ExternalObservation{
-		ResourceExists:          true,
-		ResourceUpToDate:        upToDate,
-		Diff:                    diff,
-		ResourceLateInitialized: !cmp.Equal(&cr.Spec.ForProvider, currentSpec),
-	}, nil)
+	return e.observe(ctx, mg)
 }
 
 func (e *external) Create(ctx context.Context, mg cpresource.Managed) (managed.ExternalCreation, error) {
@@ -169,18 +128,14 @@ type option func(*external)
 
 func newExternal(kube client.Client, client svcsdkapi.CloudWatchLogsAPI, opts []option) *external {
 	e := &external{
-		kube:           kube,
-		client:         client,
-		preObserve:     nopPreObserve,
-		postObserve:    nopPostObserve,
-		lateInitialize: nopLateInitialize,
-		isUpToDate:     alwaysUpToDate,
-		filterList:     nopFilterList,
-		preCreate:      nopPreCreate,
-		postCreate:     nopPostCreate,
-		preDelete:      nopPreDelete,
-		postDelete:     nopPostDelete,
-		update:         nopUpdate,
+		kube:       kube,
+		client:     client,
+		observe:    nopObserve,
+		preCreate:  nopPreCreate,
+		postCreate: nopPostCreate,
+		preDelete:  nopPreDelete,
+		postDelete: nopPostDelete,
+		update:     nopUpdate,
 	}
 	for _, f := range opts {
 		f(e)
@@ -189,35 +144,18 @@ func newExternal(kube client.Client, client svcsdkapi.CloudWatchLogsAPI, opts []
 }
 
 type external struct {
-	kube           client.Client
-	client         svcsdkapi.CloudWatchLogsAPI
-	preObserve     func(context.Context, *svcapitypes.ResourcePolicy, *svcsdk.DescribeResourcePoliciesInput) error
-	postObserve    func(context.Context, *svcapitypes.ResourcePolicy, *svcsdk.DescribeResourcePoliciesOutput, managed.ExternalObservation, error) (managed.ExternalObservation, error)
-	filterList     func(*svcapitypes.ResourcePolicy, *svcsdk.DescribeResourcePoliciesOutput) *svcsdk.DescribeResourcePoliciesOutput
-	lateInitialize func(*svcapitypes.ResourcePolicyParameters, *svcsdk.DescribeResourcePoliciesOutput) error
-	isUpToDate     func(context.Context, *svcapitypes.ResourcePolicy, *svcsdk.DescribeResourcePoliciesOutput) (bool, string, error)
-	preCreate      func(context.Context, *svcapitypes.ResourcePolicy, *svcsdk.PutResourcePolicyInput) error
-	postCreate     func(context.Context, *svcapitypes.ResourcePolicy, *svcsdk.PutResourcePolicyOutput, managed.ExternalCreation, error) (managed.ExternalCreation, error)
-	preDelete      func(context.Context, *svcapitypes.ResourcePolicy, *svcsdk.DeleteResourcePolicyInput) (bool, error)
-	postDelete     func(context.Context, *svcapitypes.ResourcePolicy, *svcsdk.DeleteResourcePolicyOutput, error) error
-	update         func(context.Context, cpresource.Managed) (managed.ExternalUpdate, error)
+	kube       client.Client
+	client     svcsdkapi.CloudWatchLogsAPI
+	observe    func(context.Context, cpresource.Managed) (managed.ExternalObservation, error)
+	preCreate  func(context.Context, *svcapitypes.ResourcePolicy, *svcsdk.PutResourcePolicyInput) error
+	postCreate func(context.Context, *svcapitypes.ResourcePolicy, *svcsdk.PutResourcePolicyOutput, managed.ExternalCreation, error) (managed.ExternalCreation, error)
+	preDelete  func(context.Context, *svcapitypes.ResourcePolicy, *svcsdk.DeleteResourcePolicyInput) (bool, error)
+	postDelete func(context.Context, *svcapitypes.ResourcePolicy, *svcsdk.DeleteResourcePolicyOutput, error) error
+	update     func(context.Context, cpresource.Managed) (managed.ExternalUpdate, error)
 }
 
-func nopPreObserve(context.Context, *svcapitypes.ResourcePolicy, *svcsdk.DescribeResourcePoliciesInput) error {
-	return nil
-}
-func nopPostObserve(_ context.Context, _ *svcapitypes.ResourcePolicy, _ *svcsdk.DescribeResourcePoliciesOutput, obs managed.ExternalObservation, err error) (managed.ExternalObservation, error) {
-	return obs, err
-}
-func nopFilterList(_ *svcapitypes.ResourcePolicy, list *svcsdk.DescribeResourcePoliciesOutput) *svcsdk.DescribeResourcePoliciesOutput {
-	return list
-}
-
-func nopLateInitialize(*svcapitypes.ResourcePolicyParameters, *svcsdk.DescribeResourcePoliciesOutput) error {
-	return nil
-}
-func alwaysUpToDate(context.Context, *svcapitypes.ResourcePolicy, *svcsdk.DescribeResourcePoliciesOutput) (bool, string, error) {
-	return true, "", nil
+func nopObserve(context.Context, cpresource.Managed) (managed.ExternalObservation, error) {
+	return managed.ExternalObservation{}, nil
 }
 
 func nopPreCreate(context.Context, *svcapitypes.ResourcePolicy, *svcsdk.PutResourcePolicyInput) error {

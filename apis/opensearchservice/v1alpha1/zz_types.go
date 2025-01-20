@@ -348,7 +348,7 @@ type DomainStatus_SDK struct {
 
 	EngineVersion *string `json:"engineVersion,omitempty"`
 
-	IPAddressType *string `json:"iPAddressType,omitempty"`
+	IPAddressType *string `json:"ipAddressType,omitempty"`
 
 	LogPublishingOptions map[string]*LogPublishingOption `json:"logPublishingOptions,omitempty"`
 	// Enables or disables node-to-node encryption. For more information, see Node-to-node
@@ -557,6 +557,11 @@ type ReservedInstanceOffering struct {
 	InstanceType *string `json:"instanceType,omitempty"`
 
 	ReservedInstanceOfferingID *string `json:"reservedInstanceOfferingID,omitempty"`
+}
+
+// +kubebuilder:skipversion
+type S3GlueDataCatalog struct {
+	RoleARN *string `json:"roleARN,omitempty"`
 }
 
 // +kubebuilder:skipversion

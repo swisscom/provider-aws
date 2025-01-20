@@ -34,7 +34,7 @@ type AuthorizerParameters struct {
 
 	AuthorizerPayloadFormatVersion *string `json:"authorizerPayloadFormatVersion,omitempty"`
 
-	AuthorizerResultTtlInSeconds *int64 `json:"authorizerResultTtlInSeconds,omitempty"`
+	AuthorizerResultTTLInSeconds *int64 `json:"authorizerResultTTLInSeconds,omitempty"`
 
 	// +kubebuilder:validation:Required
 	AuthorizerType *string `json:"authorizerType"`

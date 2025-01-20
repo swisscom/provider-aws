@@ -328,6 +328,17 @@ type DBClusterSnapshotAttributesResult struct {
 }
 
 // +kubebuilder:skipversion
+type DBClusterStatusInfo struct {
+	Message *string `json:"message,omitempty"`
+
+	Normal *bool `json:"normal,omitempty"`
+
+	Status *string `json:"status,omitempty"`
+
+	StatusType *string `json:"statusType,omitempty"`
+}
+
+// +kubebuilder:skipversion
 type DBCluster_SDK struct {
 	ActivityStreamKinesisStreamName *string `json:"activityStreamKinesisStreamName,omitempty"`
 
@@ -482,6 +493,8 @@ type DBCluster_SDK struct {
 	ServerlessV2ScalingConfiguration *ServerlessV2ScalingConfigurationInfo `json:"serverlessV2ScalingConfiguration,omitempty"`
 
 	Status *string `json:"status,omitempty"`
+
+	StatusInfos []*DBClusterStatusInfo `json:"statusInfos,omitempty"`
 
 	StorageEncrypted *bool `json:"storageEncrypted,omitempty"`
 
@@ -1644,6 +1657,8 @@ type Range struct {
 // +kubebuilder:skipversion
 type RdsCustomClusterConfiguration struct {
 	InterconnectSubnetID *string `json:"interconnectSubnetID,omitempty"`
+
+	ReplicaMode *string `json:"replicaMode,omitempty"`
 
 	TransitGatewayMulticastDomainID *string `json:"transitGatewayMulticastDomainID,omitempty"`
 }

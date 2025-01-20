@@ -58,9 +58,9 @@ type AccessPointDescription struct {
 
 // +kubebuilder:skipversion
 type CreationInfo struct {
-	OwnerGid *int64 `json:"ownerGid,omitempty"`
+	OwnerGID *int64 `json:"ownerGID,omitempty"`
 
-	OwnerUid *int64 `json:"ownerUid,omitempty"`
+	OwnerUID *int64 `json:"ownerUID,omitempty"`
 
 	Permissions *string `json:"permissions,omitempty"`
 }
@@ -75,6 +75,8 @@ type Destination struct {
 // +kubebuilder:skipversion
 type DestinationToCreate struct {
 	AvailabilityZoneName *string `json:"availabilityZoneName,omitempty"`
+
+	FileSystemID *string `json:"fileSystemID,omitempty"`
 
 	KMSKeyID *string `json:"kmsKeyID,omitempty"`
 }
@@ -94,6 +96,8 @@ type FileSystemDescription struct {
 	FileSystemARN *string `json:"fileSystemARN,omitempty"`
 
 	FileSystemID *string `json:"fileSystemID,omitempty"`
+	// Describes the protection on a file system.
+	FileSystemProtection *FileSystemProtectionDescription `json:"fileSystemProtection,omitempty"`
 
 	KMSKeyID *string `json:"kmsKeyID,omitempty"`
 
@@ -122,10 +126,17 @@ type FileSystemDescription struct {
 }
 
 // +kubebuilder:skipversion
+type FileSystemProtectionDescription struct {
+	ReplicationOverwriteProtection *string `json:"replicationOverwriteProtection,omitempty"`
+}
+
+// +kubebuilder:skipversion
 type FileSystemSize struct {
 	Timestamp *metav1.Time `json:"timestamp,omitempty"`
 
 	Value *int64 `json:"value,omitempty"`
+
+	ValueInArchive *int64 `json:"valueInArchive,omitempty"`
 
 	ValueInIA *int64 `json:"valueInIA,omitempty"`
 
@@ -157,11 +168,11 @@ type MountTargetDescription struct {
 
 // +kubebuilder:skipversion
 type PosixUser struct {
-	Gid *int64 `json:"gid,omitempty"`
+	GID *int64 `json:"gid,omitempty"`
 
-	SecondaryGids []*int64 `json:"secondaryGids,omitempty"`
+	SecondaryGIDs []*int64 `json:"secondaryGIDs,omitempty"`
 
-	Uid *int64 `json:"uid,omitempty"`
+	UID *int64 `json:"uid,omitempty"`
 }
 
 // +kubebuilder:skipversion

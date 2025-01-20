@@ -209,7 +209,7 @@ func (e *external) Create(ctx context.Context, mg cpresource.Managed) (managed.E
 				f11val.CacheDataEncrypted = f11valiter.CacheDataEncrypted
 			}
 			if f11valiter.CacheTtlInSeconds != nil {
-				f11val.CacheTtlInSeconds = f11valiter.CacheTtlInSeconds
+				f11val.CacheTTLInSeconds = f11valiter.CacheTtlInSeconds
 			}
 			if f11valiter.CachingEnabled != nil {
 				f11val.CachingEnabled = f11valiter.CachingEnabled

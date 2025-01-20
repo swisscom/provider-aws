@@ -37,7 +37,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/crossplane-contrib/provider-aws/apis/v1alpha1"
-	svcapitypes "github.com/crossplane-contrib/provider-aws/apis/wafv2/manualv1alpha1"
+	svcapitypes "github.com/crossplane-contrib/provider-aws/apis/wafv2/v1alpha1"
 	"github.com/crossplane-contrib/provider-aws/pkg/features"
 	connectaws "github.com/crossplane-contrib/provider-aws/pkg/utils/connect/aws"
 	errorutils "github.com/crossplane-contrib/provider-aws/pkg/utils/errors"
@@ -354,12 +354,3 @@ func createPatch(currentParams *svcapitypes.WebACLParameters, resp *svcsdk.GetWe
 	}
 	return patch, nil
 }
-
-//func statementToString[S Statement](statement S) (*string, error) {
-//	configBytes, err := json.Marshal(statement)
-//	if err != nil {
-//		return nil, err
-//	}
-//	configStr := string(configBytes)
-//	return &configStr, nil
-//}

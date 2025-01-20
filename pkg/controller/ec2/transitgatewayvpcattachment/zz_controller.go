@@ -140,6 +140,9 @@ func (e *external) Create(ctx context.Context, mg cpresource.Managed) (managed.E
 		if resp.TransitGatewayVpcAttachment.Options.Ipv6Support != nil {
 			f1.IPv6Support = resp.TransitGatewayVpcAttachment.Options.Ipv6Support
 		}
+		if resp.TransitGatewayVpcAttachment.Options.SecurityGroupReferencingSupport != nil {
+			f1.SecurityGroupReferencingSupport = resp.TransitGatewayVpcAttachment.Options.SecurityGroupReferencingSupport
+		}
 		cr.Spec.ForProvider.Options = f1
 	} else {
 		cr.Spec.ForProvider.Options = nil

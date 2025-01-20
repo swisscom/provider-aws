@@ -896,6 +896,11 @@ type Headers struct {
 }
 
 // +kubebuilder:skipversion
+type ImportSource struct {
+	SourceARN *string `json:"sourceARN,omitempty"`
+}
+
+// +kubebuilder:skipversion
 type Invalidation struct {
 	CreateTime *metav1.Time `json:"createTime,omitempty"`
 
@@ -964,6 +969,35 @@ type KeyGroupList struct {
 // +kubebuilder:skipversion
 type KeyPairIDs struct {
 	Items []*string `json:"items,omitempty"`
+
+	Quantity *int64 `json:"quantity,omitempty"`
+}
+
+// +kubebuilder:skipversion
+type KeyValueStore struct {
+	ARN *string `json:"arn,omitempty"`
+
+	Comment *string `json:"comment,omitempty"`
+
+	ID *string `json:"id,omitempty"`
+
+	LastModifiedTime *metav1.Time `json:"lastModifiedTime,omitempty"`
+
+	Name *string `json:"name,omitempty"`
+
+	Status *string `json:"status,omitempty"`
+}
+
+// +kubebuilder:skipversion
+type KeyValueStoreAssociations struct {
+	Quantity *int64 `json:"quantity,omitempty"`
+}
+
+// +kubebuilder:skipversion
+type KeyValueStoreList struct {
+	MaxItems *int64 `json:"maxItems,omitempty"`
+
+	NextMarker *string `json:"nextMarker,omitempty"`
 
 	Quantity *int64 `json:"quantity,omitempty"`
 }
@@ -1542,7 +1576,7 @@ type ResponseHeadersPolicySecurityHeadersConfig struct {
 	// For more information about the X-XSS-Protection HTTP response header, see
 	// X-XSS-Protection (https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/X-XSS-Protection)
 	// in the MDN Web Docs.
-	XSSProtection *ResponseHeadersPolicyXSSProtection `json:"xSSProtection,omitempty"`
+	XSSProtection *ResponseHeadersPolicyXSSProtection `json:"xssProtection,omitempty"`
 }
 
 // +kubebuilder:skipversion
@@ -1759,7 +1793,7 @@ type TrustedSigners struct {
 
 // +kubebuilder:skipversion
 type ViewerCertificate struct {
-	ACMCertificateARN *string `json:"aCMCertificateARN,omitempty"`
+	ACMCertificateARN *string `json:"acmCertificateARN,omitempty"`
 
 	Certificate *string `json:"certificate,omitempty"`
 

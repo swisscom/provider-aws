@@ -161,7 +161,7 @@ func (e *external) Create(ctx context.Context, mg cpresource.Managed) (managed.E
 	if resp.PosixUser != nil {
 		f7 := &svcapitypes.PosixUser{}
 		if resp.PosixUser.Gid != nil {
-			f7.Gid = resp.PosixUser.Gid
+			f7.GID = resp.PosixUser.Gid
 		}
 		if resp.PosixUser.SecondaryGids != nil {
 			f7f1 := []*int64{}
@@ -170,10 +170,10 @@ func (e *external) Create(ctx context.Context, mg cpresource.Managed) (managed.E
 				f7f1elem = *f7f1iter
 				f7f1 = append(f7f1, &f7f1elem)
 			}
-			f7.SecondaryGids = f7f1
+			f7.SecondaryGIDs = f7f1
 		}
 		if resp.PosixUser.Uid != nil {
-			f7.Uid = resp.PosixUser.Uid
+			f7.UID = resp.PosixUser.Uid
 		}
 		cr.Spec.ForProvider.PosixUser = f7
 	} else {
@@ -184,10 +184,10 @@ func (e *external) Create(ctx context.Context, mg cpresource.Managed) (managed.E
 		if resp.RootDirectory.CreationInfo != nil {
 			f8f0 := &svcapitypes.CreationInfo{}
 			if resp.RootDirectory.CreationInfo.OwnerGid != nil {
-				f8f0.OwnerGid = resp.RootDirectory.CreationInfo.OwnerGid
+				f8f0.OwnerGID = resp.RootDirectory.CreationInfo.OwnerGid
 			}
 			if resp.RootDirectory.CreationInfo.OwnerUid != nil {
-				f8f0.OwnerUid = resp.RootDirectory.CreationInfo.OwnerUid
+				f8f0.OwnerUID = resp.RootDirectory.CreationInfo.OwnerUid
 			}
 			if resp.RootDirectory.CreationInfo.Permissions != nil {
 				f8f0.Permissions = resp.RootDirectory.CreationInfo.Permissions

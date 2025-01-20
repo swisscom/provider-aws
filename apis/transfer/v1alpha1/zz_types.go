@@ -171,6 +171,8 @@ type DescribedServer struct {
 	ProtocolDetails *ProtocolDetails `json:"protocolDetails,omitempty"`
 
 	Protocols []*string `json:"protocols,omitempty"`
+	// The Amazon S3 storage options that are configured for your server.
+	S3StorageOptions *S3StorageOptions `json:"s3StorageOptions,omitempty"`
 
 	SecurityPolicyName *string `json:"securityPolicyName,omitempty"`
 
@@ -251,6 +253,8 @@ type HomeDirectoryMapEntry struct {
 	Entry *string `json:"entry,omitempty"`
 
 	Target *string `json:"target,omitempty"`
+
+	Type *string `json:"type_,omitempty"`
 }
 
 // +kubebuilder:skipversion
@@ -382,11 +386,11 @@ type LoggingConfiguration struct {
 
 // +kubebuilder:skipversion
 type PosixProfile struct {
-	Gid *int64 `json:"gid,omitempty"`
+	GID *int64 `json:"gid,omitempty"`
 
-	SecondaryGids []*int64 `json:"secondaryGids,omitempty"`
+	SecondaryGIDs []*int64 `json:"secondaryGIDs,omitempty"`
 
-	Uid *int64 `json:"uid,omitempty"`
+	UID *int64 `json:"uid,omitempty"`
 }
 
 // +kubebuilder:skipversion
@@ -398,6 +402,13 @@ type ProtocolDetails struct {
 	SetStatOption *string `json:"setStatOption,omitempty"`
 
 	TLSSessionResumptionMode *string `json:"tlsSessionResumptionMode,omitempty"`
+}
+
+// +kubebuilder:skipversion
+type S3StorageOptions struct {
+	// Indicates whether optimization to directory listing on S3 servers is used.
+	// Disabled by default for compatibility.
+	DirectoryListingOptimization *string `json:"directoryListingOptimization,omitempty"`
 }
 
 // +kubebuilder:skipversion

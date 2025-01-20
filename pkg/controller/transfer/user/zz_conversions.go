@@ -73,6 +73,9 @@ func GenerateCreateUserInput(cr *svcapitypes.User) *svcsdk.CreateUserInput {
 			if f1iter.Target != nil {
 				f1elem.SetTarget(*f1iter.Target)
 			}
+			if f1iter.Type != nil {
+				f1elem.SetType(*f1iter.Type)
+			}
 			f1 = append(f1, f1elem)
 		}
 		res.SetHomeDirectoryMappings(f1)
@@ -85,20 +88,20 @@ func GenerateCreateUserInput(cr *svcapitypes.User) *svcsdk.CreateUserInput {
 	}
 	if cr.Spec.ForProvider.PosixProfile != nil {
 		f4 := &svcsdk.PosixProfile{}
-		if cr.Spec.ForProvider.PosixProfile.Gid != nil {
-			f4.SetGid(*cr.Spec.ForProvider.PosixProfile.Gid)
+		if cr.Spec.ForProvider.PosixProfile.GID != nil {
+			f4.SetGid(*cr.Spec.ForProvider.PosixProfile.GID)
 		}
-		if cr.Spec.ForProvider.PosixProfile.SecondaryGids != nil {
+		if cr.Spec.ForProvider.PosixProfile.SecondaryGIDs != nil {
 			f4f1 := []*int64{}
-			for _, f4f1iter := range cr.Spec.ForProvider.PosixProfile.SecondaryGids {
+			for _, f4f1iter := range cr.Spec.ForProvider.PosixProfile.SecondaryGIDs {
 				var f4f1elem int64
 				f4f1elem = *f4f1iter
 				f4f1 = append(f4f1, &f4f1elem)
 			}
 			f4.SetSecondaryGids(f4f1)
 		}
-		if cr.Spec.ForProvider.PosixProfile.Uid != nil {
-			f4.SetUid(*cr.Spec.ForProvider.PosixProfile.Uid)
+		if cr.Spec.ForProvider.PosixProfile.UID != nil {
+			f4.SetUid(*cr.Spec.ForProvider.PosixProfile.UID)
 		}
 		res.SetPosixProfile(f4)
 	}
@@ -137,6 +140,9 @@ func GenerateUpdateUserInput(cr *svcapitypes.User) *svcsdk.UpdateUserInput {
 			if f1iter.Target != nil {
 				f1elem.SetTarget(*f1iter.Target)
 			}
+			if f1iter.Type != nil {
+				f1elem.SetType(*f1iter.Type)
+			}
 			f1 = append(f1, f1elem)
 		}
 		res.SetHomeDirectoryMappings(f1)
@@ -149,20 +155,20 @@ func GenerateUpdateUserInput(cr *svcapitypes.User) *svcsdk.UpdateUserInput {
 	}
 	if cr.Spec.ForProvider.PosixProfile != nil {
 		f4 := &svcsdk.PosixProfile{}
-		if cr.Spec.ForProvider.PosixProfile.Gid != nil {
-			f4.SetGid(*cr.Spec.ForProvider.PosixProfile.Gid)
+		if cr.Spec.ForProvider.PosixProfile.GID != nil {
+			f4.SetGid(*cr.Spec.ForProvider.PosixProfile.GID)
 		}
-		if cr.Spec.ForProvider.PosixProfile.SecondaryGids != nil {
+		if cr.Spec.ForProvider.PosixProfile.SecondaryGIDs != nil {
 			f4f1 := []*int64{}
-			for _, f4f1iter := range cr.Spec.ForProvider.PosixProfile.SecondaryGids {
+			for _, f4f1iter := range cr.Spec.ForProvider.PosixProfile.SecondaryGIDs {
 				var f4f1elem int64
 				f4f1elem = *f4f1iter
 				f4f1 = append(f4f1, &f4f1elem)
 			}
 			f4.SetSecondaryGids(f4f1)
 		}
-		if cr.Spec.ForProvider.PosixProfile.Uid != nil {
-			f4.SetUid(*cr.Spec.ForProvider.PosixProfile.Uid)
+		if cr.Spec.ForProvider.PosixProfile.UID != nil {
+			f4.SetUid(*cr.Spec.ForProvider.PosixProfile.UID)
 		}
 		res.SetPosixProfile(f4)
 	}

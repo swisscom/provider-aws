@@ -124,6 +124,8 @@ type DBClusterSnapshot struct {
 
 	StorageEncrypted *bool `json:"storageEncrypted,omitempty"`
 
+	StorageType *string `json:"storageType,omitempty"`
+
 	VPCID *string `json:"vpcID,omitempty"`
 }
 
@@ -200,6 +202,8 @@ type DBCluster_SDK struct {
 	Status *string `json:"status,omitempty"`
 
 	StorageEncrypted *bool `json:"storageEncrypted,omitempty"`
+
+	StorageType *string `json:"storageType,omitempty"`
 
 	VPCSecurityGroups []*VPCSecurityGroupMembership `json:"vpcSecurityGroups,omitempty"`
 }
@@ -412,6 +416,8 @@ type OrderableDBInstanceOption struct {
 	EngineVersion *string `json:"engineVersion,omitempty"`
 
 	LicenseModel *string `json:"licenseModel,omitempty"`
+
+	StorageType *string `json:"storageType,omitempty"`
 
 	VPC *bool `json:"vpc,omitempty"`
 }

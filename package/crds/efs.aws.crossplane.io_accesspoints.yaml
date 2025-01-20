@@ -3,7 +3,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.14.0
+    controller-gen.kubebuilder.io/version: v0.16.0
   name: accesspoints.efs.aws.crossplane.io
 spec:
   group: efs.aws.crossplane.io
@@ -163,7 +163,7 @@ spec:
                       gid:
                         format: int64
                         type: integer
-                      secondaryGids:
+                      secondaryGIDs:
                         items:
                           format: int64
                           type: integer
@@ -177,14 +177,13 @@ spec:
                     type: string
                   rootDirectory:
                     description: |-
-                      Specifies the directory on the Amazon EFS file system that the access point
-                      exposes as the root directory of your file system to NFS clients using the
-                      access point. The clients using the access point can only access the root
-                      directory and below. If the RootDirectory > Path specified does not exist,
-                      EFS creates it and applies the CreationInfo settings when a client connects
-                      to an access point. When specifying a RootDirectory, you must provide the
-                      Path, and the CreationInfo.
-
+                      Specifies the directory on the EFS file system that the access point exposes
+                      as the root directory of your file system to NFS clients using the access
+                      point. The clients using the access point can only access the root directory
+                      and below. If the RootDirectory > Path specified does not exist, Amazon EFS
+                      creates it and applies the CreationInfo settings when a client connects to
+                      an access point. When specifying a RootDirectory, you must provide the Path,
+                      and the CreationInfo.
 
                       Amazon EFS creates a root directory only if you have provided the CreationInfo:
                       OwnUid, OwnGID, and permissions for the directory. If you do not provide
@@ -199,20 +198,18 @@ spec:
                           with these settings when a client connects to the access point. When specifying
                           CreationInfo, you must include values for all properties.
 
-
                           Amazon EFS creates a root directory only if you have provided the CreationInfo:
                           OwnUid, OwnGID, and permissions for the directory. If you do not provide
                           this information, Amazon EFS does not create the root directory. If the root
                           directory does not exist, attempts to mount using the access point will fail.
 
-
                           If you do not provide CreationInfo and the specified RootDirectory does not
                           exist, attempts to mount the file system using the access point will fail.
                         properties:
-                          ownerGid:
+                          ownerGID:
                             format: int64
                             type: integer
-                          ownerUid:
+                          ownerUID:
                             format: int64
                             type: integer
                           permissions:

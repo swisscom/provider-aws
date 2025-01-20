@@ -50,7 +50,7 @@ type DNSProperties struct {
 
 // +kubebuilder:skipversion
 type DNSRecord struct {
-	TTL *int64 `json:"tTL,omitempty"`
+	TTL *int64 `json:"ttl,omitempty"`
 
 	Type *string `json:"type_,omitempty"`
 }
@@ -215,12 +215,12 @@ type PublicDNSPropertiesMutableChange struct {
 
 // +kubebuilder:skipversion
 type SOA struct {
-	TTL *int64 `json:"tTL,omitempty"`
+	TTL *int64 `json:"ttl,omitempty"`
 }
 
 // +kubebuilder:skipversion
 type SOAChange struct {
-	TTL *int64 `json:"tTL,omitempty"`
+	TTL *int64 `json:"ttl,omitempty"`
 }
 
 // +kubebuilder:skipversion

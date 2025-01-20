@@ -79,7 +79,7 @@ type DomainParameters struct {
 	// OpenSearch Service domains (https://docs.aws.amazon.com/opensearch-service/latest/developerguide/createupdatedomains.html#createdomains).
 	EngineVersion *string `json:"engineVersion,omitempty"`
 	// The type of IP addresses supported by the endpoint for the domain.
-	IPAddressType *string `json:"iPAddressType,omitempty"`
+	IPAddressType *string `json:"ipAddressType,omitempty"`
 	// Key-value pairs to configure log publishing.
 	LogPublishingOptions map[string]*LogPublishingOption `json:"logPublishingOptions,omitempty"`
 	// Enables node-to-node encryption.

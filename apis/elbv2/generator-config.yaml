@@ -10,6 +10,7 @@ ignore:
     - DescribeListenersInput.LoadBalancerArn
   resource_names:
     - Rule
+    - TrustStore
 resources:
   Listener:
     exceptions:

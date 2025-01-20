@@ -60,9 +60,9 @@ func GenerateAuthorizer(resp *svcsdk.GetAuthorizerOutput) *svcapitypes.Authorize
 		cr.Spec.ForProvider.AuthorizerPayloadFormatVersion = nil
 	}
 	if resp.AuthorizerResultTtlInSeconds != nil {
-		cr.Spec.ForProvider.AuthorizerResultTtlInSeconds = resp.AuthorizerResultTtlInSeconds
+		cr.Spec.ForProvider.AuthorizerResultTTLInSeconds = resp.AuthorizerResultTtlInSeconds
 	} else {
-		cr.Spec.ForProvider.AuthorizerResultTtlInSeconds = nil
+		cr.Spec.ForProvider.AuthorizerResultTTLInSeconds = nil
 	}
 	if resp.AuthorizerType != nil {
 		cr.Spec.ForProvider.AuthorizerType = resp.AuthorizerType
@@ -132,8 +132,8 @@ func GenerateCreateAuthorizerInput(cr *svcapitypes.Authorizer) *svcsdk.CreateAut
 	if cr.Spec.ForProvider.AuthorizerPayloadFormatVersion != nil {
 		res.SetAuthorizerPayloadFormatVersion(*cr.Spec.ForProvider.AuthorizerPayloadFormatVersion)
 	}
-	if cr.Spec.ForProvider.AuthorizerResultTtlInSeconds != nil {
-		res.SetAuthorizerResultTtlInSeconds(*cr.Spec.ForProvider.AuthorizerResultTtlInSeconds)
+	if cr.Spec.ForProvider.AuthorizerResultTTLInSeconds != nil {
+		res.SetAuthorizerResultTtlInSeconds(*cr.Spec.ForProvider.AuthorizerResultTTLInSeconds)
 	}
 	if cr.Spec.ForProvider.AuthorizerType != nil {
 		res.SetAuthorizerType(*cr.Spec.ForProvider.AuthorizerType)
@@ -192,8 +192,8 @@ func GenerateUpdateAuthorizerInput(cr *svcapitypes.Authorizer) *svcsdk.UpdateAut
 	if cr.Spec.ForProvider.AuthorizerPayloadFormatVersion != nil {
 		res.SetAuthorizerPayloadFormatVersion(*cr.Spec.ForProvider.AuthorizerPayloadFormatVersion)
 	}
-	if cr.Spec.ForProvider.AuthorizerResultTtlInSeconds != nil {
-		res.SetAuthorizerResultTtlInSeconds(*cr.Spec.ForProvider.AuthorizerResultTtlInSeconds)
+	if cr.Spec.ForProvider.AuthorizerResultTTLInSeconds != nil {
+		res.SetAuthorizerResultTtlInSeconds(*cr.Spec.ForProvider.AuthorizerResultTTLInSeconds)
 	}
 	if cr.Spec.ForProvider.AuthorizerType != nil {
 		res.SetAuthorizerType(*cr.Spec.ForProvider.AuthorizerType)

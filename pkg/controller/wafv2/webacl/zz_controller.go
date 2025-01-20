@@ -33,7 +33,7 @@ import (
 	"github.com/crossplane/crossplane-runtime/pkg/reconciler/managed"
 	cpresource "github.com/crossplane/crossplane-runtime/pkg/resource"
 
-	svcapitypes "github.com/crossplane-contrib/provider-aws/apis/wafv2/manualv1alpha1"
+	svcapitypes "github.com/crossplane-contrib/provider-aws/apis/wafv2/v1alpha1"
 	connectaws "github.com/crossplane-contrib/provider-aws/pkg/utils/connect/aws"
 	errorutils "github.com/crossplane-contrib/provider-aws/pkg/utils/errors"
 )
@@ -140,9 +140,9 @@ func (e *external) Create(ctx context.Context, mg cpresource.Managed) (managed.E
 		cr.Status.AtProvider.LockToken = nil
 	}
 	if resp.Summary.Name != nil {
-		cr.Status.AtProvider.Name = resp.Summary.Name
+		cr.Spec.ForProvider.Name = resp.Summary.Name
 	} else {
-		cr.Status.AtProvider.Name = nil
+		cr.Spec.ForProvider.Name = nil
 	}
 
 	return e.postCreate(ctx, cr, resp, managed.ExternalCreation{}, err)

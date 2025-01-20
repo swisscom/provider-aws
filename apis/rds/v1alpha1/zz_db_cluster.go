@@ -762,6 +762,8 @@ type DBClusterObservation struct {
 	ScalingConfigurationInfo *ScalingConfigurationInfo `json:"scalingConfigurationInfo,omitempty"`
 	// The current state of this DB cluster.
 	Status *string `json:"status,omitempty"`
+	// Reserved for future use.
+	StatusInfos []*DBClusterStatusInfo `json:"statusInfos,omitempty"`
 
 	TagList []*Tag `json:"tagList,omitempty"`
 	// The list of VPC security groups that the DB cluster belongs to.

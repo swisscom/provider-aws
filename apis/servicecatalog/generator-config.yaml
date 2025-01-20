@@ -38,7 +38,7 @@ operations:
     resource_name: ProvisionedProduct
   DescribeProvisionedProduct:
     operation_type:
-      - Read
+      - ReadOne
     resource_name: ProvisionedProduct
   TerminateProvisionedProduct:
     operation_type:

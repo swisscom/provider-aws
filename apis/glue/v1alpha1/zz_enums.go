@@ -22,6 +22,7 @@ type AdditionalOptionKeys string
 
 const (
 	AdditionalOptionKeys_performanceTuning_caching AdditionalOptionKeys = "performanceTuning.caching"
+	AdditionalOptionKeys_observations_scope        AdditionalOptionKeys = "observations.scope"
 )
 
 type AggFunction string
@@ -84,6 +85,16 @@ type CloudWatchEncryptionMode string
 const (
 	CloudWatchEncryptionMode_DISABLED CloudWatchEncryptionMode = "DISABLED"
 	CloudWatchEncryptionMode_SSE_KMS  CloudWatchEncryptionMode = "SSE-KMS"
+)
+
+type ColumnStatisticsState string
+
+const (
+	ColumnStatisticsState_STARTING  ColumnStatisticsState = "STARTING"
+	ColumnStatisticsState_RUNNING   ColumnStatisticsState = "RUNNING"
+	ColumnStatisticsState_SUCCEEDED ColumnStatisticsState = "SUCCEEDED"
+	ColumnStatisticsState_FAILED    ColumnStatisticsState = "FAILED"
+	ColumnStatisticsState_STOPPED   ColumnStatisticsState = "STOPPED"
 )
 
 type ColumnStatisticsType string
@@ -605,12 +616,12 @@ const (
 	QuoteChar_disabled     QuoteChar = "disabled"
 )
 
-type RecrawlBehavior string
+type RECRawlBehavior string
 
 const (
-	RecrawlBehavior_CRAWL_EVERYTHING       RecrawlBehavior = "CRAWL_EVERYTHING"
-	RecrawlBehavior_CRAWL_NEW_FOLDERS_ONLY RecrawlBehavior = "CRAWL_NEW_FOLDERS_ONLY"
-	RecrawlBehavior_CRAWL_EVENT_MODE       RecrawlBehavior = "CRAWL_EVENT_MODE"
+	RECRawlBehavior_CRAWL_EVERYTHING       RECRawlBehavior = "CRAWL_EVERYTHING"
+	RECRawlBehavior_CRAWL_NEW_FOLDERS_ONLY RECRawlBehavior = "CRAWL_NEW_FOLDERS_ONLY"
+	RECRawlBehavior_CRAWL_EVENT_MODE       RECRawlBehavior = "CRAWL_EVENT_MODE"
 )
 
 type RegistryStatus string

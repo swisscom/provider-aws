@@ -379,6 +379,14 @@ const (
 	SettingName_fargateFIPSMode                 SettingName = "fargateFIPSMode"
 	SettingName_tagResourceAuthorization        SettingName = "tagResourceAuthorization"
 	SettingName_fargateTaskRetirementWaitPeriod SettingName = "fargateTaskRetirementWaitPeriod"
+	SettingName_guardDutyActivate               SettingName = "guardDutyActivate"
+)
+
+type SettingType string
+
+const (
+	SettingType_user        SettingType = "user"
+	SettingType_aws_managed SettingType = "aws_managed"
 )
 
 type SortOrder string

@@ -84,6 +84,10 @@ func (e *external) Observe(ctx context.Context, mg cpresource.Managed) (managed.
 	if err != nil {
 		return managed.ExternalObservation{ResourceExists: false}, errorutils.Wrap(cpresource.Ignore(IsNotFound, err), errDescribe)
 	}
+	resp = e.filterList(cr, resp)
+	if len(resp.Services) == 0 {
+		return managed.ExternalObservation{ResourceExists: false}, nil
+	}
 	currentSpec := cr.Spec.ForProvider.DeepCopy()
 	if err := e.lateInitialize(&cr.Spec.ForProvider, resp); err != nil {
 		return managed.ExternalObservation{}, errors.Wrap(err, "late-init failed")
@@ -828,6 +832,7 @@ func newExternal(kube client.Client, client svcsdkapi.ECSAPI, opts []option) *ex
 		postObserve:    nopPostObserve,
 		lateInitialize: nopLateInitialize,
 		isUpToDate:     alwaysUpToDate,
+		filterList:     nopFilterList,
 		preCreate:      nopPreCreate,
 		postCreate:     nopPostCreate,
 		preDelete:      nopPreDelete,
@@ -846,6 +851,7 @@ type external struct {
 	client         svcsdkapi.ECSAPI
 	preObserve     func(context.Context, *svcapitypes.Service, *svcsdk.DescribeServicesInput) error
 	postObserve    func(context.Context, *svcapitypes.Service, *svcsdk.DescribeServicesOutput, managed.ExternalObservation, error) (managed.ExternalObservation, error)
+	filterList     func(*svcapitypes.Service, *svcsdk.DescribeServicesOutput) *svcsdk.DescribeServicesOutput
 	lateInitialize func(*svcapitypes.ServiceParameters, *svcsdk.DescribeServicesOutput) error
 	isUpToDate     func(context.Context, *svcapitypes.Service, *svcsdk.DescribeServicesOutput) (bool, string, error)
 	preCreate      func(context.Context, *svcapitypes.Service, *svcsdk.CreateServiceInput) error
@@ -859,10 +865,13 @@ type external struct {
 func nopPreObserve(context.Context, *svcapitypes.Service, *svcsdk.DescribeServicesInput) error {
 	return nil
 }
-
 func nopPostObserve(_ context.Context, _ *svcapitypes.Service, _ *svcsdk.DescribeServicesOutput, obs managed.ExternalObservation, err error) (managed.ExternalObservation, error) {
 	return obs, err
 }
+func nopFilterList(_ *svcapitypes.Service, list *svcsdk.DescribeServicesOutput) *svcsdk.DescribeServicesOutput {
+	return list
+}
+
 func nopLateInitialize(*svcapitypes.ServiceParameters, *svcsdk.DescribeServicesOutput) error {
 	return nil
 }

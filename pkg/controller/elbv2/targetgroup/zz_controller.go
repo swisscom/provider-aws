@@ -163,7 +163,7 @@ func (e *external) Create(ctx context.Context, mg cpresource.Managed) (managed.E
 			if f0iter.Matcher != nil {
 				f0elemf9 := &svcapitypes.Matcher{}
 				if f0iter.Matcher.GrpcCode != nil {
-					f0elemf9.GrpcCode = f0iter.Matcher.GrpcCode
+					f0elemf9.GRPCCode = f0iter.Matcher.GrpcCode
 				}
 				if f0iter.Matcher.HttpCode != nil {
 					f0elemf9.HTTPCode = f0iter.Matcher.HttpCode

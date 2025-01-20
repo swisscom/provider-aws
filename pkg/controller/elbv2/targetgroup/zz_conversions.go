@@ -91,7 +91,7 @@ func GenerateTargetGroup(resp *svcsdk.DescribeTargetGroupsOutput) *svcapitypes.T
 		if elem.Matcher != nil {
 			f9 := &svcapitypes.Matcher{}
 			if elem.Matcher.GrpcCode != nil {
-				f9.GrpcCode = elem.Matcher.GrpcCode
+				f9.GRPCCode = elem.Matcher.GrpcCode
 			}
 			if elem.Matcher.HttpCode != nil {
 				f9.HTTPCode = elem.Matcher.HttpCode
@@ -170,8 +170,8 @@ func GenerateCreateTargetGroupInput(cr *svcapitypes.TargetGroup) *svcsdk.CreateT
 	}
 	if cr.Spec.ForProvider.Matcher != nil {
 		f8 := &svcsdk.Matcher{}
-		if cr.Spec.ForProvider.Matcher.GrpcCode != nil {
-			f8.SetGrpcCode(*cr.Spec.ForProvider.Matcher.GrpcCode)
+		if cr.Spec.ForProvider.Matcher.GRPCCode != nil {
+			f8.SetGrpcCode(*cr.Spec.ForProvider.Matcher.GRPCCode)
 		}
 		if cr.Spec.ForProvider.Matcher.HTTPCode != nil {
 			f8.SetHttpCode(*cr.Spec.ForProvider.Matcher.HTTPCode)
@@ -244,8 +244,8 @@ func GenerateModifyTargetGroupInput(cr *svcapitypes.TargetGroup) *svcsdk.ModifyT
 	}
 	if cr.Spec.ForProvider.Matcher != nil {
 		f7 := &svcsdk.Matcher{}
-		if cr.Spec.ForProvider.Matcher.GrpcCode != nil {
-			f7.SetGrpcCode(*cr.Spec.ForProvider.Matcher.GrpcCode)
+		if cr.Spec.ForProvider.Matcher.GRPCCode != nil {
+			f7.SetGrpcCode(*cr.Spec.ForProvider.Matcher.GRPCCode)
 		}
 		if cr.Spec.ForProvider.Matcher.HTTPCode != nil {
 			f7.SetHttpCode(*cr.Spec.ForProvider.Matcher.HTTPCode)

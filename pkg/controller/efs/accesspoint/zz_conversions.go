@@ -87,7 +87,7 @@ func GenerateAccessPoint(resp *svcsdk.DescribeAccessPointsOutput) *svcapitypes.A
 		if elem.PosixUser != nil {
 			f7 := &svcapitypes.PosixUser{}
 			if elem.PosixUser.Gid != nil {
-				f7.Gid = elem.PosixUser.Gid
+				f7.GID = elem.PosixUser.Gid
 			}
 			if elem.PosixUser.SecondaryGids != nil {
 				f7f1 := []*int64{}
@@ -96,10 +96,10 @@ func GenerateAccessPoint(resp *svcsdk.DescribeAccessPointsOutput) *svcapitypes.A
 					f7f1elem = *f7f1iter
 					f7f1 = append(f7f1, &f7f1elem)
 				}
-				f7.SecondaryGids = f7f1
+				f7.SecondaryGIDs = f7f1
 			}
 			if elem.PosixUser.Uid != nil {
-				f7.Uid = elem.PosixUser.Uid
+				f7.UID = elem.PosixUser.Uid
 			}
 			cr.Spec.ForProvider.PosixUser = f7
 		} else {
@@ -110,10 +110,10 @@ func GenerateAccessPoint(resp *svcsdk.DescribeAccessPointsOutput) *svcapitypes.A
 			if elem.RootDirectory.CreationInfo != nil {
 				f8f0 := &svcapitypes.CreationInfo{}
 				if elem.RootDirectory.CreationInfo.OwnerGid != nil {
-					f8f0.OwnerGid = elem.RootDirectory.CreationInfo.OwnerGid
+					f8f0.OwnerGID = elem.RootDirectory.CreationInfo.OwnerGid
 				}
 				if elem.RootDirectory.CreationInfo.OwnerUid != nil {
-					f8f0.OwnerUid = elem.RootDirectory.CreationInfo.OwnerUid
+					f8f0.OwnerUID = elem.RootDirectory.CreationInfo.OwnerUid
 				}
 				if elem.RootDirectory.CreationInfo.Permissions != nil {
 					f8f0.Permissions = elem.RootDirectory.CreationInfo.Permissions
@@ -159,20 +159,20 @@ func GenerateCreateAccessPointInput(cr *svcapitypes.AccessPoint) *svcsdk.CreateA
 
 	if cr.Spec.ForProvider.PosixUser != nil {
 		f0 := &svcsdk.PosixUser{}
-		if cr.Spec.ForProvider.PosixUser.Gid != nil {
-			f0.SetGid(*cr.Spec.ForProvider.PosixUser.Gid)
+		if cr.Spec.ForProvider.PosixUser.GID != nil {
+			f0.SetGid(*cr.Spec.ForProvider.PosixUser.GID)
 		}
-		if cr.Spec.ForProvider.PosixUser.SecondaryGids != nil {
+		if cr.Spec.ForProvider.PosixUser.SecondaryGIDs != nil {
 			f0f1 := []*int64{}
-			for _, f0f1iter := range cr.Spec.ForProvider.PosixUser.SecondaryGids {
+			for _, f0f1iter := range cr.Spec.ForProvider.PosixUser.SecondaryGIDs {
 				var f0f1elem int64
 				f0f1elem = *f0f1iter
 				f0f1 = append(f0f1, &f0f1elem)
 			}
 			f0.SetSecondaryGids(f0f1)
 		}
-		if cr.Spec.ForProvider.PosixUser.Uid != nil {
-			f0.SetUid(*cr.Spec.ForProvider.PosixUser.Uid)
+		if cr.Spec.ForProvider.PosixUser.UID != nil {
+			f0.SetUid(*cr.Spec.ForProvider.PosixUser.UID)
 		}
 		res.SetPosixUser(f0)
 	}
@@ -180,11 +180,11 @@ func GenerateCreateAccessPointInput(cr *svcapitypes.AccessPoint) *svcsdk.CreateA
 		f1 := &svcsdk.RootDirectory{}
 		if cr.Spec.ForProvider.RootDirectory.CreationInfo != nil {
 			f1f0 := &svcsdk.CreationInfo{}
-			if cr.Spec.ForProvider.RootDirectory.CreationInfo.OwnerGid != nil {
-				f1f0.SetOwnerGid(*cr.Spec.ForProvider.RootDirectory.CreationInfo.OwnerGid)
+			if cr.Spec.ForProvider.RootDirectory.CreationInfo.OwnerGID != nil {
+				f1f0.SetOwnerGid(*cr.Spec.ForProvider.RootDirectory.CreationInfo.OwnerGID)
 			}
-			if cr.Spec.ForProvider.RootDirectory.CreationInfo.OwnerUid != nil {
-				f1f0.SetOwnerUid(*cr.Spec.ForProvider.RootDirectory.CreationInfo.OwnerUid)
+			if cr.Spec.ForProvider.RootDirectory.CreationInfo.OwnerUID != nil {
+				f1f0.SetOwnerUid(*cr.Spec.ForProvider.RootDirectory.CreationInfo.OwnerUID)
 			}
 			if cr.Spec.ForProvider.RootDirectory.CreationInfo.Permissions != nil {
 				f1f0.SetPermissions(*cr.Spec.ForProvider.RootDirectory.CreationInfo.Permissions)

@@ -911,6 +911,11 @@ func (in *DBClusterParameters) DeepCopyInto(out *DBClusterParameters) {
 		*out = new(bool)
 		**out = **in
 	}
+	if in.StorageType != nil {
+		in, out := &in.StorageType, &out.StorageType
+		*out = new(string)
+		**out = **in
+	}
 	if in.Tags != nil {
 		in, out := &in.Tags, &out.Tags
 		*out = make([]*Tag, len(*in))
@@ -1056,6 +1061,11 @@ func (in *DBClusterSnapshot) DeepCopyInto(out *DBClusterSnapshot) {
 	if in.StorageEncrypted != nil {
 		in, out := &in.StorageEncrypted, &out.StorageEncrypted
 		*out = new(bool)
+		**out = **in
+	}
+	if in.StorageType != nil {
+		in, out := &in.StorageType, &out.StorageType
+		*out = new(string)
 		**out = **in
 	}
 	if in.VPCID != nil {
@@ -1332,6 +1342,11 @@ func (in *DBCluster_SDK) DeepCopyInto(out *DBCluster_SDK) {
 	if in.StorageEncrypted != nil {
 		in, out := &in.StorageEncrypted, &out.StorageEncrypted
 		*out = new(bool)
+		**out = **in
+	}
+	if in.StorageType != nil {
+		in, out := &in.StorageType, &out.StorageType
+		*out = new(string)
 		**out = **in
 	}
 	if in.VPCSecurityGroups != nil {
@@ -2458,6 +2473,11 @@ func (in *OrderableDBInstanceOption) DeepCopyInto(out *OrderableDBInstanceOption
 	}
 	if in.LicenseModel != nil {
 		in, out := &in.LicenseModel, &out.LicenseModel
+		*out = new(string)
+		**out = **in
+	}
+	if in.StorageType != nil {
+		in, out := &in.StorageType, &out.StorageType
 		*out = new(string)
 		**out = **in
 	}

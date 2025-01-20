@@ -3,7 +3,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.14.0
+    controller-gen.kubebuilder.io/version: v0.16.0
   name: webacls.wafv2.aws.crossplane.io
 spec:
   group: wafv2.aws.crossplane.io
@@ -78,11 +78,9 @@ spec:
                       Specifies custom configurations for the associations between the web ACL
                       and protected resources.
 
-
                       Use this to customize the maximum size of the request body that your protected
                       CloudFront distributions forward to WAF for inspection. The default is 16
                       KB (16,384 bytes).
-
 
                       You are charged additional fees when your protected resources forward body
                       sizes that are larger than the default. For more information, see WAF Pricing
@@ -144,11 +142,9 @@ spec:
                       define these for the web ACL, and then use them in the rules and default
                       actions that you define in the web ACL.
 
-
                       For information about customizing web requests and responses, see Customizing
                       web requests and responses in WAF (https://docs.aws.amazon.com/waf/latest/developerguide/waf-custom-request-response.html)
                       in the WAF Developer Guide.
-
 
                       For information about the limits on count and size for custom request and
                       response settings, see WAF quotas (https://docs.aws.amazon.com/waf/latest/developerguide/limits.html)
@@ -163,7 +159,6 @@ spec:
                           Specifies that WAF should allow the request and optionally defines additional
                           custom handling for the request.
 
-
                           This is used in the context of other settings, for example to specify values
                           for RuleAction and web ACL DefaultAction.
                         properties:
@@ -173,7 +168,6 @@ spec:
                               You can add custom request handling for WAF to use when the rule action doesn't
                               block the request. For example, CaptchaAction for requests with valid t okens,
                               and AllowAction.
-
 
                               For information about customizing web requests and responses, see Customizing
                               web requests and responses in WAF (https://docs.aws.amazon.com/waf/latest/developerguide/waf-custom-request-response.html)
@@ -195,7 +189,6 @@ spec:
                           Specifies that WAF should block the request and optionally defines additional
                           custom handling for the response to the web request.
 
-
                           This is used in the context of other settings, for example to specify values
                           for RuleAction and web ACL DefaultAction.
                         properties:
@@ -203,7 +196,6 @@ spec:
                             description: |-
                               A custom response to send to the client. You can define a custom response
                               for rule actions and default web ACL actions that are set to BlockAction.
-
 
                               For information about customizing web requests and responses, see Customizing
                               web requests and responses in WAF (https://docs.aws.amazon.com/waf/latest/developerguide/waf-custom-request-response.html)
@@ -229,6 +221,11 @@ spec:
                   description:
                     description: A description of the web ACL that helps with identification.
                     type: string
+                  name:
+                    description: |-
+                      The name of the web ACL. You cannot change the name of a web ACL after you
+                      create it.
+                    type: string
                   region:
                     description: Region is which region the WebACL will be created.
                     type: string
@@ -249,7 +246,6 @@ spec:
                                 Specifies that WAF should allow the request and optionally defines additional
                                 custom handling for the request.
 
-
                                 This is used in the context of other settings, for example to specify values
                                 for RuleAction and web ACL DefaultAction.
                               properties:
@@ -259,7 +255,6 @@ spec:
                                     You can add custom request handling for WAF to use when the rule action doesn't
                                     block the request. For example, CaptchaAction for requests with valid t okens,
                                     and AllowAction.
-
 
                                     For information about customizing web requests and responses, see Customizing
                                     web requests and responses in WAF (https://docs.aws.amazon.com/waf/latest/developerguide/waf-custom-request-response.html)
@@ -281,7 +276,6 @@ spec:
                                 Specifies that WAF should block the request and optionally defines additional
                                 custom handling for the response to the web request.
 
-
                                 This is used in the context of other settings, for example to specify values
                                 for RuleAction and web ACL DefaultAction.
                               properties:
@@ -289,7 +283,6 @@ spec:
                                   description: |-
                                     A custom response to send to the client. You can define a custom response
                                     for rule actions and default web ACL actions that are set to BlockAction.
-
 
                                     For information about customizing web requests and responses, see Customizing
                                     web requests and responses in WAF (https://docs.aws.amazon.com/waf/latest/developerguide/waf-custom-request-response.html)
@@ -315,12 +308,10 @@ spec:
                               description: |-
                                 Specifies that WAF should run a CAPTCHA check against the request:
 
-
                                    * If the request includes a valid, unexpired CAPTCHA token, WAF applies
                                    any custom request handling and labels that you've configured and then
                                    allows the web request inspection to proceed to the next rule, similar
                                    to a CountAction.
-
 
                                    * If the request doesn't include a valid, unexpired token, WAF discontinues
                                    the web ACL evaluation of the request and blocks it from going to its
@@ -330,11 +321,9 @@ spec:
                                    request contains an Accept header with a value of text/html, the response
                                    includes a CAPTCHA JavaScript page interstitial.
 
-
                                 You can configure the expiration time in the CaptchaConfig ImmunityTimeProperty
                                 setting at the rule and web ACL level. The rule setting overrides the web
                                 ACL setting.
-
 
                                 This action option is available for rules. It isn't available for web ACL
                                 default actions.
@@ -345,7 +334,6 @@ spec:
                                     You can add custom request handling for WAF to use when the rule action doesn't
                                     block the request. For example, CaptchaAction for requests with valid t okens,
                                     and AllowAction.
-
 
                                     For information about customizing web requests and responses, see Customizing
                                     web requests and responses in WAF (https://docs.aws.amazon.com/waf/latest/developerguide/waf-custom-request-response.html)
@@ -367,12 +355,10 @@ spec:
                                 Specifies that WAF should run a Challenge check against the request to verify
                                 that the request is coming from a legitimate client session:
 
-
                                    * If the request includes a valid, unexpired challenge token, WAF applies
                                    any custom request handling and labels that you've configured and then
                                    allows the web request inspection to proceed to the next rule, similar
                                    to a CountAction.
-
 
                                    * If the request doesn't include a valid, unexpired challenge token, WAF
                                    discontinues the web ACL evaluation of the request and blocks it from
@@ -390,11 +376,9 @@ spec:
                                    it receives a new token from WAF, which the challenge script uses to resubmit
                                    the original request.
 
-
                                 You can configure the expiration time in the ChallengeConfig ImmunityTimeProperty
                                 setting at the rule and web ACL level. The rule setting overrides the web
                                 ACL setting.
-
 
                                 This action option is available for rules. It isn't available for web ACL
                                 default actions.
@@ -405,7 +389,6 @@ spec:
                                     You can add custom request handling for WAF to use when the rule action doesn't
                                     block the request. For example, CaptchaAction for requests with valid t okens,
                                     and AllowAction.
-
 
                                     For information about customizing web requests and responses, see Customizing
                                     web requests and responses in WAF (https://docs.aws.amazon.com/waf/latest/developerguide/waf-custom-request-response.html)
@@ -427,7 +410,6 @@ spec:
                                 Specifies that WAF should count the request. Optionally defines additional
                                 custom handling for the request.
 
-
                                 This is used in the context of other settings, for example to specify values
                                 for RuleAction and web ACL DefaultAction.
                               properties:
@@ -437,7 +419,6 @@ spec:
                                     You can add custom request handling for WAF to use when the rule action doesn't
                                     block the request. For example, CaptchaAction for requests with valid t okens,
                                     and AllowAction.
-
 
                                     For information about customizing web requests and responses, see Customizing
                                     web requests and responses in WAF (https://docs.aws.amazon.com/waf/latest/developerguide/waf-custom-request-response.html)
@@ -495,10 +476,8 @@ spec:
                             evaluation. Set the override action to none to leave the result of the rule
                             group alone. Set it to count to override the result to count only.
 
-
                             You can only use this for rule statements that reference a rule group, like
                             RuleGroupReferenceStatement and ManagedRuleGroupStatement.
-
 
                             This option is usually set to none. It does not affect how the rules in the
                             rule group are evaluated. If you want the rules in the rule group to only
@@ -510,7 +489,6 @@ spec:
                                 Specifies that WAF should count the request. Optionally defines additional
                                 custom handling for the request.
 
-
                                 This is used in the context of other settings, for example to specify values
                                 for RuleAction and web ACL DefaultAction.
                               properties:
@@ -520,7 +498,6 @@ spec:
                                     You can add custom request handling for WAF to use when the rule action doesn't
                                     block the request. For example, CaptchaAction for requests with valid t okens,
                                     and AllowAction.
-
 
                                     For information about customizing web requests and responses, see Customizing
                                     web requests and responses in WAF (https://docs.aws.amazon.com/waf/latest/developerguide/waf-custom-request-response.html)
@@ -544,10 +521,8 @@ spec:
                                 Specifies that WAF should do nothing. This is used for the OverrideAction
                                 setting on a Rule when the rule uses a rule group reference statement.
 
-
                                 This is used in the context of other settings, for example to specify values
                                 for RuleAction and web ACL DefaultAction.
-
 
                                 JSON specification: "None": {}
                               type: object
@@ -566,7 +541,6 @@ spec:
                           description: |-
                             The processing guidance for a Rule, used by WAF to determine whether a web
                             request matches the rule.
-
 
                             For example specifications, see the examples section of CreateWebACL.
                           properties:
@@ -590,15 +564,11 @@ spec:
                                     than one component of the web request, create a separate rule statement for
                                     each component.
 
-
                                     Example JSON for a QueryString field to match:
-
 
                                     "FieldToMatch": { "QueryString": {} }
 
-
                                     Example JSON for a Method field to match specification:
-
 
                                     "FieldToMatch": { "Method": { "Name": "DELETE" } }
                                   properties:
@@ -608,10 +578,8 @@ spec:
                                       description: |-
                                         Inspect all query arguments of the web request.
 
-
                                         This is used in the FieldToMatch specification for some web request component
                                         types.
-
 
                                         JSON specification: "AllQueryArguments": {}
                                       type: object
@@ -619,7 +587,6 @@ spec:
                                       description: |-
                                         Inspect the body of the web request. The body immediately follows the request
                                         headers.
-
 
                                         This is used to indicate the web request component to inspect, in the FieldToMatch
                                         specification.
@@ -633,10 +600,8 @@ spec:
                                         cookies to inspect and you can narrow the set of cookies to inspect by including
                                         or excluding specific keys.
 
-
                                         This is used to indicate the web request component to inspect, in the FieldToMatch
                                         specification.
-
 
                                         Example JSON: "Cookies": { "MatchPattern": { "All": {} }, "MatchScope": "KEY",
                                         "OversizeHandling": "MATCH" }
@@ -645,9 +610,7 @@ spec:
                                           description: |-
                                             The filter to use to identify the subset of cookies to inspect in a web request.
 
-
                                             You must specify exactly one setting: either All, IncludedCookies, or ExcludedCookies.
-
 
                                             Example JSON: "MatchPattern": { "IncludedCookies": [ "session-id-time", "session-id"
                                             ] }
@@ -659,10 +622,8 @@ spec:
                                                 Inspect all of the elements that WAF has parsed and extracted from the web
                                                 request component that you've identified in your FieldToMatch specifications.
 
-
                                                 This is used in the FieldToMatch specification for some web request component
                                                 types.
-
 
                                                 JSON specification: "All": {}
                                               type: object
@@ -697,14 +658,11 @@ spec:
                                         headers to inspect and you can narrow the set of headers to inspect by including
                                         or excluding specific keys.
 
-
                                         This is used to indicate the web request component to inspect, in the FieldToMatch
                                         specification.
 
-
                                         If you want to inspect just the value of a single header, use the SingleHeader
                                         FieldToMatch setting instead.
-
 
                                         Example JSON: "Headers": { "MatchPattern": { "All": {} }, "MatchScope": "KEY",
                                         "OversizeHandling": "MATCH" }
@@ -713,9 +671,7 @@ spec:
                                           description: |-
                                             The filter to use to identify the subset of headers to inspect in a web request.
 
-
                                             You must specify exactly one setting: either All, IncludedHeaders, or ExcludedHeaders.
-
 
                                             Example JSON: "MatchPattern": { "ExcludedHeaders": [ "KeyToExclude1", "KeyToExclude2"
                                             ] }
@@ -727,10 +683,8 @@ spec:
                                                 Inspect all of the elements that WAF has parsed and extracted from the web
                                                 request component that you've identified in your FieldToMatch specifications.
 
-
                                                 This is used in the FieldToMatch specification for some web request component
                                                 types.
-
 
                                                 JSON specification: "All": {}
                                               type: object
@@ -756,16 +710,13 @@ spec:
                                         and logs this fingerprint for each request that has enough TLS Client Hello
                                         information for the calculation. Almost all web requests include this information.
 
-
                                         You can use this choice only with a string match ByteMatchStatement with
                                         the PositionalConstraint set to EXACTLY.
-
 
                                         You can obtain the JA3 fingerprint for client requests from the web ACL logs.
                                         If WAF is able to calculate the fingerprint, it includes it in the logs.
                                         For information about the logging fields, see Log fields (https://docs.aws.amazon.com/waf/latest/developerguide/logging-fields.html)
                                         in the WAF Developer Guide.
-
 
                                         Provide the JA3 fingerprint string from the logs in your string match statement
                                         specification, to match with any future requests that have the same TLS configuration.
@@ -778,15 +729,12 @@ spec:
                                         Inspect the body of the web request as JSON. The body immediately follows
                                         the request headers.
 
-
                                         This is used to indicate the web request component to inspect, in the FieldToMatch
                                         specification.
-
 
                                         Use the specifications in this object to indicate which parts of the JSON
                                         body to inspect using the rule's inspection criteria. WAF inspects only the
                                         parts of the JSON that result from the matches that you indicate.
-
 
                                         Example JSON: "JsonBody": { "MatchPattern": { "All": {} }, "MatchScope":
                                         "ALL" }
@@ -806,10 +754,8 @@ spec:
                                                 Inspect all of the elements that WAF has parsed and extracted from the web
                                                 request component that you've identified in your FieldToMatch specifications.
 
-
                                                 This is used in the FieldToMatch specification for some web request component
                                                 types.
-
 
                                                 JSON specification: "All": {}
                                               type: object
@@ -830,10 +776,8 @@ spec:
                                         Inspect the HTTP method of the web request. The method indicates the type
                                         of operation that the request is asking the origin to perform.
 
-
                                         This is used in the FieldToMatch specification for some web request component
                                         types.
-
 
                                         JSON specification: "Method": {}
                                       type: object
@@ -844,10 +788,8 @@ spec:
                                         Inspect the query string of the web request. This is the part of a URL that
                                         appears after a ? character, if any.
 
-
                                         This is used in the FieldToMatch specification for some web request component
                                         types.
-
 
                                         JSON specification: "QueryString": {}
                                       type: object
@@ -856,13 +798,10 @@ spec:
                                         Inspect one of the headers in the web request, identified by name, for example,
                                         User-Agent or Referer. The name isn't case sensitive.
 
-
                                         You can filter and inspect all headers with the FieldToMatch setting Headers.
-
 
                                         This is used to indicate the web request component to inspect, in the FieldToMatch
                                         specification.
-
 
                                         Example JSON: "SingleHeader": { "Name": "haystack" }
                                       properties:
@@ -874,10 +813,8 @@ spec:
                                         Inspect one query argument in the web request, identified by name, for example
                                         UserName or SalesRegion. The name isn't case sensitive.
 
-
                                         This is used to indicate the web request component to inspect, in the FieldToMatch
                                         specification.
-
 
                                         Example JSON: "SingleQueryArgument": { "Name": "myArgument" }
                                       properties:
@@ -891,10 +828,8 @@ spec:
                                         Inspect the path component of the URI of the web request. This is the part
                                         of the web request that identifies a resource. For example, /images/daily-ad.jpg.
 
-
                                         This is used in the FieldToMatch specification for some web request component
                                         types.
-
 
                                         JSON specification: "UriPath": {}
                                       type: object
@@ -921,33 +856,27 @@ spec:
                                 matches against web requests based on country code. A geo match rule labels
                                 every request that it inspects regardless of whether it finds a match.
 
-
                                    * To manage requests only by country, you can use this statement by itself
                                    and specify the countries that you want to match against in the CountryCodes
                                    array.
-
 
                                    * Otherwise, configure your geo match rule with Count action so that it
                                    only labels requests. Then, add one or more label match rules to run after
                                    the geo match rule and configure them to match against the geographic
                                    labels and handle the requests as needed.
 
-
                                 WAF labels requests using the alpha-2 country and region codes from the International
                                 Organization for Standardization (ISO) 3166 standard. WAF determines the
                                 codes using either the IP address in the web request origin or, if you specify
                                 it, the address in the geo match ForwardedIPConfig.
 
-
                                 If you use the web request origin, the label formats are awswaf:clientip:geo:region:<ISO
                                 country code>-<ISO region code> and awswaf:clientip:geo:country:<ISO country
                                 code>.
 
-
                                 If you use a forwarded IP address, the label formats are awswaf:forwardedip:geo:region:<ISO
                                 country code>-<ISO region code> and awswaf:forwardedip:geo:country:<ISO country
                                 code>.
-
 
                                 For additional details, see Geographic match rule statement (https://docs.aws.amazon.com/waf/latest/developerguide/waf-rule-statement-type-geo-match.html)
                                 in the WAF Developer Guide (https://docs.aws.amazon.com/waf/latest/developerguide/waf-chapter.html).
@@ -963,14 +892,11 @@ spec:
                                     origin. Commonly, this is the X-Forwarded-For (XFF) header, but you can specify
                                     any header name.
 
-
                                     If the specified header isn't present in the request, WAF doesn't apply the
                                     rule to the web request at all.
 
-
                                     This configuration is used for GeoMatchStatement and RateBasedStatement.
                                     For IPSetReferenceStatement, use IPSetForwardedIPConfig instead.
-
 
                                     WAF only evaluates the first IP address found in the specified HTTP header.
                                   properties:
@@ -987,7 +913,6 @@ spec:
                                 you want to detect, then use the ARN of that set in this statement. To create
                                 an IP set, see CreateIPSet.
 
-
                                 Each IP set rule statement references an IP set. You create and maintain
                                 the set independent of your rules. This allows you to use the single set
                                 in multiple rules. When you update the referenced set, WAF automatically
@@ -1002,10 +927,8 @@ spec:
                                     origin. Commonly, this is the X-Forwarded-For (XFF) header, but you can specify
                                     any header name.
 
-
                                     If the specified header isn't present in the request, WAF doesn't apply the
                                     rule to the web request at all.
-
 
                                     This configuration is used only for IPSetReferenceStatement. For GeoMatchStatement
                                     and RateBasedStatement, use ForwardedIPConfig instead.
@@ -1022,7 +945,6 @@ spec:
                               description: |-
                                 A rule statement to match against labels that have been added to the web
                                 request by rules that have already run in the web ACL.
-
 
                                 The label match statement provides the label or namespace string to search
                                 for. The label string can represent a part or all of the fully qualified
@@ -1044,12 +966,10 @@ spec:
                                 group. To use this, provide the vendor name and the name of the rule group
                                 in this statement. You can retrieve the required names by calling ListAvailableManagedRuleGroups.
 
-
                                 You cannot nest a ManagedRuleGroupStatement, for example for use inside a
                                 NotStatement or OrStatement. You cannot use a managed rule group inside another
                                 rule group. You can only reference a managed rule group as a top-level statement
                                 within a rule that you define in a web ACL.
-
 
                                 You are charged additional fees when you use the WAF Bot Control managed
                                 rule group AWSManagedRulesBotControlRuleSet, the WAF Fraud Control account
@@ -1083,9 +1003,7 @@ spec:
                                               The criteria for inspecting account creation requests, used by the ACFP rule
                                               group to validate and track account creation attempts.
 
-
                                               This is part of the AWSManagedRulesACFPRuleSet configuration in ManagedRuleGroupConfig.
-
 
                                               In these settings, you specify how your application accepts account creation
                                               attempts by providing the request payload type and the names of the fields
@@ -1104,7 +1022,6 @@ spec:
                                                   The name of the field in the request payload that contains your customer's
                                                   email.
 
-
                                                   This data type is used in the RequestInspectionACFP data type.
                                                 properties:
                                                   identifier:
@@ -1114,7 +1031,6 @@ spec:
                                                 description: |-
                                                   The name of the field in the request payload that contains your customer's
                                                   password.
-
 
                                                   This data type is used in the RequestInspection and RequestInspectionACFP
                                                   data types.
@@ -1136,7 +1052,6 @@ spec:
                                                   The name of the field in the request payload that contains your customer's
                                                   username.
 
-
                                                   This data type is used in the RequestInspection and RequestInspectionACFP
                                                   data types.
                                                 properties:
@@ -1150,10 +1065,8 @@ spec:
                                               requests, used by the ATP and ACFP rule groups to track login and account
                                               creation success and failure rates.
 
-
                                               Response inspection is available only in web ACLs that protect Amazon CloudFront
                                               distributions.
-
 
                                               The rule groups evaluates the responses that your protected resources send
                                               back to client login and account creation attempts, keeping count of successful
@@ -1161,10 +1074,8 @@ spec:
                                               the rule group labels and mitigates requests from client sessions and IP
                                               addresses with too much suspicious activity in a short amount of time.
 
-
                                               This is part of the AWSManagedRulesATPRuleSet and AWSManagedRulesACFPRuleSet
                                               configurations in ManagedRuleGroupConfig.
-
 
                                               Enable response inspection by configuring exactly one component of the response
                                               to inspect, for example, Header or StatusCode. You can't configure more than
@@ -1176,7 +1087,6 @@ spec:
                                                   Configures inspection of the response body. WAF can inspect the first 65,536
                                                   bytes (64 KB) of the response body. This is part of the ResponseInspection
                                                   configuration for AWSManagedRulesATPRuleSet and AWSManagedRulesACFPRuleSet.
-
 
                                                   Response inspection is available only in web ACLs that protect Amazon CloudFront
                                                   distributions.
@@ -1194,7 +1104,6 @@ spec:
                                                 description: |-
                                                   Configures inspection of the response header. This is part of the ResponseInspection
                                                   configuration for AWSManagedRulesATPRuleSet and AWSManagedRulesACFPRuleSet.
-
 
                                                   Response inspection is available only in web ACLs that protect Amazon CloudFront
                                                   distributions.
@@ -1216,7 +1125,6 @@ spec:
                                                   bytes (64 KB) of the response JSON. This is part of the ResponseInspection
                                                   configuration for AWSManagedRulesATPRuleSet and AWSManagedRulesACFPRuleSet.
 
-
                                                   Response inspection is available only in web ACLs that protect Amazon CloudFront
                                                   distributions.
                                                 properties:
@@ -1235,7 +1143,6 @@ spec:
                                                 description: |-
                                                   Configures inspection of the response status code. This is part of the ResponseInspection
                                                   configuration for AWSManagedRulesATPRuleSet and AWSManagedRulesACFPRuleSet.
-
 
                                                   Response inspection is available only in web ACLs that protect Amazon CloudFront
                                                   distributions.
@@ -1267,9 +1174,7 @@ spec:
                                               The criteria for inspecting login requests, used by the ATP rule group to
                                               validate credentials usage.
 
-
                                               This is part of the AWSManagedRulesATPRuleSet configuration in ManagedRuleGroupConfig.
-
 
                                               In these settings, you specify how your application accepts login attempts
                                               by providing the request payload type and the names of the fields within
@@ -1279,7 +1184,6 @@ spec:
                                                 description: |-
                                                   The name of the field in the request payload that contains your customer's
                                                   password.
-
 
                                                   This data type is used in the RequestInspection and RequestInspectionACFP
                                                   data types.
@@ -1294,7 +1198,6 @@ spec:
                                                   The name of the field in the request payload that contains your customer's
                                                   username.
 
-
                                                   This data type is used in the RequestInspection and RequestInspectionACFP
                                                   data types.
                                                 properties:
@@ -1308,10 +1211,8 @@ spec:
                                               requests, used by the ATP and ACFP rule groups to track login and account
                                               creation success and failure rates.
 
-
                                               Response inspection is available only in web ACLs that protect Amazon CloudFront
                                               distributions.
-
 
                                               The rule groups evaluates the responses that your protected resources send
                                               back to client login and account creation attempts, keeping count of successful
@@ -1319,10 +1220,8 @@ spec:
                                               the rule group labels and mitigates requests from client sessions and IP
                                               addresses with too much suspicious activity in a short amount of time.
 
-
                                               This is part of the AWSManagedRulesATPRuleSet and AWSManagedRulesACFPRuleSet
                                               configurations in ManagedRuleGroupConfig.
-
 
                                               Enable response inspection by configuring exactly one component of the response
                                               to inspect, for example, Header or StatusCode. You can't configure more than
@@ -1334,7 +1233,6 @@ spec:
                                                   Configures inspection of the response body. WAF can inspect the first 65,536
                                                   bytes (64 KB) of the response body. This is part of the ResponseInspection
                                                   configuration for AWSManagedRulesATPRuleSet and AWSManagedRulesACFPRuleSet.
-
 
                                                   Response inspection is available only in web ACLs that protect Amazon CloudFront
                                                   distributions.
@@ -1352,7 +1250,6 @@ spec:
                                                 description: |-
                                                   Configures inspection of the response header. This is part of the ResponseInspection
                                                   configuration for AWSManagedRulesATPRuleSet and AWSManagedRulesACFPRuleSet.
-
 
                                                   Response inspection is available only in web ACLs that protect Amazon CloudFront
                                                   distributions.
@@ -1374,7 +1271,6 @@ spec:
                                                   bytes (64 KB) of the response JSON. This is part of the ResponseInspection
                                                   configuration for AWSManagedRulesATPRuleSet and AWSManagedRulesACFPRuleSet.
 
-
                                                   Response inspection is available only in web ACLs that protect Amazon CloudFront
                                                   distributions.
                                                 properties:
@@ -1393,7 +1289,6 @@ spec:
                                                 description: |-
                                                   Configures inspection of the response status code. This is part of the ResponseInspection
                                                   configuration for AWSManagedRulesATPRuleSet and AWSManagedRulesACFPRuleSet.
-
 
                                                   Response inspection is available only in web ACLs that protect Amazon CloudFront
                                                   distributions.
@@ -1428,7 +1323,6 @@ spec:
                                           The name of the field in the request payload that contains your customer's
                                           password.
 
-
                                           This data type is used in the RequestInspection and RequestInspectionACFP
                                           data types.
                                         properties:
@@ -1441,7 +1335,6 @@ spec:
                                         description: |-
                                           The name of the field in the request payload that contains your customer's
                                           username.
-
 
                                           This data type is used in the RequestInspection and RequestInspectionACFP
                                           data types.
@@ -1466,7 +1359,6 @@ spec:
                                               Specifies that WAF should allow the request and optionally defines additional
                                               custom handling for the request.
 
-
                                               This is used in the context of other settings, for example to specify values
                                               for RuleAction and web ACL DefaultAction.
                                             properties:
@@ -1476,7 +1368,6 @@ spec:
                                                   You can add custom request handling for WAF to use when the rule action doesn't
                                                   block the request. For example, CaptchaAction for requests with valid t okens,
                                                   and AllowAction.
-
 
                                                   For information about customizing web requests and responses, see Customizing
                                                   web requests and responses in WAF (https://docs.aws.amazon.com/waf/latest/developerguide/waf-custom-request-response.html)
@@ -1498,7 +1389,6 @@ spec:
                                               Specifies that WAF should block the request and optionally defines additional
                                               custom handling for the response to the web request.
 
-
                                               This is used in the context of other settings, for example to specify values
                                               for RuleAction and web ACL DefaultAction.
                                             properties:
@@ -1506,7 +1396,6 @@ spec:
                                                 description: |-
                                                   A custom response to send to the client. You can define a custom response
                                                   for rule actions and default web ACL actions that are set to BlockAction.
-
 
                                                   For information about customizing web requests and responses, see Customizing
                                                   web requests and responses in WAF (https://docs.aws.amazon.com/waf/latest/developerguide/waf-custom-request-response.html)
@@ -1532,12 +1421,10 @@ spec:
                                             description: |-
                                               Specifies that WAF should run a CAPTCHA check against the request:
 
-
                                                  * If the request includes a valid, unexpired CAPTCHA token, WAF applies
                                                  any custom request handling and labels that you've configured and then
                                                  allows the web request inspection to proceed to the next rule, similar
                                                  to a CountAction.
-
 
                                                  * If the request doesn't include a valid, unexpired token, WAF discontinues
                                                  the web ACL evaluation of the request and blocks it from going to its
@@ -1547,11 +1434,9 @@ spec:
                                                  request contains an Accept header with a value of text/html, the response
                                                  includes a CAPTCHA JavaScript page interstitial.
 
-
                                               You can configure the expiration time in the CaptchaConfig ImmunityTimeProperty
                                               setting at the rule and web ACL level. The rule setting overrides the web
                                               ACL setting.
-
 
                                               This action option is available for rules. It isn't available for web ACL
                                               default actions.
@@ -1562,7 +1447,6 @@ spec:
                                                   You can add custom request handling for WAF to use when the rule action doesn't
                                                   block the request. For example, CaptchaAction for requests with valid t okens,
                                                   and AllowAction.
-
 
                                                   For information about customizing web requests and responses, see Customizing
                                                   web requests and responses in WAF (https://docs.aws.amazon.com/waf/latest/developerguide/waf-custom-request-response.html)
@@ -1584,12 +1468,10 @@ spec:
                                               Specifies that WAF should run a Challenge check against the request to verify
                                               that the request is coming from a legitimate client session:
 
-
                                                  * If the request includes a valid, unexpired challenge token, WAF applies
                                                  any custom request handling and labels that you've configured and then
                                                  allows the web request inspection to proceed to the next rule, similar
                                                  to a CountAction.
-
 
                                                  * If the request doesn't include a valid, unexpired challenge token, WAF
                                                  discontinues the web ACL evaluation of the request and blocks it from
@@ -1607,11 +1489,9 @@ spec:
                                                  it receives a new token from WAF, which the challenge script uses to resubmit
                                                  the original request.
 
-
                                               You can configure the expiration time in the ChallengeConfig ImmunityTimeProperty
                                               setting at the rule and web ACL level. The rule setting overrides the web
                                               ACL setting.
-
 
                                               This action option is available for rules. It isn't available for web ACL
                                               default actions.
@@ -1622,7 +1502,6 @@ spec:
                                                   You can add custom request handling for WAF to use when the rule action doesn't
                                                   block the request. For example, CaptchaAction for requests with valid t okens,
                                                   and AllowAction.
-
 
                                                   For information about customizing web requests and responses, see Customizing
                                                   web requests and responses in WAF (https://docs.aws.amazon.com/waf/latest/developerguide/waf-custom-request-response.html)
@@ -1644,7 +1523,6 @@ spec:
                                               Specifies that WAF should count the request. Optionally defines additional
                                               custom handling for the request.
 
-
                                               This is used in the context of other settings, for example to specify values
                                               for RuleAction and web ACL DefaultAction.
                                             properties:
@@ -1654,7 +1532,6 @@ spec:
                                                   You can add custom request handling for WAF to use when the rule action doesn't
                                                   block the request. For example, CaptchaAction for requests with valid t okens,
                                                   and AllowAction.
-
 
                                                   For information about customizing web requests and responses, see Customizing
                                                   web requests and responses in WAF (https://docs.aws.amazon.com/waf/latest/developerguide/waf-custom-request-response.html)
@@ -1694,36 +1571,27 @@ spec:
                                 to your aggregation criteria, collects them into aggregation instances, and
                                 counts and rate limits the requests for each instance.
 
-
                                 You can specify individual aggregation keys, like IP address or HTTP method.
                                 You can also specify aggregation key combinations, like IP address and HTTP
                                 method, or HTTP method, query argument, and cookie.
-
 
                                 Each unique set of values for the aggregation keys that you specify is a
                                 separate aggregation instance, with the value from each key contributing
                                 to the aggregation instance definition.
 
-
                                 For example, assume the rule evaluates web requests with the following IP
                                 address and HTTP method values:
 
-
                                    * IP address 10.1.1.1, HTTP method POST
 
-
                                    * IP address 10.1.1.1, HTTP method GET
-
 
                                    * IP address 127.0.0.0, HTTP method POST
 
-
                                    * IP address 10.1.1.1, HTTP method GET
-
 
                                 The rule would create different aggregation instances according to your aggregation
                                 criteria, for example:
-
 
                                    * If the aggregation criteria is just the IP address, then each individual
                                    address is an aggregation instance, and WAF counts requests separately
@@ -1731,12 +1599,10 @@ spec:
                                    would be the following: IP address 10.1.1.1: count 3 IP address 127.0.0.0:
                                    count 1
 
-
                                    * If the aggregation criteria is HTTP method, then each individual HTTP
                                    method is an aggregation instance. The aggregation instances and request
                                    counts for our example would be the following: HTTP method POST: count
                                    2 HTTP method GET: count 2
-
 
                                    * If the aggregation criteria is IP address and HTTP method, then each
                                    IP address and each HTTP method would contribute to the combined aggregation
@@ -1745,11 +1611,9 @@ spec:
                                    IP address 10.1.1.1, HTTP method GET: count 2 IP address 127.0.0.0, HTTP
                                    method POST: count 1
 
-
                                 For any n-tuple of aggregation keys, each unique combination of values for
                                 the keys defines a separate aggregation instance, which WAF counts and rate-limits
                                 individually.
-
 
                                 You can optionally nest another statement inside the rate-based statement,
                                 to narrow the scope of the rule so that it only counts and rate limits requests
@@ -1760,22 +1624,18 @@ spec:
                                 match a scope-down statement, the aggregation instance is singular for the
                                 rule.
 
-
                                 You cannot nest a RateBasedStatement inside another statement, for example
                                 inside a NotStatement or OrStatement. You can define a RateBasedStatement
                                 inside a web ACL and inside a rule group.
-
 
                                 For additional information about the options, see Rate limiting web requests
                                 using rate-based rules (https://docs.aws.amazon.com/waf/latest/developerguide/waf-rate-based-rules.html)
                                 in the WAF Developer Guide.
 
-
                                 If you only aggregate on the individual IP address or forwarded IP address,
                                 you can retrieve the list of IP addresses that WAF is currently rate limiting
                                 for a rule through the API call GetRateBasedStatementManagedKeys. This option
                                 is not available for other aggregation configurations.
-
 
                                 WAF tracks and manages web requests separately for each instance of a rate-based
                                 rule that you use. For example, if you provide the same rate-based rule settings
@@ -1818,22 +1678,18 @@ spec:
                                           a rate-based rule. Each distinct forwarded IP address contributes to the
                                           aggregation instance.
 
-
                                           This setting is used only in the RateBasedStatementCustomKey specification
                                           of a rate-based rule statement. When you specify an IP or forwarded IP in
                                           the custom key settings, you must also specify at least one other key to
                                           use. You can aggregate on only the forwarded IP address by specifying FORWARDED_IP
                                           in your rate-based statement's AggregateKeyType.
 
-
                                           This data type supports using the forwarded IP address in the web request
                                           aggregation for a rate-based rule, in RateBasedStatementCustomKey. The JSON
                                           specification for using the forwarded IP address doesn't explicitly use this
                                           data type.
 
-
                                           JSON specification: "ForwardedIP": {}
-
 
                                           When you use this specification, you must also configure the forwarded IP
                                           address in the rate-based statement's ForwardedIPConfig.
@@ -1867,7 +1723,6 @@ spec:
                                           If you use just the HTTP method as your custom key, then each method fully
                                           defines an aggregation instance.
 
-
                                           JSON specification: "RateLimitHTTPMethod": {}
                                         type: object
                                       iP:
@@ -1877,13 +1732,11 @@ spec:
                                           Specifies the IP address in the web request as an aggregate key for a rate-based
                                           rule. Each distinct IP address contributes to the aggregation instance.
 
-
                                           This setting is used only in the RateBasedStatementCustomKey specification
                                           of a rate-based rule statement. To use this in the custom key settings, you
                                           must specify at least one other key to use, along with the IP address. To
                                           aggregate on only the IP address, in your rate-based statement's AggregateKeyType,
                                           specify IP.
-
 
                                           JSON specification: "RateLimitIP": {}
                                         type: object
@@ -1894,10 +1747,8 @@ spec:
                                           contributes to the aggregation instance. If you use just one label namespace
                                           as your custom key, then each label name fully defines an aggregation instance.
 
-
                                           This uses only labels that have been added to the request by rules that are
                                           evaluated before this rate-based rule in the web ACL.
-
 
                                           For information about label namespaces and names, see Label syntax and naming
                                           requirements (https://docs.aws.amazon.com/waf/latest/developerguide/waf-rule-label-requirements.html)
@@ -1971,14 +1822,11 @@ spec:
                                     origin. Commonly, this is the X-Forwarded-For (XFF) header, but you can specify
                                     any header name.
 
-
                                     If the specified header isn't present in the request, WAF doesn't apply the
                                     rule to the web request at all.
 
-
                                     This configuration is used for GeoMatchStatement and RateBasedStatement.
                                     For IPSetReferenceStatement, use IPSetForwardedIPConfig instead.
-
 
                                     WAF only evaluates the first IP address found in the specified HTTP header.
                                   properties:
@@ -2007,15 +1855,11 @@ spec:
                                     than one component of the web request, create a separate rule statement for
                                     each component.
 
-
                                     Example JSON for a QueryString field to match:
-
 
                                     "FieldToMatch": { "QueryString": {} }
 
-
                                     Example JSON for a Method field to match specification:
-
 
                                     "FieldToMatch": { "Method": { "Name": "DELETE" } }
                                   properties:
@@ -2025,10 +1869,8 @@ spec:
                                       description: |-
                                         Inspect all query arguments of the web request.
 
-
                                         This is used in the FieldToMatch specification for some web request component
                                         types.
-
 
                                         JSON specification: "AllQueryArguments": {}
                                       type: object
@@ -2036,7 +1878,6 @@ spec:
                                       description: |-
                                         Inspect the body of the web request. The body immediately follows the request
                                         headers.
-
 
                                         This is used to indicate the web request component to inspect, in the FieldToMatch
                                         specification.
@@ -2050,10 +1891,8 @@ spec:
                                         cookies to inspect and you can narrow the set of cookies to inspect by including
                                         or excluding specific keys.
 
-
                                         This is used to indicate the web request component to inspect, in the FieldToMatch
                                         specification.
-
 
                                         Example JSON: "Cookies": { "MatchPattern": { "All": {} }, "MatchScope": "KEY",
                                         "OversizeHandling": "MATCH" }
@@ -2062,9 +1901,7 @@ spec:
                                           description: |-
                                             The filter to use to identify the subset of cookies to inspect in a web request.
 
-
                                             You must specify exactly one setting: either All, IncludedCookies, or ExcludedCookies.
-
 
                                             Example JSON: "MatchPattern": { "IncludedCookies": [ "session-id-time", "session-id"
                                             ] }
@@ -2076,10 +1913,8 @@ spec:
                                                 Inspect all of the elements that WAF has parsed and extracted from the web
                                                 request component that you've identified in your FieldToMatch specifications.
 
-
                                                 This is used in the FieldToMatch specification for some web request component
                                                 types.
-
 
                                                 JSON specification: "All": {}
                                               type: object
@@ -2114,14 +1949,11 @@ spec:
                                         headers to inspect and you can narrow the set of headers to inspect by including
                                         or excluding specific keys.
 
-
                                         This is used to indicate the web request component to inspect, in the FieldToMatch
                                         specification.
 
-
                                         If you want to inspect just the value of a single header, use the SingleHeader
                                         FieldToMatch setting instead.
-
 
                                         Example JSON: "Headers": { "MatchPattern": { "All": {} }, "MatchScope": "KEY",
                                         "OversizeHandling": "MATCH" }
@@ -2130,9 +1962,7 @@ spec:
                                           description: |-
                                             The filter to use to identify the subset of headers to inspect in a web request.
 
-
                                             You must specify exactly one setting: either All, IncludedHeaders, or ExcludedHeaders.
-
 
                                             Example JSON: "MatchPattern": { "ExcludedHeaders": [ "KeyToExclude1", "KeyToExclude2"
                                             ] }
@@ -2144,10 +1974,8 @@ spec:
                                                 Inspect all of the elements that WAF has parsed and extracted from the web
                                                 request component that you've identified in your FieldToMatch specifications.
 
-
                                                 This is used in the FieldToMatch specification for some web request component
                                                 types.
-
 
                                                 JSON specification: "All": {}
                                               type: object
@@ -2173,16 +2001,13 @@ spec:
                                         and logs this fingerprint for each request that has enough TLS Client Hello
                                         information for the calculation. Almost all web requests include this information.
 
-
                                         You can use this choice only with a string match ByteMatchStatement with
                                         the PositionalConstraint set to EXACTLY.
-
 
                                         You can obtain the JA3 fingerprint for client requests from the web ACL logs.
                                         If WAF is able to calculate the fingerprint, it includes it in the logs.
                                         For information about the logging fields, see Log fields (https://docs.aws.amazon.com/waf/latest/developerguide/logging-fields.html)
                                         in the WAF Developer Guide.
-
 
                                         Provide the JA3 fingerprint string from the logs in your string match statement
                                         specification, to match with any future requests that have the same TLS configuration.
@@ -2195,15 +2020,12 @@ spec:
                                         Inspect the body of the web request as JSON. The body immediately follows
                                         the request headers.
 
-
                                         This is used to indicate the web request component to inspect, in the FieldToMatch
                                         specification.
-
 
                                         Use the specifications in this object to indicate which parts of the JSON
                                         body to inspect using the rule's inspection criteria. WAF inspects only the
                                         parts of the JSON that result from the matches that you indicate.
-
 
                                         Example JSON: "JsonBody": { "MatchPattern": { "All": {} }, "MatchScope":
                                         "ALL" }
@@ -2223,10 +2045,8 @@ spec:
                                                 Inspect all of the elements that WAF has parsed and extracted from the web
                                                 request component that you've identified in your FieldToMatch specifications.
 
-
                                                 This is used in the FieldToMatch specification for some web request component
                                                 types.
-
 
                                                 JSON specification: "All": {}
                                               type: object
@@ -2247,10 +2067,8 @@ spec:
                                         Inspect the HTTP method of the web request. The method indicates the type
                                         of operation that the request is asking the origin to perform.
 
-
                                         This is used in the FieldToMatch specification for some web request component
                                         types.
-
 
                                         JSON specification: "Method": {}
                                       type: object
@@ -2261,10 +2079,8 @@ spec:
                                         Inspect the query string of the web request. This is the part of a URL that
                                         appears after a ? character, if any.
 
-
                                         This is used in the FieldToMatch specification for some web request component
                                         types.
-
 
                                         JSON specification: "QueryString": {}
                                       type: object
@@ -2273,13 +2089,10 @@ spec:
                                         Inspect one of the headers in the web request, identified by name, for example,
                                         User-Agent or Referer. The name isn't case sensitive.
 
-
                                         You can filter and inspect all headers with the FieldToMatch setting Headers.
-
 
                                         This is used to indicate the web request component to inspect, in the FieldToMatch
                                         specification.
-
 
                                         Example JSON: "SingleHeader": { "Name": "haystack" }
                                       properties:
@@ -2291,10 +2104,8 @@ spec:
                                         Inspect one query argument in the web request, identified by name, for example
                                         UserName or SalesRegion. The name isn't case sensitive.
 
-
                                         This is used to indicate the web request component to inspect, in the FieldToMatch
                                         specification.
-
 
                                         Example JSON: "SingleQueryArgument": { "Name": "myArgument" }
                                       properties:
@@ -2308,10 +2119,8 @@ spec:
                                         Inspect the path component of the URI of the web request. This is the part
                                         of the web request that identifies a resource. For example, /images/daily-ad.jpg.
 
-
                                         This is used in the FieldToMatch specification for some web request component
                                         types.
-
 
                                         JSON specification: "UriPath": {}
                                       type: object
@@ -2338,7 +2147,6 @@ spec:
                                 matches any of the patterns in the set. To create a regex pattern set, see
                                 CreateRegexPatternSet.
 
-
                                 Each regex pattern set rule statement references a regex pattern set. You
                                 create and maintain the set independent of your rules. This allows you to
                                 use the single set in multiple rules. When you update the referenced set,
@@ -2355,15 +2163,11 @@ spec:
                                     than one component of the web request, create a separate rule statement for
                                     each component.
 
-
                                     Example JSON for a QueryString field to match:
-
 
                                     "FieldToMatch": { "QueryString": {} }
 
-
                                     Example JSON for a Method field to match specification:
-
 
                                     "FieldToMatch": { "Method": { "Name": "DELETE" } }
                                   properties:
@@ -2373,10 +2177,8 @@ spec:
                                       description: |-
                                         Inspect all query arguments of the web request.
 
-
                                         This is used in the FieldToMatch specification for some web request component
                                         types.
-
 
                                         JSON specification: "AllQueryArguments": {}
                                       type: object
@@ -2384,7 +2186,6 @@ spec:
                                       description: |-
                                         Inspect the body of the web request. The body immediately follows the request
                                         headers.
-
 
                                         This is used to indicate the web request component to inspect, in the FieldToMatch
                                         specification.
@@ -2398,10 +2199,8 @@ spec:
                                         cookies to inspect and you can narrow the set of cookies to inspect by including
                                         or excluding specific keys.
 
-
                                         This is used to indicate the web request component to inspect, in the FieldToMatch
                                         specification.
-
 
                                         Example JSON: "Cookies": { "MatchPattern": { "All": {} }, "MatchScope": "KEY",
                                         "OversizeHandling": "MATCH" }
@@ -2410,9 +2209,7 @@ spec:
                                           description: |-
                                             The filter to use to identify the subset of cookies to inspect in a web request.
 
-
                                             You must specify exactly one setting: either All, IncludedCookies, or ExcludedCookies.
-
 
                                             Example JSON: "MatchPattern": { "IncludedCookies": [ "session-id-time", "session-id"
                                             ] }
@@ -2424,10 +2221,8 @@ spec:
                                                 Inspect all of the elements that WAF has parsed and extracted from the web
                                                 request component that you've identified in your FieldToMatch specifications.
 
-
                                                 This is used in the FieldToMatch specification for some web request component
                                                 types.
-
 
                                                 JSON specification: "All": {}
                                               type: object
@@ -2462,14 +2257,11 @@ spec:
                                         headers to inspect and you can narrow the set of headers to inspect by including
                                         or excluding specific keys.
 
-
                                         This is used to indicate the web request component to inspect, in the FieldToMatch
                                         specification.
 
-
                                         If you want to inspect just the value of a single header, use the SingleHeader
                                         FieldToMatch setting instead.
-
 
                                         Example JSON: "Headers": { "MatchPattern": { "All": {} }, "MatchScope": "KEY",
                                         "OversizeHandling": "MATCH" }
@@ -2478,9 +2270,7 @@ spec:
                                           description: |-
                                             The filter to use to identify the subset of headers to inspect in a web request.
 
-
                                             You must specify exactly one setting: either All, IncludedHeaders, or ExcludedHeaders.
-
 
                                             Example JSON: "MatchPattern": { "ExcludedHeaders": [ "KeyToExclude1", "KeyToExclude2"
                                             ] }
@@ -2492,10 +2282,8 @@ spec:
                                                 Inspect all of the elements that WAF has parsed and extracted from the web
                                                 request component that you've identified in your FieldToMatch specifications.
 
-
                                                 This is used in the FieldToMatch specification for some web request component
                                                 types.
-
 
                                                 JSON specification: "All": {}
                                               type: object
@@ -2521,16 +2309,13 @@ spec:
                                         and logs this fingerprint for each request that has enough TLS Client Hello
                                         information for the calculation. Almost all web requests include this information.
 
-
                                         You can use this choice only with a string match ByteMatchStatement with
                                         the PositionalConstraint set to EXACTLY.
-
 
                                         You can obtain the JA3 fingerprint for client requests from the web ACL logs.
                                         If WAF is able to calculate the fingerprint, it includes it in the logs.
                                         For information about the logging fields, see Log fields (https://docs.aws.amazon.com/waf/latest/developerguide/logging-fields.html)
                                         in the WAF Developer Guide.
-
 
                                         Provide the JA3 fingerprint string from the logs in your string match statement
                                         specification, to match with any future requests that have the same TLS configuration.
@@ -2543,15 +2328,12 @@ spec:
                                         Inspect the body of the web request as JSON. The body immediately follows
                                         the request headers.
 
-
                                         This is used to indicate the web request component to inspect, in the FieldToMatch
                                         specification.
-
 
                                         Use the specifications in this object to indicate which parts of the JSON
                                         body to inspect using the rule's inspection criteria. WAF inspects only the
                                         parts of the JSON that result from the matches that you indicate.
-
 
                                         Example JSON: "JsonBody": { "MatchPattern": { "All": {} }, "MatchScope":
                                         "ALL" }
@@ -2571,10 +2353,8 @@ spec:
                                                 Inspect all of the elements that WAF has parsed and extracted from the web
                                                 request component that you've identified in your FieldToMatch specifications.
 
-
                                                 This is used in the FieldToMatch specification for some web request component
                                                 types.
-
 
                                                 JSON specification: "All": {}
                                               type: object
@@ -2595,10 +2375,8 @@ spec:
                                         Inspect the HTTP method of the web request. The method indicates the type
                                         of operation that the request is asking the origin to perform.
 
-
                                         This is used in the FieldToMatch specification for some web request component
                                         types.
-
 
                                         JSON specification: "Method": {}
                                       type: object
@@ -2609,10 +2387,8 @@ spec:
                                         Inspect the query string of the web request. This is the part of a URL that
                                         appears after a ? character, if any.
 
-
                                         This is used in the FieldToMatch specification for some web request component
                                         types.
-
 
                                         JSON specification: "QueryString": {}
                                       type: object
@@ -2621,13 +2397,10 @@ spec:
                                         Inspect one of the headers in the web request, identified by name, for example,
                                         User-Agent or Referer. The name isn't case sensitive.
 
-
                                         You can filter and inspect all headers with the FieldToMatch setting Headers.
-
 
                                         This is used to indicate the web request component to inspect, in the FieldToMatch
                                         specification.
-
 
                                         Example JSON: "SingleHeader": { "Name": "haystack" }
                                       properties:
@@ -2639,10 +2412,8 @@ spec:
                                         Inspect one query argument in the web request, identified by name, for example
                                         UserName or SalesRegion. The name isn't case sensitive.
 
-
                                         This is used to indicate the web request component to inspect, in the FieldToMatch
                                         specification.
-
 
                                         Example JSON: "SingleQueryArgument": { "Name": "myArgument" }
                                       properties:
@@ -2656,10 +2427,8 @@ spec:
                                         Inspect the path component of the URI of the web request. This is the part
                                         of the web request that identifies a resource. For example, /images/daily-ad.jpg.
 
-
                                         This is used in the FieldToMatch specification for some web request component
                                         types.
-
 
                                         JSON specification: "UriPath": {}
                                       type: object
@@ -2680,7 +2449,6 @@ spec:
                                 A rule statement used to run the rules that are defined in a RuleGroup. To
                                 use this, create a rule group with your rules, then provide the ARN of the
                                 rule group in this statement.
-
 
                                 You cannot nest a RuleGroupReferenceStatement, for example for use inside
                                 a NotStatement or OrStatement. You cannot use a rule group reference statement
@@ -2709,7 +2477,6 @@ spec:
                                               Specifies that WAF should allow the request and optionally defines additional
                                               custom handling for the request.
 
-
                                               This is used in the context of other settings, for example to specify values
                                               for RuleAction and web ACL DefaultAction.
                                             properties:
@@ -2719,7 +2486,6 @@ spec:
                                                   You can add custom request handling for WAF to use when the rule action doesn't
                                                   block the request. For example, CaptchaAction for requests with valid t okens,
                                                   and AllowAction.
-
 
                                                   For information about customizing web requests and responses, see Customizing
                                                   web requests and responses in WAF (https://docs.aws.amazon.com/waf/latest/developerguide/waf-custom-request-response.html)
@@ -2741,7 +2507,6 @@ spec:
                                               Specifies that WAF should block the request and optionally defines additional
                                               custom handling for the response to the web request.
 
-
                                               This is used in the context of other settings, for example to specify values
                                               for RuleAction and web ACL DefaultAction.
                                             properties:
@@ -2749,7 +2514,6 @@ spec:
                                                 description: |-
                                                   A custom response to send to the client. You can define a custom response
                                                   for rule actions and default web ACL actions that are set to BlockAction.
-
 
                                                   For information about customizing web requests and responses, see Customizing
                                                   web requests and responses in WAF (https://docs.aws.amazon.com/waf/latest/developerguide/waf-custom-request-response.html)
@@ -2775,12 +2539,10 @@ spec:
                                             description: |-
                                               Specifies that WAF should run a CAPTCHA check against the request:
 
-
                                                  * If the request includes a valid, unexpired CAPTCHA token, WAF applies
                                                  any custom request handling and labels that you've configured and then
                                                  allows the web request inspection to proceed to the next rule, similar
                                                  to a CountAction.
-
 
                                                  * If the request doesn't include a valid, unexpired token, WAF discontinues
                                                  the web ACL evaluation of the request and blocks it from going to its
@@ -2790,11 +2552,9 @@ spec:
                                                  request contains an Accept header with a value of text/html, the response
                                                  includes a CAPTCHA JavaScript page interstitial.
 
-
                                               You can configure the expiration time in the CaptchaConfig ImmunityTimeProperty
                                               setting at the rule and web ACL level. The rule setting overrides the web
                                               ACL setting.
-
 
                                               This action option is available for rules. It isn't available for web ACL
                                               default actions.
@@ -2805,7 +2565,6 @@ spec:
                                                   You can add custom request handling for WAF to use when the rule action doesn't
                                                   block the request. For example, CaptchaAction for requests with valid t okens,
                                                   and AllowAction.
-
 
                                                   For information about customizing web requests and responses, see Customizing
                                                   web requests and responses in WAF (https://docs.aws.amazon.com/waf/latest/developerguide/waf-custom-request-response.html)
@@ -2827,12 +2586,10 @@ spec:
                                               Specifies that WAF should run a Challenge check against the request to verify
                                               that the request is coming from a legitimate client session:
 
-
                                                  * If the request includes a valid, unexpired challenge token, WAF applies
                                                  any custom request handling and labels that you've configured and then
                                                  allows the web request inspection to proceed to the next rule, similar
                                                  to a CountAction.
-
 
                                                  * If the request doesn't include a valid, unexpired challenge token, WAF
                                                  discontinues the web ACL evaluation of the request and blocks it from
@@ -2850,11 +2607,9 @@ spec:
                                                  it receives a new token from WAF, which the challenge script uses to resubmit
                                                  the original request.
 
-
                                               You can configure the expiration time in the ChallengeConfig ImmunityTimeProperty
                                               setting at the rule and web ACL level. The rule setting overrides the web
                                               ACL setting.
-
 
                                               This action option is available for rules. It isn't available for web ACL
                                               default actions.
@@ -2865,7 +2620,6 @@ spec:
                                                   You can add custom request handling for WAF to use when the rule action doesn't
                                                   block the request. For example, CaptchaAction for requests with valid t okens,
                                                   and AllowAction.
-
 
                                                   For information about customizing web requests and responses, see Customizing
                                                   web requests and responses in WAF (https://docs.aws.amazon.com/waf/latest/developerguide/waf-custom-request-response.html)
@@ -2887,7 +2641,6 @@ spec:
                                               Specifies that WAF should count the request. Optionally defines additional
                                               custom handling for the request.
 
-
                                               This is used in the context of other settings, for example to specify values
                                               for RuleAction and web ACL DefaultAction.
                                             properties:
@@ -2897,7 +2650,6 @@ spec:
                                                   You can add custom request handling for WAF to use when the rule action doesn't
                                                   block the request. For example, CaptchaAction for requests with valid t okens,
                                                   and AllowAction.
-
 
                                                   For information about customizing web requests and responses, see Customizing
                                                   web requests and responses in WAF (https://docs.aws.amazon.com/waf/latest/developerguide/waf-custom-request-response.html)
@@ -2927,7 +2679,6 @@ spec:
                                 than (<). For example, you can use a size constraint statement to look for
                                 query strings that are longer than 100 bytes.
 
-
                                 If you configure WAF to inspect the request body, WAF inspects only the number
                                 of bytes of the body up to the limit for the web ACL. By default, for regional
                                 web ACLs, this limit is 8 KB (8,192 bytes) and for CloudFront web ACLs, this
@@ -2936,7 +2687,6 @@ spec:
                                 that the request body for your web requests should never exceed the inspection
                                 limit, you could use a size constraint statement to block requests that have
                                 a larger request body size.
-
 
                                 If you choose URI for the value of Part of the request to filter on, the
                                 slash (/) in the URI counts as one character. For example, the URI /logo.jpg
@@ -2953,15 +2703,11 @@ spec:
                                     than one component of the web request, create a separate rule statement for
                                     each component.
 
-
                                     Example JSON for a QueryString field to match:
-
 
                                     "FieldToMatch": { "QueryString": {} }
 
-
                                     Example JSON for a Method field to match specification:
-
 
                                     "FieldToMatch": { "Method": { "Name": "DELETE" } }
                                   properties:
@@ -2971,10 +2717,8 @@ spec:
                                       description: |-
                                         Inspect all query arguments of the web request.
 
-
                                         This is used in the FieldToMatch specification for some web request component
                                         types.
-
 
                                         JSON specification: "AllQueryArguments": {}
                                       type: object
@@ -2982,7 +2726,6 @@ spec:
                                       description: |-
                                         Inspect the body of the web request. The body immediately follows the request
                                         headers.
-
 
                                         This is used to indicate the web request component to inspect, in the FieldToMatch
                                         specification.
@@ -2996,10 +2739,8 @@ spec:
                                         cookies to inspect and you can narrow the set of cookies to inspect by including
                                         or excluding specific keys.
 
-
                                         This is used to indicate the web request component to inspect, in the FieldToMatch
                                         specification.
-
 
                                         Example JSON: "Cookies": { "MatchPattern": { "All": {} }, "MatchScope": "KEY",
                                         "OversizeHandling": "MATCH" }
@@ -3008,9 +2749,7 @@ spec:
                                           description: |-
                                             The filter to use to identify the subset of cookies to inspect in a web request.
 
-
                                             You must specify exactly one setting: either All, IncludedCookies, or ExcludedCookies.
-
 
                                             Example JSON: "MatchPattern": { "IncludedCookies": [ "session-id-time", "session-id"
                                             ] }
@@ -3022,10 +2761,8 @@ spec:
                                                 Inspect all of the elements that WAF has parsed and extracted from the web
                                                 request component that you've identified in your FieldToMatch specifications.
 
-
                                                 This is used in the FieldToMatch specification for some web request component
                                                 types.
-
 
                                                 JSON specification: "All": {}
                                               type: object
@@ -3060,14 +2797,11 @@ spec:
                                         headers to inspect and you can narrow the set of headers to inspect by including
                                         or excluding specific keys.
 
-
                                         This is used to indicate the web request component to inspect, in the FieldToMatch
                                         specification.
 
-
                                         If you want to inspect just the value of a single header, use the SingleHeader
                                         FieldToMatch setting instead.
-
 
                                         Example JSON: "Headers": { "MatchPattern": { "All": {} }, "MatchScope": "KEY",
                                         "OversizeHandling": "MATCH" }
@@ -3076,9 +2810,7 @@ spec:
                                           description: |-
                                             The filter to use to identify the subset of headers to inspect in a web request.
 
-
                                             You must specify exactly one setting: either All, IncludedHeaders, or ExcludedHeaders.
-
 
                                             Example JSON: "MatchPattern": { "ExcludedHeaders": [ "KeyToExclude1", "KeyToExclude2"
                                             ] }
@@ -3090,10 +2822,8 @@ spec:
                                                 Inspect all of the elements that WAF has parsed and extracted from the web
                                                 request component that you've identified in your FieldToMatch specifications.
 
-
                                                 This is used in the FieldToMatch specification for some web request component
                                                 types.
-
 
                                                 JSON specification: "All": {}
                                               type: object
@@ -3119,16 +2849,13 @@ spec:
                                         and logs this fingerprint for each request that has enough TLS Client Hello
                                         information for the calculation. Almost all web requests include this information.
 
-
                                         You can use this choice only with a string match ByteMatchStatement with
                                         the PositionalConstraint set to EXACTLY.
-
 
                                         You can obtain the JA3 fingerprint for client requests from the web ACL logs.
                                         If WAF is able to calculate the fingerprint, it includes it in the logs.
                                         For information about the logging fields, see Log fields (https://docs.aws.amazon.com/waf/latest/developerguide/logging-fields.html)
                                         in the WAF Developer Guide.
-
 
                                         Provide the JA3 fingerprint string from the logs in your string match statement
                                         specification, to match with any future requests that have the same TLS configuration.
@@ -3141,15 +2868,12 @@ spec:
                                         Inspect the body of the web request as JSON. The body immediately follows
                                         the request headers.
 
-
                                         This is used to indicate the web request component to inspect, in the FieldToMatch
                                         specification.
-
 
                                         Use the specifications in this object to indicate which parts of the JSON
                                         body to inspect using the rule's inspection criteria. WAF inspects only the
                                         parts of the JSON that result from the matches that you indicate.
-
 
                                         Example JSON: "JsonBody": { "MatchPattern": { "All": {} }, "MatchScope":
                                         "ALL" }
@@ -3169,10 +2893,8 @@ spec:
                                                 Inspect all of the elements that WAF has parsed and extracted from the web
                                                 request component that you've identified in your FieldToMatch specifications.
 
-
                                                 This is used in the FieldToMatch specification for some web request component
                                                 types.
-
 
                                                 JSON specification: "All": {}
                                               type: object
@@ -3193,10 +2915,8 @@ spec:
                                         Inspect the HTTP method of the web request. The method indicates the type
                                         of operation that the request is asking the origin to perform.
 
-
                                         This is used in the FieldToMatch specification for some web request component
                                         types.
-
 
                                         JSON specification: "Method": {}
                                       type: object
@@ -3207,10 +2927,8 @@ spec:
                                         Inspect the query string of the web request. This is the part of a URL that
                                         appears after a ? character, if any.
 
-
                                         This is used in the FieldToMatch specification for some web request component
                                         types.
-
 
                                         JSON specification: "QueryString": {}
                                       type: object
@@ -3219,13 +2937,10 @@ spec:
                                         Inspect one of the headers in the web request, identified by name, for example,
                                         User-Agent or Referer. The name isn't case sensitive.
 
-
                                         You can filter and inspect all headers with the FieldToMatch setting Headers.
-
 
                                         This is used to indicate the web request component to inspect, in the FieldToMatch
                                         specification.
-
 
                                         Example JSON: "SingleHeader": { "Name": "haystack" }
                                       properties:
@@ -3237,10 +2952,8 @@ spec:
                                         Inspect one query argument in the web request, identified by name, for example
                                         UserName or SalesRegion. The name isn't case sensitive.
 
-
                                         This is used to indicate the web request component to inspect, in the FieldToMatch
                                         specification.
-
 
                                         Example JSON: "SingleQueryArgument": { "Name": "myArgument" }
                                       properties:
@@ -3254,10 +2967,8 @@ spec:
                                         Inspect the path component of the URI of the web request. This is the part
                                         of the web request that identifies a resource. For example, /images/daily-ad.jpg.
 
-
                                         This is used in the FieldToMatch specification for some web request component
                                         types.
-
 
                                         JSON specification: "UriPath": {}
                                       type: object
@@ -3291,15 +3002,11 @@ spec:
                                     than one component of the web request, create a separate rule statement for
                                     each component.
 
-
                                     Example JSON for a QueryString field to match:
-
 
                                     "FieldToMatch": { "QueryString": {} }
 
-
                                     Example JSON for a Method field to match specification:
-
 
                                     "FieldToMatch": { "Method": { "Name": "DELETE" } }
                                   properties:
@@ -3309,10 +3016,8 @@ spec:
                                       description: |-
                                         Inspect all query arguments of the web request.
 
-
                                         This is used in the FieldToMatch specification for some web request component
                                         types.
-
 
                                         JSON specification: "AllQueryArguments": {}
                                       type: object
@@ -3320,7 +3025,6 @@ spec:
                                       description: |-
                                         Inspect the body of the web request. The body immediately follows the request
                                         headers.
-
 
                                         This is used to indicate the web request component to inspect, in the FieldToMatch
                                         specification.
@@ -3334,10 +3038,8 @@ spec:
                                         cookies to inspect and you can narrow the set of cookies to inspect by including
                                         or excluding specific keys.
 
-
                                         This is used to indicate the web request component to inspect, in the FieldToMatch
                                         specification.
-
 
                                         Example JSON: "Cookies": { "MatchPattern": { "All": {} }, "MatchScope": "KEY",
                                         "OversizeHandling": "MATCH" }
@@ -3346,9 +3048,7 @@ spec:
                                           description: |-
                                             The filter to use to identify the subset of cookies to inspect in a web request.
 
-
                                             You must specify exactly one setting: either All, IncludedCookies, or ExcludedCookies.
-
 
                                             Example JSON: "MatchPattern": { "IncludedCookies": [ "session-id-time", "session-id"
                                             ] }
@@ -3360,10 +3060,8 @@ spec:
                                                 Inspect all of the elements that WAF has parsed and extracted from the web
                                                 request component that you've identified in your FieldToMatch specifications.
 
-
                                                 This is used in the FieldToMatch specification for some web request component
                                                 types.
-
 
                                                 JSON specification: "All": {}
                                               type: object
@@ -3398,14 +3096,11 @@ spec:
                                         headers to inspect and you can narrow the set of headers to inspect by including
                                         or excluding specific keys.
 
-
                                         This is used to indicate the web request component to inspect, in the FieldToMatch
                                         specification.
 
-
                                         If you want to inspect just the value of a single header, use the SingleHeader
                                         FieldToMatch setting instead.
-
 
                                         Example JSON: "Headers": { "MatchPattern": { "All": {} }, "MatchScope": "KEY",
                                         "OversizeHandling": "MATCH" }
@@ -3414,9 +3109,7 @@ spec:
                                           description: |-
                                             The filter to use to identify the subset of headers to inspect in a web request.
 
-
                                             You must specify exactly one setting: either All, IncludedHeaders, or ExcludedHeaders.
-
 
                                             Example JSON: "MatchPattern": { "ExcludedHeaders": [ "KeyToExclude1", "KeyToExclude2"
                                             ] }
@@ -3428,10 +3121,8 @@ spec:
                                                 Inspect all of the elements that WAF has parsed and extracted from the web
                                                 request component that you've identified in your FieldToMatch specifications.
 
-
                                                 This is used in the FieldToMatch specification for some web request component
                                                 types.
-
 
                                                 JSON specification: "All": {}
                                               type: object
@@ -3457,16 +3148,13 @@ spec:
                                         and logs this fingerprint for each request that has enough TLS Client Hello
                                         information for the calculation. Almost all web requests include this information.
 
-
                                         You can use this choice only with a string match ByteMatchStatement with
                                         the PositionalConstraint set to EXACTLY.
-
 
                                         You can obtain the JA3 fingerprint for client requests from the web ACL logs.
                                         If WAF is able to calculate the fingerprint, it includes it in the logs.
                                         For information about the logging fields, see Log fields (https://docs.aws.amazon.com/waf/latest/developerguide/logging-fields.html)
                                         in the WAF Developer Guide.
-
 
                                         Provide the JA3 fingerprint string from the logs in your string match statement
                                         specification, to match with any future requests that have the same TLS configuration.
@@ -3479,15 +3167,12 @@ spec:
                                         Inspect the body of the web request as JSON. The body immediately follows
                                         the request headers.
 
-
                                         This is used to indicate the web request component to inspect, in the FieldToMatch
                                         specification.
-
 
                                         Use the specifications in this object to indicate which parts of the JSON
                                         body to inspect using the rule's inspection criteria. WAF inspects only the
                                         parts of the JSON that result from the matches that you indicate.
-
 
                                         Example JSON: "JsonBody": { "MatchPattern": { "All": {} }, "MatchScope":
                                         "ALL" }
@@ -3507,10 +3192,8 @@ spec:
                                                 Inspect all of the elements that WAF has parsed and extracted from the web
                                                 request component that you've identified in your FieldToMatch specifications.
 
-
                                                 This is used in the FieldToMatch specification for some web request component
                                                 types.
-
 
                                                 JSON specification: "All": {}
                                               type: object
@@ -3531,10 +3214,8 @@ spec:
                                         Inspect the HTTP method of the web request. The method indicates the type
                                         of operation that the request is asking the origin to perform.
 
-
                                         This is used in the FieldToMatch specification for some web request component
                                         types.
-
 
                                         JSON specification: "Method": {}
                                       type: object
@@ -3545,10 +3226,8 @@ spec:
                                         Inspect the query string of the web request. This is the part of a URL that
                                         appears after a ? character, if any.
 
-
                                         This is used in the FieldToMatch specification for some web request component
                                         types.
-
 
                                         JSON specification: "QueryString": {}
                                       type: object
@@ -3557,13 +3236,10 @@ spec:
                                         Inspect one of the headers in the web request, identified by name, for example,
                                         User-Agent or Referer. The name isn't case sensitive.
 
-
                                         You can filter and inspect all headers with the FieldToMatch setting Headers.
-
 
                                         This is used to indicate the web request component to inspect, in the FieldToMatch
                                         specification.
-
 
                                         Example JSON: "SingleHeader": { "Name": "haystack" }
                                       properties:
@@ -3575,10 +3251,8 @@ spec:
                                         Inspect one query argument in the web request, identified by name, for example
                                         UserName or SalesRegion. The name isn't case sensitive.
 
-
                                         This is used to indicate the web request component to inspect, in the FieldToMatch
                                         specification.
-
 
                                         Example JSON: "SingleQueryArgument": { "Name": "myArgument" }
                                       properties:
@@ -3592,10 +3266,8 @@ spec:
                                         Inspect the path component of the URI of the web request. This is the part
                                         of the web request that identifies a resource. For example, /images/daily-ad.jpg.
 
-
                                         This is used in the FieldToMatch specification for some web request component
                                         types.
-
 
                                         JSON specification: "UriPath": {}
                                       type: object
@@ -3628,15 +3300,11 @@ spec:
                                     than one component of the web request, create a separate rule statement for
                                     each component.
 
-
                                     Example JSON for a QueryString field to match:
-
 
                                     "FieldToMatch": { "QueryString": {} }
 
-
                                     Example JSON for a Method field to match specification:
-
 
                                     "FieldToMatch": { "Method": { "Name": "DELETE" } }
                                   properties:
@@ -3646,10 +3314,8 @@ spec:
                                       description: |-
                                         Inspect all query arguments of the web request.
 
-
                                         This is used in the FieldToMatch specification for some web request component
                                         types.
-
 
                                         JSON specification: "AllQueryArguments": {}
                                       type: object
@@ -3657,7 +3323,6 @@ spec:
                                       description: |-
                                         Inspect the body of the web request. The body immediately follows the request
                                         headers.
-
 
                                         This is used to indicate the web request component to inspect, in the FieldToMatch
                                         specification.
@@ -3671,10 +3336,8 @@ spec:
                                         cookies to inspect and you can narrow the set of cookies to inspect by including
                                         or excluding specific keys.
 
-
                                         This is used to indicate the web request component to inspect, in the FieldToMatch
                                         specification.
-
 
                                         Example JSON: "Cookies": { "MatchPattern": { "All": {} }, "MatchScope": "KEY",
                                         "OversizeHandling": "MATCH" }
@@ -3683,9 +3346,7 @@ spec:
                                           description: |-
                                             The filter to use to identify the subset of cookies to inspect in a web request.
 
-
                                             You must specify exactly one setting: either All, IncludedCookies, or ExcludedCookies.
-
 
                                             Example JSON: "MatchPattern": { "IncludedCookies": [ "session-id-time", "session-id"
                                             ] }
@@ -3697,10 +3358,8 @@ spec:
                                                 Inspect all of the elements that WAF has parsed and extracted from the web
                                                 request component that you've identified in your FieldToMatch specifications.
 
-
                                                 This is used in the FieldToMatch specification for some web request component
                                                 types.
-
 
                                                 JSON specification: "All": {}
                                               type: object
@@ -3735,14 +3394,11 @@ spec:
                                         headers to inspect and you can narrow the set of headers to inspect by including
                                         or excluding specific keys.
 
-
                                         This is used to indicate the web request component to inspect, in the FieldToMatch
                                         specification.
 
-
                                         If you want to inspect just the value of a single header, use the SingleHeader
                                         FieldToMatch setting instead.
-
 
                                         Example JSON: "Headers": { "MatchPattern": { "All": {} }, "MatchScope": "KEY",
                                         "OversizeHandling": "MATCH" }
@@ -3751,9 +3407,7 @@ spec:
                                           description: |-
                                             The filter to use to identify the subset of headers to inspect in a web request.
 
-
                                             You must specify exactly one setting: either All, IncludedHeaders, or ExcludedHeaders.
-
 
                                             Example JSON: "MatchPattern": { "ExcludedHeaders": [ "KeyToExclude1", "KeyToExclude2"
                                             ] }
@@ -3765,10 +3419,8 @@ spec:
                                                 Inspect all of the elements that WAF has parsed and extracted from the web
                                                 request component that you've identified in your FieldToMatch specifications.
 
-
                                                 This is used in the FieldToMatch specification for some web request component
                                                 types.
-
 
                                                 JSON specification: "All": {}
                                               type: object
@@ -3794,16 +3446,13 @@ spec:
                                         and logs this fingerprint for each request that has enough TLS Client Hello
                                         information for the calculation. Almost all web requests include this information.
 
-
                                         You can use this choice only with a string match ByteMatchStatement with
                                         the PositionalConstraint set to EXACTLY.
-
 
                                         You can obtain the JA3 fingerprint for client requests from the web ACL logs.
                                         If WAF is able to calculate the fingerprint, it includes it in the logs.
                                         For information about the logging fields, see Log fields (https://docs.aws.amazon.com/waf/latest/developerguide/logging-fields.html)
                                         in the WAF Developer Guide.
-
 
                                         Provide the JA3 fingerprint string from the logs in your string match statement
                                         specification, to match with any future requests that have the same TLS configuration.
@@ -3816,15 +3465,12 @@ spec:
                                         Inspect the body of the web request as JSON. The body immediately follows
                                         the request headers.
 
-
                                         This is used to indicate the web request component to inspect, in the FieldToMatch
                                         specification.
-
 
                                         Use the specifications in this object to indicate which parts of the JSON
                                         body to inspect using the rule's inspection criteria. WAF inspects only the
                                         parts of the JSON that result from the matches that you indicate.
-
 
                                         Example JSON: "JsonBody": { "MatchPattern": { "All": {} }, "MatchScope":
                                         "ALL" }
@@ -3844,10 +3490,8 @@ spec:
                                                 Inspect all of the elements that WAF has parsed and extracted from the web
                                                 request component that you've identified in your FieldToMatch specifications.
 
-
                                                 This is used in the FieldToMatch specification for some web request component
                                                 types.
-
 
                                                 JSON specification: "All": {}
                                               type: object
@@ -3868,10 +3512,8 @@ spec:
                                         Inspect the HTTP method of the web request. The method indicates the type
                                         of operation that the request is asking the origin to perform.
 
-
                                         This is used in the FieldToMatch specification for some web request component
                                         types.
-
 
                                         JSON specification: "Method": {}
                                       type: object
@@ -3882,10 +3524,8 @@ spec:
                                         Inspect the query string of the web request. This is the part of a URL that
                                         appears after a ? character, if any.
 
-
                                         This is used in the FieldToMatch specification for some web request component
                                         types.
-
 
                                         JSON specification: "QueryString": {}
                                       type: object
@@ -3894,13 +3534,10 @@ spec:
                                         Inspect one of the headers in the web request, identified by name, for example,
                                         User-Agent or Referer. The name isn't case sensitive.
 
-
                                         You can filter and inspect all headers with the FieldToMatch setting Headers.
-
 
                                         This is used to indicate the web request component to inspect, in the FieldToMatch
                                         specification.
-
 
                                         Example JSON: "SingleHeader": { "Name": "haystack" }
                                       properties:
@@ -3912,10 +3549,8 @@ spec:
                                         Inspect one query argument in the web request, identified by name, for example
                                         UserName or SalesRegion. The name isn't case sensitive.
 
-
                                         This is used to indicate the web request component to inspect, in the FieldToMatch
                                         specification.
-
 
                                         Example JSON: "SingleQueryArgument": { "Name": "myArgument" }
                                       properties:
@@ -3929,10 +3564,8 @@ spec:
                                         Inspect the path component of the URI of the web request. This is the part
                                         of the web request that identifies a resource. For example, /images/daily-ad.jpg.
 
-
                                         This is used in the FieldToMatch specification for some web request component
                                         types.
-
 
                                         JSON specification: "UriPath": {}
                                       type: object
@@ -3970,14 +3603,11 @@ spec:
                       Cognito user pool, an App Runner service, or an Amazon Web Services Verified
                       Access instance.
 
-
                       To work with CloudFront, you must also specify the Region US East (N. Virginia)
                       as follows:
 
-
                          * CLI - Specify the Region when you use the CloudFront scope: --scope=CLOUDFRONT
                          --region=us-east-1.
-
 
                          * API and SDKs - For all calls, use the Region endpoint us-east-1.
                     type: string
@@ -4002,9 +3632,7 @@ spec:
                       domain list, WAF accepts the resource's host domain plus all domains in the
                       token domain list, including their prefixed subdomains.
 
-
                       Example JSON: "TokenDomains": { "mywebsite.com", "myotherwebsite.com" }
-
 
                       Public suffixes aren't allowed. For example, you can't use usa.gov or co.uk
                       as token domains.
@@ -4024,6 +3652,7 @@ spec:
                     type: object
                 required:
                 - defaultAction
+                - name
                 - region
                 - scope
                 - visibilityConfig
@@ -4220,11 +3849,6 @@ spec:
                       If a change has been made, the update fails with a WAFOptimisticLockException.
                       If this happens, perform another get, and use the new token returned by that
                       operation.
-                    type: string
-                  name:
-                    description: |-
-                      The name of the web ACL. You cannot change the name of a web ACL after you
-                      create it.
                     type: string
                 type: object
               conditions:

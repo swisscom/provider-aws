@@ -577,6 +577,13 @@ const (
 	Status_Cancelling Status = "Cancelling"
 )
 
+type TargetFieldOrder string
+
+const (
+	TargetFieldOrder_LatLon TargetFieldOrder = "LatLon"
+	TargetFieldOrder_LonLat TargetFieldOrder = "LonLat"
+)
+
 type TargetSelection string
 
 const (

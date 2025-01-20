@@ -224,12 +224,12 @@ const (
 	Replacement_CONDITIONAL Replacement = "CONDITIONAL"
 )
 
-type RequiresRecreation string
+type RequiresRECReation string
 
 const (
-	RequiresRecreation_NEVER         RequiresRecreation = "NEVER"
-	RequiresRecreation_CONDITIONALLY RequiresRecreation = "CONDITIONALLY"
-	RequiresRecreation_ALWAYS        RequiresRecreation = "ALWAYS"
+	RequiresRECReation_NEVER         RequiresRECReation = "NEVER"
+	RequiresRECReation_CONDITIONALLY RequiresRECReation = "CONDITIONALLY"
+	RequiresRECReation_ALWAYS        RequiresRECReation = "ALWAYS"
 )
 
 type ResourceAttribute string

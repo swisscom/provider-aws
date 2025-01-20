@@ -51,9 +51,9 @@ func GenerateAuthorizer(resp *svcsdk.Authorizer) *svcapitypes.Authorizer {
 		cr.Spec.ForProvider.AuthorizerCredentials = nil
 	}
 	if resp.AuthorizerResultTtlInSeconds != nil {
-		cr.Spec.ForProvider.AuthorizerResultTtlInSeconds = resp.AuthorizerResultTtlInSeconds
+		cr.Spec.ForProvider.AuthorizerResultTTLInSeconds = resp.AuthorizerResultTtlInSeconds
 	} else {
-		cr.Spec.ForProvider.AuthorizerResultTtlInSeconds = nil
+		cr.Spec.ForProvider.AuthorizerResultTTLInSeconds = nil
 	}
 	if resp.AuthorizerUri != nil {
 		cr.Spec.ForProvider.AuthorizerURI = resp.AuthorizerUri
@@ -110,8 +110,8 @@ func GenerateCreateAuthorizerInput(cr *svcapitypes.Authorizer) *svcsdk.CreateAut
 	if cr.Spec.ForProvider.AuthorizerCredentials != nil {
 		res.SetAuthorizerCredentials(*cr.Spec.ForProvider.AuthorizerCredentials)
 	}
-	if cr.Spec.ForProvider.AuthorizerResultTtlInSeconds != nil {
-		res.SetAuthorizerResultTtlInSeconds(*cr.Spec.ForProvider.AuthorizerResultTtlInSeconds)
+	if cr.Spec.ForProvider.AuthorizerResultTTLInSeconds != nil {
+		res.SetAuthorizerResultTtlInSeconds(*cr.Spec.ForProvider.AuthorizerResultTTLInSeconds)
 	}
 	if cr.Spec.ForProvider.AuthorizerURI != nil {
 		res.SetAuthorizerUri(*cr.Spec.ForProvider.AuthorizerURI)

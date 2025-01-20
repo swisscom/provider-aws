@@ -95,7 +95,7 @@ import (
 	transferv1alpha1 "github.com/crossplane-contrib/provider-aws/apis/transfer/v1alpha1"
 	awsv1alpha1 "github.com/crossplane-contrib/provider-aws/apis/v1alpha1"
 	awsv1beta1 "github.com/crossplane-contrib/provider-aws/apis/v1beta1"
-	wafv2manualv1alpha1 "github.com/crossplane-contrib/provider-aws/apis/wafv2/manualv1alpha1"
+	wafv2v1alpha1 "github.com/crossplane-contrib/provider-aws/apis/wafv2/v1alpha1"
 )
 
 func init() {
@@ -176,7 +176,7 @@ func init() {
 		servicecatalogv1alpha1.SchemeBuilder.AddToScheme,
 		s3control.SchemeBuilder.AddToScheme,
 		firehosev1alpha1.SchemeBuilder.AddToScheme,
-		wafv2manualv1alpha1.SchemeBuilder.AddToScheme,
+		wafv2v1alpha1.SchemeBuilder.AddToScheme,
 	)
 }
 

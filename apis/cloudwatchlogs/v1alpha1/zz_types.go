@@ -37,6 +37,11 @@ type AccountPolicy struct {
 }
 
 // +kubebuilder:skipversion
+type AnomalyDetector struct {
+	KMSKeyID *string `json:"kmsKeyID,omitempty"`
+}
+
+// +kubebuilder:skipversion
 type Delivery struct {
 	ARN *string `json:"arn,omitempty"`
 
@@ -110,6 +115,8 @@ type LogGroup_SDK struct {
 	InheritedProperties []*string `json:"inheritedProperties,omitempty"`
 
 	KMSKeyID *string `json:"kmsKeyID,omitempty"`
+
+	LogGroupClass *string `json:"logGroupClass,omitempty"`
 
 	LogGroupName *string `json:"logGroupName,omitempty"`
 
