@@ -33,7 +33,7 @@ import (
 	"github.com/crossplane/crossplane-runtime/pkg/reconciler/managed"
 	cpresource "github.com/crossplane/crossplane-runtime/pkg/resource"
 
-	svcapitypes "github.com/crossplane-contrib/provider-aws/apis/wafv2/manualv1alpha1"
+	svcapitypes "github.com/crossplane-contrib/provider-aws/apis/wafv2/v1alpha1"
 	connectaws "github.com/crossplane-contrib/provider-aws/pkg/utils/connect/aws"
 	errorutils "github.com/crossplane-contrib/provider-aws/pkg/utils/errors"
 )

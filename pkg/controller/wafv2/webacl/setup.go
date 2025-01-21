@@ -1,5 +1,5 @@
 /*
-   Copyright 2021 The Crossplane Authors.
+   Copyright 2025 The Crossplane Authors.
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
    You may obtain a copy of the License at
@@ -37,7 +37,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/crossplane-contrib/provider-aws/apis/v1alpha1"
-	svcapitypes "github.com/crossplane-contrib/provider-aws/apis/wafv2/manualv1alpha1"
+	svcapitypes "github.com/crossplane-contrib/provider-aws/apis/wafv2/v1alpha1"
 	"github.com/crossplane-contrib/provider-aws/pkg/features"
 	connectaws "github.com/crossplane-contrib/provider-aws/pkg/utils/connect/aws"
 	errorutils "github.com/crossplane-contrib/provider-aws/pkg/utils/errors"
