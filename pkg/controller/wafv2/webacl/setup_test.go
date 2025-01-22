@@ -23,11 +23,11 @@ import (
 	"testing"
 
 	svcsdk "github.com/aws/aws-sdk-go/service/wafv2"
-	svcsdkapi "github.com/aws/aws-sdk-go/service/wafv2/wafv2iface"
 	"github.com/crossplane/crossplane-runtime/pkg/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	svcapitypes "github.com/crossplane-contrib/provider-aws/apis/wafv2/v1alpha1"
+	"github.com/crossplane-contrib/provider-aws/pkg/clients/wafv2/fake"
 )
 
 func TestIsUpToDate(t *testing.T) {
@@ -38,7 +38,7 @@ func TestIsUpToDate(t *testing.T) {
 	type args struct {
 		desired  *svcapitypes.WebACL
 		observed *svcsdk.GetWebACLOutput
-		client   svcsdkapi.WAFV2API
+		client   *fake.MockWAFV2Client
 		cache    *cache
 	}
 
@@ -51,48 +51,52 @@ func TestIsUpToDate(t *testing.T) {
 
 	scope := "REGIONAL"
 
+	tag1Key := "used-by-elb"
+	tag1Value := "true"
+
 	ruleName := "ruleName"
 	rulePriority := int64(0)
+	rulePriority1 := int64(1)
 	ruleAndStatement := ` {
-              "Statements": [
-                {
-                  "ByteMatchStatement":
-                    {
-                      "FieldToMatch": {
-                        "SingleHeader": {
-                          "Name": "User-Agent"
-                        }
-                      },
-                      "PositionalConstraint": "CONTAINS",
-                      "SearchString": "YmFkQm90",
-                      "TextTransformations": [
-                        {
-                          "Priority": 0,
-                          "Type": "NONE"
-                        }
-                      ]
-                    }
-                },
-                {
-                  "ByteMatchStatement":
-                    {
-                      "FieldToMatch": {
-                        "SingleHeader": {
-                          "Name": "User-AgentCustom"
-                        }
-                      },
-                      "PositionalConstraint": "CONTAINS",
-                      "SearchString": "YmFkQm90",
-                      "TextTransformations": [
-                        {
-                          "Priority": 1,
-                          "Type": "NONE"
-                        }
-                      ]
-                    }
-                }
-              ]
-            }`
+	              "Statements": [
+	                {
+	                  "ByteMatchStatement":
+	                    {
+	                      "FieldToMatch": {
+	                        "SingleHeader": {
+	                          "Name": "User-Agent"
+	                        }
+	                      },
+	                      "PositionalConstraint": "CONTAINS",
+	                      "SearchString": "YmFkQm90",
+	                      "TextTransformations": [
+	                        {
+	                          "Priority": 0,
+	                          "Type": "NONE"
+	                        }
+	                      ]
+	                    }
+	                },
+	                {
+	                  "ByteMatchStatement":
+	                    {
+	                      "FieldToMatch": {
+	                        "SingleHeader": {
+	                          "Name": "User-AgentCustom"
+	                        }
+	                      },
+	                      "PositionalConstraint": "CONTAINS",
+	                      "SearchString": "YmFkQm90",
+	                      "TextTransformations": [
+	                        {
+	                          "Priority": 1,
+	                          "Type": "NONE"
+	                        }
+	                      ]
+	                    }
+	                }
+	              ]
+	            }`
 
 	desiredRuleAndStatement0FieldToMatchSingleHeaderName := "User-Agent"
 	desiredRuleAndStatement0PositionalConstraint := "CONTAINS"
@@ -112,6 +116,15 @@ func TestIsUpToDate(t *testing.T) {
 	}{
 		"Same": {
 			args: args{
+				client: &fake.MockWAFV2Client{
+					MockListTagsForResource: func(input *svcsdk.ListTagsForResourceInput) (*svcsdk.ListTagsForResourceOutput, error) {
+						return &svcsdk.ListTagsForResourceOutput{
+							TagInfoForResource: &svcsdk.TagInfoForResource{TagList: []*svcsdk.Tag{
+								{Key: &tag1Key, Value: &tag1Value},
+							}},
+						}, nil
+					},
+				},
 				desired: &svcapitypes.WebACL{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: webAclName,
@@ -139,7 +152,7 @@ func TestIsUpToDate(t *testing.T) {
 										SampledRequestsEnabled:   &visibilityConfigSampledRequestsEnabled,
 										CloudWatchMetricsEnabled: &visibilityConfigCloudWatchMetricsEnabled,
 									},
-									Priority: &rulePriority,
+									Priority: &rulePriority1,
 									Action: &svcapitypes.RuleAction{
 										Allow: &svcapitypes.AllowAction{},
 									},
@@ -147,6 +160,9 @@ func TestIsUpToDate(t *testing.T) {
 										AndStatement: &ruleAndStatement,
 									},
 								},
+							},
+							Tags: []*svcapitypes.Tag{
+								{Key: &tag1Key, Value: &tag1Value},
 							},
 						},
 					},
@@ -222,12 +238,12 @@ func TestIsUpToDate(t *testing.T) {
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
 			s := shared{cache: tc.args.cache, client: tc.args.client}
-			result, _, err := s.isUpToDate(context.TODO(), tc.args.desired, tc.args.observed)
+			result, funcDiff, err := s.isUpToDate(context.TODO(), tc.args.desired, tc.args.observed)
 			if diff := cmp.Diff(err, tc.want.err, test.EquateErrors()); diff != "" {
 				t.Errorf("r: -want, +got:\n%s", diff)
 			}
 			if diff := cmp.Diff(tc.want.result, result); diff != "" {
-				t.Errorf("r: -want, +got:\n%s", diff)
+				t.Errorf("r: -want, +got:\n%s\nthe diff is %s", diff, funcDiff)
 			}
 		})
 	}

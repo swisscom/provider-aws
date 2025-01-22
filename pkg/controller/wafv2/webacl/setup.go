@@ -209,7 +209,7 @@ func (s *shared) isUpToDate(_ context.Context, cr *svcapitypes.WebACL, resp *svc
 		return false, "", err
 	}
 	diff = cmp.Diff(&svcapitypes.WebACLParameters{}, patch, cmpopts.EquateEmpty(),
-		cmpopts.IgnoreFields(svcapitypes.WebACLParameters{}, "Region"),
+		cmpopts.IgnoreFields(svcapitypes.WebACLParameters{}, "Region", "Scope"),
 	)
 	if diff != "" {
 		return false, "Found observed difference in wafv2 weback " + diff, nil
@@ -302,6 +302,15 @@ func statementFromJSONString[S Statement](jsonPointer *string) (*S, error) {
 	return &statement, nil
 }
 
+func statementToJSONString[S Statement](statement S) (*string, error) {
+	configBytes, err := json.Marshal(statement)
+	if err != nil {
+		return nil, err
+	}
+	configStr := string(configBytes)
+	return &configStr, nil
+}
+
 func setInputRuleStatementsFromJSON(cr *svcapitypes.WebACL, rules []*svcsdk.Rule) (err error) {
 	for i, rule := range cr.Spec.ForProvider.Rules {
 		if rule.Statement.OrStatement != nil {
@@ -342,6 +351,43 @@ func createPatch(currentParams *svcapitypes.WebACLParameters, resp *svcsdk.GetWe
 	targetConfig := currentParams.DeepCopy()
 	externalConfig := GenerateWebACL(resp).Spec.ForProvider
 	patch := &svcapitypes.WebACLParameters{}
+	for i, respRule := range resp.WebACL.Rules {
+		if respRule.Statement.AndStatement != nil {
+			jsonString, err := statementToJSONString[svcsdk.AndStatement](*respRule.Statement.AndStatement)
+			if err != nil {
+				return patch, err
+			}
+			externalConfig.Rules[i].Statement.AndStatement = jsonString
+		}
+		if respRule.Statement.OrStatement != nil {
+			jsonString, err := statementToJSONString[svcsdk.OrStatement](*respRule.Statement.OrStatement)
+			if err != nil {
+				return patch, err
+			}
+			externalConfig.Rules[i].Statement.OrStatement = jsonString
+		}
+		if respRule.Statement.NotStatement != nil {
+			jsonString, err := statementToJSONString[svcsdk.NotStatement](*respRule.Statement.NotStatement)
+			if err != nil {
+				return patch, err
+			}
+			externalConfig.Rules[i].Statement.NotStatement = jsonString
+		}
+		if respRule.Statement.ManagedRuleGroupStatement != nil && respRule.Statement.ManagedRuleGroupStatement.ScopeDownStatement != nil {
+			jsonString, err := statementToJSONString[svcsdk.Statement](*respRule.Statement.ManagedRuleGroupStatement.ScopeDownStatement)
+			if err != nil {
+				return patch, err
+			}
+			externalConfig.Rules[i].Statement.ManagedRuleGroupStatement.ScopeDownStatement = jsonString
+		}
+		if respRule.Statement.RateBasedStatement != nil && respRule.Statement.RateBasedStatement.ScopeDownStatement != nil {
+			jsonString, err := statementToJSONString[svcsdk.Statement](*respRule.Statement.RateBasedStatement.ScopeDownStatement)
+			if err != nil {
+				return patch, err
+			}
+			externalConfig.Rules[i].Statement.RateBasedStatement.ScopeDownStatement = jsonString
+		}
+	}
 	for _, v := range respTagList {
 		externalConfig.Tags = append(externalConfig.Tags, &svcapitypes.Tag{Key: v.Key, Value: v.Value})
 	}
@@ -354,12 +400,3 @@ func createPatch(currentParams *svcapitypes.WebACLParameters, resp *svcsdk.GetWe
 	}
 	return patch, nil
 }
-
-//func statementToString[S Statement](statement S) (*string, error) {
-//	configBytes, err := json.Marshal(statement)
-//	if err != nil {
-//		return nil, err
-//	}
-//	configStr := string(configBytes)
-//	return &configStr, nil
-//}
