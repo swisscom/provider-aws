@@ -15,6 +15,7 @@ package webacl
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 
@@ -209,10 +210,20 @@ func (s *shared) isUpToDate(_ context.Context, cr *svcapitypes.WebACL, resp *svc
 		return false, "", err
 	}
 	diff = cmp.Diff(&svcapitypes.WebACLParameters{}, patch, cmpopts.EquateEmpty(),
+		// Scope is immutable
 		cmpopts.IgnoreFields(svcapitypes.WebACLParameters{}, "Region", "Scope"),
+		// Ignore jsonified statements
+		cmpopts.IgnoreFields(svcapitypes.Statement{}, "AndStatement", "OrStatement", "NotStatement"),
+		cmpopts.IgnoreFields(svcapitypes.ManagedRuleGroupStatement{}, "ScopeDownStatement"),
+		cmpopts.IgnoreFields(svcapitypes.RateBasedStatement{}, "ScopeDownStatement"),
 	)
+	jsonStatementsDiff, err := compareJsonifiedStatements(cr.Spec.ForProvider.Rules, resp.WebACL.Rules)
+	if err != nil {
+		return false, "", err
+	}
+	diff += jsonStatementsDiff
 	if diff != "" {
-		return false, "Found observed difference in wafv2 weback " + diff, nil
+		return false, "Found observed difference in wafv2 webacl " + diff, nil
 	}
 	return true, "", nil
 }
@@ -302,14 +313,14 @@ func statementFromJSONString[S Statement](jsonPointer *string) (*S, error) {
 	return &statement, nil
 }
 
-func statementToJSONString[S Statement](statement S) (*string, error) {
-	configBytes, err := json.Marshal(statement)
-	if err != nil {
-		return nil, err
-	}
-	configStr := string(configBytes)
-	return &configStr, nil
-}
+//func statementToJSONString[S Statement](statement S) (*string, error) {
+//	configBytes, err := json.Marshal(statement)
+//	if err != nil {
+//		return nil, err
+//	}
+//	configStr := string(configBytes)
+//	return &configStr, nil
+//}
 
 func setInputRuleStatementsFromJSON(cr *svcapitypes.WebACL, rules []*svcsdk.Rule) (err error) {
 	for i, rule := range cr.Spec.ForProvider.Rules {
@@ -351,46 +362,28 @@ func createPatch(currentParams *svcapitypes.WebACLParameters, resp *svcsdk.GetWe
 	targetConfig := currentParams.DeepCopy()
 	externalConfig := GenerateWebACL(resp).Spec.ForProvider
 	patch := &svcapitypes.WebACLParameters{}
-	for i, respRule := range resp.WebACL.Rules {
-		if respRule.Statement.AndStatement != nil {
-			jsonString, err := statementToJSONString[svcsdk.AndStatement](*respRule.Statement.AndStatement)
-			if err != nil {
-				return patch, err
-			}
-			externalConfig.Rules[i].Statement.AndStatement = jsonString
+	// Drop jsonified statements due to this method of comparison doesn't work well with json strings
+	for i, rule := range targetConfig.Rules {
+		if rule.Statement.AndStatement != nil {
+			targetConfig.Rules[i].Statement.AndStatement = nil
 		}
-		if respRule.Statement.OrStatement != nil {
-			jsonString, err := statementToJSONString[svcsdk.OrStatement](*respRule.Statement.OrStatement)
-			if err != nil {
-				return patch, err
-			}
-			externalConfig.Rules[i].Statement.OrStatement = jsonString
+		if rule.Statement.OrStatement != nil {
+			targetConfig.Rules[i].Statement.OrStatement = nil
 		}
-		if respRule.Statement.NotStatement != nil {
-			jsonString, err := statementToJSONString[svcsdk.NotStatement](*respRule.Statement.NotStatement)
-			if err != nil {
-				return patch, err
-			}
-			externalConfig.Rules[i].Statement.NotStatement = jsonString
+		if rule.Statement.NotStatement != nil {
+			targetConfig.Rules[i].Statement.NotStatement = nil
 		}
-		if respRule.Statement.ManagedRuleGroupStatement != nil && respRule.Statement.ManagedRuleGroupStatement.ScopeDownStatement != nil {
-			jsonString, err := statementToJSONString[svcsdk.Statement](*respRule.Statement.ManagedRuleGroupStatement.ScopeDownStatement)
-			if err != nil {
-				return patch, err
-			}
-			externalConfig.Rules[i].Statement.ManagedRuleGroupStatement.ScopeDownStatement = jsonString
+		if rule.Statement.ManagedRuleGroupStatement != nil && rule.Statement.ManagedRuleGroupStatement.ScopeDownStatement != nil {
+			targetConfig.Rules[i].Statement.ManagedRuleGroupStatement.ScopeDownStatement = nil
 		}
-		if respRule.Statement.RateBasedStatement != nil && respRule.Statement.RateBasedStatement.ScopeDownStatement != nil {
-			jsonString, err := statementToJSONString[svcsdk.Statement](*respRule.Statement.RateBasedStatement.ScopeDownStatement)
-			if err != nil {
-				return patch, err
-			}
-			externalConfig.Rules[i].Statement.RateBasedStatement.ScopeDownStatement = jsonString
+		if rule.Statement.RateBasedStatement != nil && rule.Statement.RateBasedStatement.ScopeDownStatement != nil {
+			targetConfig.Rules[i].Statement.RateBasedStatement.ScopeDownStatement = nil
 		}
 	}
 	for _, v := range respTagList {
 		externalConfig.Tags = append(externalConfig.Tags, &svcapitypes.Tag{Key: v.Key, Value: v.Value})
 	}
+
 	jsonPatch, err := jsonpatch.CreateJSONPatch(externalConfig, targetConfig)
 	if err != nil {
 		return patch, err
@@ -399,4 +392,92 @@ func createPatch(currentParams *svcapitypes.WebACLParameters, resp *svcsdk.GetWe
 		return patch, err
 	}
 	return patch, nil
+}
+
+func compareJsonifiedStatements(curRules []*svcapitypes.Rule, respRules []*svcsdk.Rule) (string, error) {
+	var targetConfig []*svcsdk.Rule
+	var externalConfig []*svcsdk.Rule
+	for _, rule := range respRules {
+		if rule.Statement.AndStatement != nil {
+			for _, statement := range rule.Statement.AndStatement.Statements {
+				decodeRespBase64SearchStringIfExists(statement)
+			}
+			externalConfig = append(externalConfig, &svcsdk.Rule{Statement: &svcsdk.Statement{AndStatement: rule.Statement.AndStatement}})
+		}
+		if rule.Statement.OrStatement != nil {
+			for _, statement := range rule.Statement.OrStatement.Statements {
+				decodeRespBase64SearchStringIfExists(statement)
+			}
+			externalConfig = append(externalConfig, &svcsdk.Rule{Statement: &svcsdk.Statement{OrStatement: rule.Statement.OrStatement}})
+		}
+		if rule.Statement.NotStatement != nil {
+			decodeRespBase64SearchStringIfExists(rule.Statement.NotStatement.Statement)
+			externalConfig = append(externalConfig, &svcsdk.Rule{Statement: &svcsdk.Statement{NotStatement: rule.Statement.NotStatement}})
+		}
+		if rule.Statement.ManagedRuleGroupStatement != nil && rule.Statement.ManagedRuleGroupStatement.ScopeDownStatement != nil {
+			decodeRespBase64SearchStringIfExists(rule.Statement.ManagedRuleGroupStatement.ScopeDownStatement)
+			externalConfig = append(externalConfig, &svcsdk.Rule{Statement: &svcsdk.Statement{ManagedRuleGroupStatement: &svcsdk.ManagedRuleGroupStatement{ScopeDownStatement: rule.Statement.ManagedRuleGroupStatement.ScopeDownStatement}}})
+		}
+		if rule.Statement.RateBasedStatement != nil && rule.Statement.RateBasedStatement.ScopeDownStatement != nil {
+			decodeRespBase64SearchStringIfExists(rule.Statement.RateBasedStatement.ScopeDownStatement)
+			externalConfig = append(externalConfig, &svcsdk.Rule{Statement: &svcsdk.Statement{RateBasedStatement: &svcsdk.RateBasedStatement{ScopeDownStatement: rule.Statement.RateBasedStatement.ScopeDownStatement}}})
+		}
+	}
+	for _, rule := range curRules {
+		if rule.Statement.AndStatement != nil {
+			typeAndStatement, err := statementFromJSONString[svcsdk.AndStatement](rule.Statement.AndStatement)
+			if err != nil {
+				return "", err
+			}
+			targetConfig = append(targetConfig, &svcsdk.Rule{Statement: &svcsdk.Statement{AndStatement: typeAndStatement}})
+		}
+		if rule.Statement.OrStatement != nil {
+			typeOrStatement, err := statementFromJSONString[svcsdk.OrStatement](rule.Statement.OrStatement)
+			if err != nil {
+				return "", err
+			}
+			targetConfig = append(targetConfig, &svcsdk.Rule{Statement: &svcsdk.Statement{OrStatement: typeOrStatement}})
+		}
+		if rule.Statement.NotStatement != nil {
+			typeNotStatement, err := statementFromJSONString[svcsdk.NotStatement](rule.Statement.NotStatement)
+			if err != nil {
+				return "", err
+			}
+			targetConfig = append(targetConfig, &svcsdk.Rule{Statement: &svcsdk.Statement{NotStatement: typeNotStatement}})
+		}
+		if rule.Statement.ManagedRuleGroupStatement != nil && rule.Statement.ManagedRuleGroupStatement.ScopeDownStatement != nil {
+			typeManagedRuleGroupStatement, err := statementFromJSONString[svcsdk.Statement](rule.Statement.ManagedRuleGroupStatement.ScopeDownStatement)
+			if err != nil {
+				return "", err
+			}
+			targetConfig = append(targetConfig, &svcsdk.Rule{Statement: &svcsdk.Statement{ManagedRuleGroupStatement: &svcsdk.ManagedRuleGroupStatement{ScopeDownStatement: typeManagedRuleGroupStatement}}})
+		}
+		if rule.Statement.RateBasedStatement != nil && rule.Statement.RateBasedStatement.ScopeDownStatement != nil {
+			typeRateBasedStatement, err := statementFromJSONString[svcsdk.Statement](rule.Statement.RateBasedStatement.ScopeDownStatement)
+			if err != nil {
+				return "", err
+			}
+			targetConfig = append(targetConfig, &svcsdk.Rule{Statement: &svcsdk.Statement{RateBasedStatement: &svcsdk.RateBasedStatement{ScopeDownStatement: typeRateBasedStatement}}})
+		}
+	}
+	jsonPatch, err := jsonpatch.CreateJSONPatch(externalConfig, targetConfig)
+	var patch []*svcsdk.Rule
+	if err != nil {
+		return "", err
+	}
+	if err := json.Unmarshal(jsonPatch, &patch); err != nil {
+		return "", err
+	}
+	return cmp.Diff([]*svcsdk.Rule{}, patch, cmpopts.EquateEmpty()), nil
+}
+
+func decodeRespBase64SearchStringIfExists(statement *svcsdk.Statement) error {
+	if statement.ByteMatchStatement != nil && statement.ByteMatchStatement.SearchString != nil {
+		decodedString, err := base64.StdEncoding.DecodeString(string(statement.ByteMatchStatement.SearchString))
+		statement.ByteMatchStatement.SearchString = decodedString
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }

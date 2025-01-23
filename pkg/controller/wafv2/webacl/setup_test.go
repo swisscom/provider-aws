@@ -56,7 +56,6 @@ func TestIsUpToDate(t *testing.T) {
 
 	ruleName := "ruleName"
 	rulePriority := int64(0)
-	rulePriority1 := int64(1)
 	ruleAndStatement := ` {
 	              "Statements": [
 	                {
@@ -104,7 +103,7 @@ func TestIsUpToDate(t *testing.T) {
 	desiredRuleAndStatement0TextTransformations0Priority := int64(0)
 	desiredRuleAndStatement0TextTransformations0Type := svcsdk.TextTransformationTypeNone
 
-	desiredRuleAndStatement1FieldToMatchSingleHeaderName := desiredRuleAndStatement0FieldToMatchSingleHeaderName
+	desiredRuleAndStatement1FieldToMatchSingleHeaderName := "User-AgentCustom"
 	desiredRuleAndStatement1PositionalConstraint := desiredRuleAndStatement0PositionalConstraint
 	desiredRuleAndStatement1SearchString := desiredRuleAndStatement0SearchString
 	desiredRuleAndStatement1TextTransformations0Priority := int64(1)
@@ -152,7 +151,7 @@ func TestIsUpToDate(t *testing.T) {
 										SampledRequestsEnabled:   &visibilityConfigSampledRequestsEnabled,
 										CloudWatchMetricsEnabled: &visibilityConfigCloudWatchMetricsEnabled,
 									},
-									Priority: &rulePriority1,
+									Priority: &rulePriority,
 									Action: &svcapitypes.RuleAction{
 										Allow: &svcapitypes.AllowAction{},
 									},
