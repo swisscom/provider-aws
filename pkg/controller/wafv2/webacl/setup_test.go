@@ -53,6 +53,7 @@ func TestIsUpToDate(t *testing.T) {
 
 	tag1Key := "used-by-elb"
 	tag1Value := "true"
+	tag1NewValue := "false"
 
 	ruleName := "ruleName"
 	rulePriority := int64(0)
@@ -229,6 +230,62 @@ func TestIsUpToDate(t *testing.T) {
 			},
 			want: want{
 				result: true,
+				err:    nil,
+			},
+		},
+		"TagsAreChanegd": {
+			args: args{
+				client: &fake.MockWAFV2Client{
+					MockListTagsForResource: func(input *svcsdk.ListTagsForResourceInput) (*svcsdk.ListTagsForResourceOutput, error) {
+						return &svcsdk.ListTagsForResourceOutput{
+							TagInfoForResource: &svcsdk.TagInfoForResource{TagList: []*svcsdk.Tag{
+								{Key: &tag1Key, Value: &tag1Value},
+							}},
+						}, nil
+					},
+				},
+				desired: &svcapitypes.WebACL{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: webAclName,
+						Annotations: map[string]string{
+							meta.AnnotationKeyExternalName: webAclName,
+						},
+					},
+					Spec: svcapitypes.WebACLSpec{
+						ForProvider: svcapitypes.WebACLParameters{
+							Region: "eu-central-1",
+							VisibilityConfig: &svcapitypes.VisibilityConfig{
+								MetricName:               &visibilityConfigMetricName,
+								SampledRequestsEnabled:   &visibilityConfigSampledRequestsEnabled,
+								CloudWatchMetricsEnabled: &visibilityConfigCloudWatchMetricsEnabled,
+							},
+							DefaultAction: &svcapitypes.DefaultAction{
+								Allow: &svcapitypes.AllowAction{},
+							},
+							Scope: &scope,
+							Tags: []*svcapitypes.Tag{
+								{Key: &tag1Key, Value: &tag1NewValue},
+							},
+						},
+					},
+				},
+				observed: &svcsdk.GetWebACLOutput{
+					WebACL: &svcsdk.WebACL{
+						Name: &webAclName,
+						Id:   &webAclId,
+						VisibilityConfig: &svcsdk.VisibilityConfig{
+							MetricName:               &visibilityConfigMetricName,
+							SampledRequestsEnabled:   &visibilityConfigSampledRequestsEnabled,
+							CloudWatchMetricsEnabled: &visibilityConfigCloudWatchMetricsEnabled,
+						},
+						DefaultAction: &svcsdk.DefaultAction{
+							Allow: &svcsdk.AllowAction{},
+						},
+					},
+				},
+			},
+			want: want{
+				result: false,
 				err:    nil,
 			},
 		},
