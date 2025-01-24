@@ -30,6 +30,10 @@ import (
 	"github.com/crossplane-contrib/provider-aws/pkg/clients/wafv2/fake"
 )
 
+func Ptr[T any](v T) *T {
+	return &v
+}
+
 func TestIsUpToDate(t *testing.T) {
 	type want struct {
 		result bool
@@ -87,6 +91,46 @@ func TestIsUpToDate(t *testing.T) {
 	                      },
 	                      "PositionalConstraint": "CONTAINS",
 	                      "SearchString": "YmFkQm90",
+	                      "TextTransformations": [
+	                        {
+	                          "Priority": 1,
+	                          "Type": "NONE"
+	                        }
+	                      ]
+	                    }
+	                }
+	              ]
+	            }`
+	ruleAndStatementNew := ` {
+	              "Statements": [
+	                {
+	                  "ByteMatchStatement":
+	                    {
+	                      "FieldToMatch": {
+	                        "SingleHeader": {
+	                          "Name": "User-Agent"
+	                        }
+	                      },
+	                      "PositionalConstraint": "CONTAINS",
+	                      "SearchString": "YmFkQm90",
+	                      "TextTransformations": [
+	                        {
+	                          "Priority": 0,
+	                          "Type": "NONE"
+	                        }
+	                      ]
+	                    }
+	                },
+	                {
+	                  "ByteMatchStatement":
+	                    {
+	                      "FieldToMatch": {
+	                        "SingleHeader": {
+	                          "Name": "User-AgentCustom"
+	                        }
+	                      },
+	                      "PositionalConstraint": "CONTAINS",
+	                      "SearchString": "dXNlci1hZ2VudA==",
 	                      "TextTransformations": [
 	                        {
 	                          "Priority": 1,
@@ -233,7 +277,340 @@ func TestIsUpToDate(t *testing.T) {
 				err:    nil,
 			},
 		},
-		"TagsAreChanegd": {
+		"JsonifiedRulesStatementChanged": {
+			args: args{
+				client: &fake.MockWAFV2Client{
+					MockListTagsForResource: func(input *svcsdk.ListTagsForResourceInput) (*svcsdk.ListTagsForResourceOutput, error) {
+						return &svcsdk.ListTagsForResourceOutput{
+							TagInfoForResource: &svcsdk.TagInfoForResource{TagList: []*svcsdk.Tag{
+								{Key: &tag1Key, Value: &tag1Value},
+							}},
+						}, nil
+					},
+				},
+				desired: &svcapitypes.WebACL{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: webAclName,
+						Annotations: map[string]string{
+							meta.AnnotationKeyExternalName: webAclName,
+						},
+					},
+					Spec: svcapitypes.WebACLSpec{
+						ForProvider: svcapitypes.WebACLParameters{
+							Region: "eu-central-1",
+							VisibilityConfig: &svcapitypes.VisibilityConfig{
+								MetricName:               &visibilityConfigMetricName,
+								SampledRequestsEnabled:   &visibilityConfigSampledRequestsEnabled,
+								CloudWatchMetricsEnabled: &visibilityConfigCloudWatchMetricsEnabled,
+							},
+							DefaultAction: &svcapitypes.DefaultAction{
+								Allow: &svcapitypes.AllowAction{},
+							},
+							Scope: &scope,
+							Rules: []*svcapitypes.Rule{
+								{
+									Name: &ruleName,
+									VisibilityConfig: &svcapitypes.VisibilityConfig{
+										MetricName:               &visibilityConfigMetricName,
+										SampledRequestsEnabled:   &visibilityConfigSampledRequestsEnabled,
+										CloudWatchMetricsEnabled: &visibilityConfigCloudWatchMetricsEnabled,
+									},
+									Priority: &rulePriority,
+									Action: &svcapitypes.RuleAction{
+										Allow: &svcapitypes.AllowAction{},
+									},
+									Statement: &svcapitypes.Statement{
+										AndStatement: &ruleAndStatementNew,
+									},
+								},
+							},
+							Tags: []*svcapitypes.Tag{
+								{Key: &tag1Key, Value: &tag1Value},
+							},
+						},
+					},
+				},
+				observed: &svcsdk.GetWebACLOutput{
+					WebACL: &svcsdk.WebACL{
+						Name: &webAclName,
+						Id:   &webAclId,
+						VisibilityConfig: &svcsdk.VisibilityConfig{
+							MetricName:               &visibilityConfigMetricName,
+							SampledRequestsEnabled:   &visibilityConfigSampledRequestsEnabled,
+							CloudWatchMetricsEnabled: &visibilityConfigCloudWatchMetricsEnabled,
+						},
+						DefaultAction: &svcsdk.DefaultAction{
+							Allow: &svcsdk.AllowAction{},
+						},
+						Rules: []*svcsdk.Rule{
+							{
+								Name: &ruleName,
+								VisibilityConfig: &svcsdk.VisibilityConfig{
+									MetricName:               &visibilityConfigMetricName,
+									SampledRequestsEnabled:   &visibilityConfigSampledRequestsEnabled,
+									CloudWatchMetricsEnabled: &visibilityConfigCloudWatchMetricsEnabled,
+								},
+								Priority: &rulePriority,
+								Action: &svcsdk.RuleAction{
+									Allow: &svcsdk.AllowAction{},
+								},
+								Statement: &svcsdk.Statement{
+									AndStatement: &svcsdk.AndStatement{
+										Statements: []*svcsdk.Statement{
+											{ByteMatchStatement: &svcsdk.ByteMatchStatement{
+												FieldToMatch: &svcsdk.FieldToMatch{
+													SingleHeader: &svcsdk.SingleHeader{
+														Name: &desiredRuleAndStatement0FieldToMatchSingleHeaderName,
+													},
+												},
+												PositionalConstraint: &desiredRuleAndStatement0PositionalConstraint,
+												SearchString:         desiredRuleAndStatement0SearchString,
+												TextTransformations: []*svcsdk.TextTransformation{
+													{Priority: &desiredRuleAndStatement0TextTransformations0Priority, Type: &desiredRuleAndStatement0TextTransformations0Type},
+												},
+											},
+											},
+											{ByteMatchStatement: &svcsdk.ByteMatchStatement{
+												FieldToMatch: &svcsdk.FieldToMatch{
+													SingleHeader: &svcsdk.SingleHeader{
+														Name: &desiredRuleAndStatement1FieldToMatchSingleHeaderName,
+													},
+												},
+												PositionalConstraint: &desiredRuleAndStatement1PositionalConstraint,
+												SearchString:         desiredRuleAndStatement1SearchString,
+												TextTransformations: []*svcsdk.TextTransformation{
+													{Priority: &desiredRuleAndStatement1TextTransformations0Priority, Type: &desiredRuleAndStatement1TextTransformations0Type},
+												},
+											},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			want: want{
+				result: false,
+				err:    nil,
+			},
+		},
+		"NormalStatementIsNotChanged": {
+			args: args{
+				client: &fake.MockWAFV2Client{
+					MockListTagsForResource: func(input *svcsdk.ListTagsForResourceInput) (*svcsdk.ListTagsForResourceOutput, error) {
+						return &svcsdk.ListTagsForResourceOutput{
+							TagInfoForResource: &svcsdk.TagInfoForResource{TagList: []*svcsdk.Tag{}},
+						}, nil
+					},
+				},
+				desired: &svcapitypes.WebACL{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: webAclName,
+						Annotations: map[string]string{
+							meta.AnnotationKeyExternalName: webAclName,
+						},
+					},
+					Spec: svcapitypes.WebACLSpec{
+						ForProvider: svcapitypes.WebACLParameters{
+							Region: "eu-central-1",
+							VisibilityConfig: &svcapitypes.VisibilityConfig{
+								MetricName:               &visibilityConfigMetricName,
+								SampledRequestsEnabled:   &visibilityConfigSampledRequestsEnabled,
+								CloudWatchMetricsEnabled: &visibilityConfigCloudWatchMetricsEnabled,
+							},
+							DefaultAction: &svcapitypes.DefaultAction{
+								Allow: &svcapitypes.AllowAction{},
+							},
+							Scope: &scope,
+							Rules: []*svcapitypes.Rule{
+								{
+									Name: &ruleName,
+									VisibilityConfig: &svcapitypes.VisibilityConfig{
+										MetricName:               &visibilityConfigMetricName,
+										SampledRequestsEnabled:   &visibilityConfigSampledRequestsEnabled,
+										CloudWatchMetricsEnabled: &visibilityConfigCloudWatchMetricsEnabled,
+									},
+									Priority: &rulePriority,
+									Action: &svcapitypes.RuleAction{
+										Allow: &svcapitypes.AllowAction{},
+									},
+									Statement: &svcapitypes.Statement{
+										ManagedRuleGroupStatement: &svcapitypes.ManagedRuleGroupStatement{
+											Name:       Ptr("AWSManagedRulesCommonRuleSet"),
+											VendorName: Ptr("AWS"),
+											RuleActionOverrides: []*svcapitypes.RuleActionOverride{
+												{
+													Name: Ptr("SizeRestrictions_BODY"),
+													ActionToUse: &svcapitypes.RuleAction{
+														Count: &svcapitypes.CountAction{},
+													},
+												},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+				observed: &svcsdk.GetWebACLOutput{
+					WebACL: &svcsdk.WebACL{
+						Name: &webAclName,
+						Id:   &webAclId,
+						VisibilityConfig: &svcsdk.VisibilityConfig{
+							MetricName:               &visibilityConfigMetricName,
+							SampledRequestsEnabled:   &visibilityConfigSampledRequestsEnabled,
+							CloudWatchMetricsEnabled: &visibilityConfigCloudWatchMetricsEnabled,
+						},
+						DefaultAction: &svcsdk.DefaultAction{
+							Allow: &svcsdk.AllowAction{},
+						},
+						Rules: []*svcsdk.Rule{
+							{
+								Name: &ruleName,
+								VisibilityConfig: &svcsdk.VisibilityConfig{
+									MetricName:               &visibilityConfigMetricName,
+									SampledRequestsEnabled:   &visibilityConfigSampledRequestsEnabled,
+									CloudWatchMetricsEnabled: &visibilityConfigCloudWatchMetricsEnabled,
+								},
+								Priority: &rulePriority,
+								Action: &svcsdk.RuleAction{
+									Allow: &svcsdk.AllowAction{},
+								},
+								Statement: &svcsdk.Statement{
+									ManagedRuleGroupStatement: &svcsdk.ManagedRuleGroupStatement{
+										Name:       Ptr("AWSManagedRulesCommonRuleSet"),
+										VendorName: Ptr("AWS"),
+										RuleActionOverrides: []*svcsdk.RuleActionOverride{
+											{
+												Name:        Ptr("SizeRestrictions_BODY"),
+												ActionToUse: &svcsdk.RuleAction{Count: &svcsdk.CountAction{}},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			want: want{
+				result: true,
+				err:    nil,
+			},
+		},
+		"NormalStatementChanged": {
+			args: args{
+				client: &fake.MockWAFV2Client{
+					MockListTagsForResource: func(input *svcsdk.ListTagsForResourceInput) (*svcsdk.ListTagsForResourceOutput, error) {
+						return &svcsdk.ListTagsForResourceOutput{
+							TagInfoForResource: &svcsdk.TagInfoForResource{TagList: []*svcsdk.Tag{}},
+						}, nil
+					},
+				},
+				desired: &svcapitypes.WebACL{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: webAclName,
+						Annotations: map[string]string{
+							meta.AnnotationKeyExternalName: webAclName,
+						},
+					},
+					Spec: svcapitypes.WebACLSpec{
+						ForProvider: svcapitypes.WebACLParameters{
+							Region: "eu-central-1",
+							VisibilityConfig: &svcapitypes.VisibilityConfig{
+								MetricName:               &visibilityConfigMetricName,
+								SampledRequestsEnabled:   &visibilityConfigSampledRequestsEnabled,
+								CloudWatchMetricsEnabled: &visibilityConfigCloudWatchMetricsEnabled,
+							},
+							DefaultAction: &svcapitypes.DefaultAction{
+								Allow: &svcapitypes.AllowAction{},
+							},
+							Scope: &scope,
+							Rules: []*svcapitypes.Rule{
+								{
+									Name: &ruleName,
+									VisibilityConfig: &svcapitypes.VisibilityConfig{
+										MetricName:               &visibilityConfigMetricName,
+										SampledRequestsEnabled:   &visibilityConfigSampledRequestsEnabled,
+										CloudWatchMetricsEnabled: &visibilityConfigCloudWatchMetricsEnabled,
+									},
+									Priority: &rulePriority,
+									Action: &svcapitypes.RuleAction{
+										Allow: &svcapitypes.AllowAction{},
+									},
+									Statement: &svcapitypes.Statement{
+										ManagedRuleGroupStatement: &svcapitypes.ManagedRuleGroupStatement{
+											Name:       Ptr("AWSManagedRulesCommonRuleSet"),
+											VendorName: Ptr("AWS"),
+											RuleActionOverrides: []*svcapitypes.RuleActionOverride{
+												{
+													Name: Ptr("SizeRestrictions_BODY"),
+													ActionToUse: &svcapitypes.RuleAction{
+														Count: &svcapitypes.CountAction{},
+													},
+												},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+				observed: &svcsdk.GetWebACLOutput{
+					WebACL: &svcsdk.WebACL{
+						Name: &webAclName,
+						Id:   &webAclId,
+						VisibilityConfig: &svcsdk.VisibilityConfig{
+							MetricName:               &visibilityConfigMetricName,
+							SampledRequestsEnabled:   &visibilityConfigSampledRequestsEnabled,
+							CloudWatchMetricsEnabled: &visibilityConfigCloudWatchMetricsEnabled,
+						},
+						DefaultAction: &svcsdk.DefaultAction{
+							Allow: &svcsdk.AllowAction{},
+						},
+						Rules: []*svcsdk.Rule{
+							{
+								Name: &ruleName,
+								VisibilityConfig: &svcsdk.VisibilityConfig{
+									MetricName:               &visibilityConfigMetricName,
+									SampledRequestsEnabled:   &visibilityConfigSampledRequestsEnabled,
+									CloudWatchMetricsEnabled: &visibilityConfigCloudWatchMetricsEnabled,
+								},
+								Priority: &rulePriority,
+								Action: &svcsdk.RuleAction{
+									Allow: &svcsdk.AllowAction{},
+								},
+								Statement: &svcsdk.Statement{
+									ManagedRuleGroupStatement: &svcsdk.ManagedRuleGroupStatement{
+										Name:       Ptr("AWSManagedRulesCommonRuleSet"),
+										VendorName: Ptr("AWS"),
+										RuleActionOverrides: []*svcsdk.RuleActionOverride{
+											{
+												Name:        Ptr("SizeRestrictions_BODY"),
+												ActionToUse: &svcsdk.RuleAction{Count: &svcsdk.CountAction{}},
+											},
+											{
+												Name:        Ptr("SizeRestrictions_URIPATH"),
+												ActionToUse: &svcsdk.RuleAction{Count: &svcsdk.CountAction{}},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			want: want{
+				result: false,
+				err:    nil,
+			},
+		},
+		"TagsAreChanged": {
 			args: args{
 				client: &fake.MockWAFV2Client{
 					MockListTagsForResource: func(input *svcsdk.ListTagsForResourceInput) (*svcsdk.ListTagsForResourceOutput, error) {

@@ -69,6 +69,7 @@ func SetupWebACL(mgr ctrl.Manager, o controller.Options) error {
 		managed.WithConnectionPublishers(cps...),
 	}
 
+	
 	if o.Features.Enabled(features.EnableAlphaManagementPolicies) {
 		reconcilerOpts = append(reconcilerOpts, managed.WithManagementPolicies())
 	}
