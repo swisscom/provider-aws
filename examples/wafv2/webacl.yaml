@@ -3,10 +3,11 @@ apiVersion: wafv2.aws.crossplane.io/v1alpha1
 kind: WebACL
 metadata:
   name: kir-test
-  annotations:
-    crossplane.io/external-name: kir-test
+    #  annotations:
+    #    crossplane.io/external-name: kir-test
 spec:
   forProvider:
+    name: kir-test
     region: eu-central-1
     rules:
       - name: rule1
@@ -26,11 +27,11 @@ spec:
                     {
                       "FieldToMatch": {
                         "SingleHeader": {
-                          "Name": "User-Agent"
+                          "Name": "user-agent"
                         }
                       },
                       "PositionalConstraint": "CONTAINS",
-                      "SearchString": "YmFkQm90",
+                      "SearchString": "bmV3VmFsdWUh",
                       "TextTransformations": [
                         {
                           "Priority": 0,
@@ -66,5 +67,8 @@ spec:
     defaultAction:
       allow: { }
     scope: REGIONAL
+    tags:
+      - key: "crossplane:managed"
+        value: "true"
   providerConfigRef:
     name: providerconfig-aws

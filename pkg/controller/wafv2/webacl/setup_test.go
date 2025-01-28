@@ -18,34 +18,27 @@ package webacl
 
 import (
 	"context"
-	"github.com/crossplane/crossplane-runtime/pkg/test"
-	"github.com/google/go-cmp/cmp"
 	"testing"
 
+	"github.com/aws/aws-sdk-go/aws"
 	svcsdk "github.com/aws/aws-sdk-go/service/wafv2"
 	"github.com/crossplane/crossplane-runtime/pkg/meta"
+	"github.com/crossplane/crossplane-runtime/pkg/test"
+	"github.com/google/go-cmp/cmp"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	svcapitypes "github.com/crossplane-contrib/provider-aws/apis/wafv2/v1alpha1"
 	"github.com/crossplane-contrib/provider-aws/pkg/clients/wafv2/fake"
 )
 
-func Ptr[T any](v T) *T {
-	return &v
+type args struct {
+	desired  *svcapitypes.WebACL
+	observed *svcsdk.GetWebACLOutput
+	client   *fake.MockWAFV2Client
+	cache    *cache
 }
 
 func TestIsUpToDate(t *testing.T) {
-	type want struct {
-		result bool
-		err    error
-	}
-	type args struct {
-		desired  *svcapitypes.WebACL
-		observed *svcsdk.GetWebACLOutput
-		client   *fake.MockWAFV2Client
-		cache    *cache
-	}
-
 	webAclName := "webacl"
 	webAclId := "88c4049f-eba9-4666-b9a9-f6aec5b5b41b"
 
@@ -142,17 +135,22 @@ func TestIsUpToDate(t *testing.T) {
 	              ]
 	            }`
 
-	desiredRuleAndStatement0FieldToMatchSingleHeaderName := "User-Agent"
-	desiredRuleAndStatement0PositionalConstraint := "CONTAINS"
-	desiredRuleAndStatement0SearchString := []byte("YmFkQm90") // Base64 encoded "badBot"
-	desiredRuleAndStatement0TextTransformations0Priority := int64(0)
-	desiredRuleAndStatement0TextTransformations0Type := svcsdk.TextTransformationTypeNone
+	ruleAndStatement0FieldToMatchSingleHeaderName := "User-Agent"
+	ruleAndStatement0PositionalConstraint := "CONTAINS"
+	ruleAndStatement0SearchString := []byte("badBot")
+	ruleAndStatement0TextTransformations0Priority := int64(0)
+	ruleAndStatement0TextTransformations0Type := svcsdk.TextTransformationTypeNone
 
-	desiredRuleAndStatement1FieldToMatchSingleHeaderName := "User-AgentCustom"
-	desiredRuleAndStatement1PositionalConstraint := desiredRuleAndStatement0PositionalConstraint
-	desiredRuleAndStatement1SearchString := desiredRuleAndStatement0SearchString
-	desiredRuleAndStatement1TextTransformations0Priority := int64(1)
-	desiredRuleAndStatement1TextTransformations0Type := desiredRuleAndStatement0TextTransformations0Type
+	ruleAndStatement1FieldToMatchSingleHeaderName := "User-AgentCustom"
+	ruleAndStatement1PositionalConstraint := ruleAndStatement0PositionalConstraint
+	ruleAndStatement1SearchString := ruleAndStatement0SearchString
+	ruleAndStatement1TextTransformations0Priority := int64(1)
+	ruleAndStatement1TextTransformations0Type := ruleAndStatement0TextTransformations0Type
+
+	type want struct {
+		result bool
+		err    error
+	}
 
 	cases := map[string]struct {
 		args args
@@ -241,26 +239,26 @@ func TestIsUpToDate(t *testing.T) {
 											{ByteMatchStatement: &svcsdk.ByteMatchStatement{
 												FieldToMatch: &svcsdk.FieldToMatch{
 													SingleHeader: &svcsdk.SingleHeader{
-														Name: &desiredRuleAndStatement0FieldToMatchSingleHeaderName,
+														Name: aws.String("user-agent"),
 													},
 												},
-												PositionalConstraint: &desiredRuleAndStatement0PositionalConstraint,
-												SearchString:         desiredRuleAndStatement0SearchString,
+												PositionalConstraint: &ruleAndStatement0PositionalConstraint,
+												SearchString:         ruleAndStatement0SearchString,
 												TextTransformations: []*svcsdk.TextTransformation{
-													{Priority: &desiredRuleAndStatement0TextTransformations0Priority, Type: &desiredRuleAndStatement0TextTransformations0Type},
+													{Priority: &ruleAndStatement0TextTransformations0Priority, Type: &ruleAndStatement0TextTransformations0Type},
 												},
 											},
 											},
 											{ByteMatchStatement: &svcsdk.ByteMatchStatement{
 												FieldToMatch: &svcsdk.FieldToMatch{
 													SingleHeader: &svcsdk.SingleHeader{
-														Name: &desiredRuleAndStatement1FieldToMatchSingleHeaderName,
+														Name: &ruleAndStatement1FieldToMatchSingleHeaderName,
 													},
 												},
-												PositionalConstraint: &desiredRuleAndStatement1PositionalConstraint,
-												SearchString:         desiredRuleAndStatement1SearchString,
+												PositionalConstraint: &ruleAndStatement1PositionalConstraint,
+												SearchString:         ruleAndStatement1SearchString,
 												TextTransformations: []*svcsdk.TextTransformation{
-													{Priority: &desiredRuleAndStatement1TextTransformations0Priority, Type: &desiredRuleAndStatement1TextTransformations0Type},
+													{Priority: &ruleAndStatement1TextTransformations0Priority, Type: &ruleAndStatement1TextTransformations0Type},
 												},
 											},
 											},
@@ -360,26 +358,26 @@ func TestIsUpToDate(t *testing.T) {
 											{ByteMatchStatement: &svcsdk.ByteMatchStatement{
 												FieldToMatch: &svcsdk.FieldToMatch{
 													SingleHeader: &svcsdk.SingleHeader{
-														Name: &desiredRuleAndStatement0FieldToMatchSingleHeaderName,
+														Name: &ruleAndStatement0FieldToMatchSingleHeaderName,
 													},
 												},
-												PositionalConstraint: &desiredRuleAndStatement0PositionalConstraint,
-												SearchString:         desiredRuleAndStatement0SearchString,
+												PositionalConstraint: &ruleAndStatement0PositionalConstraint,
+												SearchString:         ruleAndStatement0SearchString,
 												TextTransformations: []*svcsdk.TextTransformation{
-													{Priority: &desiredRuleAndStatement0TextTransformations0Priority, Type: &desiredRuleAndStatement0TextTransformations0Type},
+													{Priority: &ruleAndStatement0TextTransformations0Priority, Type: &ruleAndStatement0TextTransformations0Type},
 												},
 											},
 											},
 											{ByteMatchStatement: &svcsdk.ByteMatchStatement{
 												FieldToMatch: &svcsdk.FieldToMatch{
 													SingleHeader: &svcsdk.SingleHeader{
-														Name: &desiredRuleAndStatement1FieldToMatchSingleHeaderName,
+														Name: &ruleAndStatement1FieldToMatchSingleHeaderName,
 													},
 												},
-												PositionalConstraint: &desiredRuleAndStatement1PositionalConstraint,
-												SearchString:         desiredRuleAndStatement1SearchString,
+												PositionalConstraint: &ruleAndStatement1PositionalConstraint,
+												SearchString:         ruleAndStatement1SearchString,
 												TextTransformations: []*svcsdk.TextTransformation{
-													{Priority: &desiredRuleAndStatement1TextTransformations0Priority, Type: &desiredRuleAndStatement1TextTransformations0Type},
+													{Priority: &ruleAndStatement1TextTransformations0Priority, Type: &ruleAndStatement1TextTransformations0Type},
 												},
 											},
 											},
@@ -438,11 +436,11 @@ func TestIsUpToDate(t *testing.T) {
 									},
 									Statement: &svcapitypes.Statement{
 										ManagedRuleGroupStatement: &svcapitypes.ManagedRuleGroupStatement{
-											Name:       Ptr("AWSManagedRulesCommonRuleSet"),
-											VendorName: Ptr("AWS"),
+											Name:       aws.String("AWSManagedRulesCommonRuleSet"),
+											VendorName: aws.String("AWS"),
 											RuleActionOverrides: []*svcapitypes.RuleActionOverride{
 												{
-													Name: Ptr("SizeRestrictions_BODY"),
+													Name: aws.String("SizeRestrictions_BODY"),
 													ActionToUse: &svcapitypes.RuleAction{
 														Count: &svcapitypes.CountAction{},
 													},
@@ -481,11 +479,11 @@ func TestIsUpToDate(t *testing.T) {
 								},
 								Statement: &svcsdk.Statement{
 									ManagedRuleGroupStatement: &svcsdk.ManagedRuleGroupStatement{
-										Name:       Ptr("AWSManagedRulesCommonRuleSet"),
-										VendorName: Ptr("AWS"),
+										Name:       aws.String("AWSManagedRulesCommonRuleSet"),
+										VendorName: aws.String("AWS"),
 										RuleActionOverrides: []*svcsdk.RuleActionOverride{
 											{
-												Name:        Ptr("SizeRestrictions_BODY"),
+												Name:        aws.String("SizeRestrictions_BODY"),
 												ActionToUse: &svcsdk.RuleAction{Count: &svcsdk.CountAction{}},
 											},
 										},
@@ -543,11 +541,11 @@ func TestIsUpToDate(t *testing.T) {
 									},
 									Statement: &svcapitypes.Statement{
 										ManagedRuleGroupStatement: &svcapitypes.ManagedRuleGroupStatement{
-											Name:       Ptr("AWSManagedRulesCommonRuleSet"),
-											VendorName: Ptr("AWS"),
+											Name:       aws.String("AWSManagedRulesCommonRuleSet"),
+											VendorName: aws.String("AWS"),
 											RuleActionOverrides: []*svcapitypes.RuleActionOverride{
 												{
-													Name: Ptr("SizeRestrictions_BODY"),
+													Name: aws.String("SizeRestrictions_BODY"),
 													ActionToUse: &svcapitypes.RuleAction{
 														Count: &svcapitypes.CountAction{},
 													},
@@ -586,15 +584,15 @@ func TestIsUpToDate(t *testing.T) {
 								},
 								Statement: &svcsdk.Statement{
 									ManagedRuleGroupStatement: &svcsdk.ManagedRuleGroupStatement{
-										Name:       Ptr("AWSManagedRulesCommonRuleSet"),
-										VendorName: Ptr("AWS"),
+										Name:       aws.String("AWSManagedRulesCommonRuleSet"),
+										VendorName: aws.String("AWS"),
 										RuleActionOverrides: []*svcsdk.RuleActionOverride{
 											{
-												Name:        Ptr("SizeRestrictions_BODY"),
+												Name:        aws.String("SizeRestrictions_BODY"),
 												ActionToUse: &svcsdk.RuleAction{Count: &svcsdk.CountAction{}},
 											},
 											{
-												Name:        Ptr("SizeRestrictions_URIPATH"),
+												Name:        aws.String("SizeRestrictions_URIPATH"),
 												ActionToUse: &svcsdk.RuleAction{Count: &svcsdk.CountAction{}},
 											},
 										},
@@ -667,16 +665,21 @@ func TestIsUpToDate(t *testing.T) {
 			},
 		},
 	}
-
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			s := shared{cache: tc.args.cache, client: tc.args.client}
-			result, funcDiff, err := s.isUpToDate(context.TODO(), tc.args.desired, tc.args.observed)
-			if diff := cmp.Diff(err, tc.want.err, test.EquateErrors()); diff != "" {
+			s := shared{cache: &cache{}, client: tc.args.client}
+			result, funcDiff, err := s.isUpToDate(context.Background(), tc.args.desired, tc.args.observed)
+			if err != nil {
+				t.Logf("error: %s", err.Error())
+			}
+			if diff := cmp.Diff(tc.want.err, err, test.EquateErrors()); diff != "" {
 				t.Errorf("r: -want, +got:\n%s", diff)
 			}
 			if diff := cmp.Diff(tc.want.result, result); diff != "" {
-				t.Errorf("r: -want, +got:\n%s\nthe diff is %s", diff, funcDiff)
+				t.Errorf("r: -want, +got:\n%s", diff)
+				if funcDiff != "" {
+					t.Errorf("isUpTODate diff: %s", funcDiff)
+				}
 			}
 		})
 	}
