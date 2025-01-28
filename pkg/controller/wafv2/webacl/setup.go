@@ -388,7 +388,7 @@ func setInputRuleStatementsFromJSON(cr *svcapitypes.WebACL, rules []*svcsdk.Rule
 
 func changeToLowerCase(params any) {
 	v := reflect.Indirect(reflect.ValueOf(params))
-	fmt.Println(fmt.Sprintf("v type is %s", v.Type().String()))
+	fmt.Println(fmt.Sprintf("reflecting of type %s", v.Type().String()))
 
 	for i := 0; i < v.NumField(); i++ {
 		fmt.Println(fmt.Sprintf("i %d from v.NumField - %d", i, v.NumField()))
@@ -398,26 +398,32 @@ func changeToLowerCase(params any) {
 			if field.Type == reflect.TypeOf([]*svcapitypes.Rule{}) || field.Type == reflect.TypeOf([]*svcsdk.Rule{}) {
 				fmt.Println("rules are found...")
 				for ri := 0; ri < v.FieldByName(field.Name).Len(); ri++ {
-					fmt.Println(fmt.Sprintf("range over rules, i %d from len is %d", ri, v.FieldByName(field.Name).Len()))
-					if v.FieldByName(field.Name).Index(ri).IsValid() && (v.FieldByName(field.Name).Index(ri).Type() == reflect.TypeOf(&svcapitypes.Statement{}) || v.FieldByName(field.Name).Index(ri).Type() == reflect.TypeOf(svcsdk.Statement{})) {
-						statement := v.FieldByName(field.Name).Index(ri).Addr().Interface()
-						fmt.Println(fmt.Sprintf("statement is found in a rule - %s, run nested loop", v.FieldByName(field.Name).Index(ri).FieldByName("Name").Elem().String()))
-						changeToLowerCase(statement)
-					}
+					fmt.Println(fmt.Sprintf("run a nested loop for a rule #%d", ri))
+					rule := v.FieldByName(field.Name).Index(ri).Addr().Interface()
+					changeToLowerCase(rule)
 				}
 			}
-			if field.Type == reflect.TypeOf(svcsdk.AndStatement{}) || field.Type == reflect.TypeOf(svcsdk.OrStatement{}) {
-				for si := 0; si < v.FieldByName(field.Name).FieldByName("Statements").Len(); si++ {
-					nestedStatement := v.FieldByName(field.Name).FieldByName("Statements").Index(si).Addr().Interface()
-					fmt.Println(fmt.Sprintf("nestedStatement is found in a statement - %s, run nested loop", field.Type.String()))
-					changeToLowerCase(nestedStatement)
+			if field.Type == reflect.TypeOf(&svcapitypes.Statement{}) || field.Type == reflect.TypeOf(&svcsdk.Statement{}) {
+				statement := v.FieldByName(field.Name).Addr().Interface()
+				fmt.Println(fmt.Sprintf("found a statement, run a nested loop", field.Type.String()))
+				changeToLowerCase(statement)
+			}
+			if field.Type == reflect.TypeOf([]*svcapitypes.Statement{}) || field.Type == reflect.TypeOf([]*svcsdk.Statement{}) {
+				fmt.Println("statements are found...")
+				for ri := 0; ri < v.FieldByName(field.Name).Len(); ri++ {
+					statement := v.FieldByName(field.Name).Index(ri).Interface()
+					fmt.Println(fmt.Sprintf("run a nested loop for statement with index %d", ri))
+					changeToLowerCase(statement)
 				}
 			}
 
-			if field.Type == reflect.TypeOf(&svcapitypes.NotStatement{}) {
-				nestedStatement := v.FieldByName(field.Name).FieldByName("Statement").Addr().Interface()
-				fmt.Println(fmt.Sprintf("nestedStatement is found in a statement - %s, run nested loop", field.Type.String()))
-				changeToLowerCase(nestedStatement)
+			if field.Type == reflect.TypeOf(svcsdk.AndStatement{}) ||
+				field.Type == reflect.TypeOf(svcsdk.OrStatement{}) ||
+				field.Type == reflect.TypeOf(svcsdk.NotStatement{}) {
+
+				statement := v.FieldByName(field.Name).Addr().Interface()
+				fmt.Println(fmt.Sprintf("found a statement with nested statement(s) - %s, run a nested loop", field.Type.String()))
+				changeToLowerCase(statement)
 			}
 
 			if field.Type == reflect.TypeOf(&svcapitypes.ByteMatchStatement{}) ||
@@ -435,10 +441,10 @@ func changeToLowerCase(params any) {
 
 				fmt.Println(fmt.Sprintf("statement confug is found - %s", field.Type.String()))
 				for i := 0; i < v.FieldByName(field.Name).NumField(); i++ {
-					statementField := reflect.TypeOf(v.FieldByName(field.Name).Interface()).Field(i)
+					statementField := reflect.TypeOf(v.FieldByName(field.Name).Addr().Interface()).Field(i)
 					if statementField.Type == reflect.TypeOf(&svcsdk.FieldToMatch{}) || statementField.Type == reflect.TypeOf(&svcapitypes.FieldToMatch{}) {
-						fmt.Println("field to match is found, run nested loop...")
-						fieldToMatch := v.FieldByName(field.Name).Field(i).Addr().Interface()
+						fmt.Println("field to match is found, run a nested loop...")
+						fieldToMatch := v.FieldByName(field.Name).FieldByName(statementField.Name).Addr().Interface()
 						changeToLowerCase(fieldToMatch)
 					}
 				}
@@ -629,3 +635,4 @@ func addJsonifiedRuleStatements(resp []*svcsdk.Rule, externalConfig svcapitypes.
 //	}
 //	return nil
 //}
+
