@@ -79,7 +79,7 @@ func TestIsUpToDate(t *testing.T) {
 	                    {
 	                      "FieldToMatch": {
 	                        "SingleHeader": {
-	                          "Name": "User-AgentCustom"
+	                          "Name": "Host"
 	                        }
 	                      },
 	                      "PositionalConstraint": "CONTAINS",
@@ -119,7 +119,7 @@ func TestIsUpToDate(t *testing.T) {
 	                    {
 	                      "FieldToMatch": {
 	                        "SingleHeader": {
-	                          "Name": "User-AgentCustom"
+	                          "Name": "Host"
 	                        }
 	                      },
 	                      "PositionalConstraint": "CONTAINS",
@@ -135,13 +135,13 @@ func TestIsUpToDate(t *testing.T) {
 	              ]
 	            }`
 
-	ruleAndStatement0FieldToMatchSingleHeaderName := "User-Agent"
+	ruleAndStatement0FieldToMatchSingleHeaderName := "user-agent"
 	ruleAndStatement0PositionalConstraint := "CONTAINS"
 	ruleAndStatement0SearchString := []byte("badBot")
 	ruleAndStatement0TextTransformations0Priority := int64(0)
 	ruleAndStatement0TextTransformations0Type := svcsdk.TextTransformationTypeNone
 
-	ruleAndStatement1FieldToMatchSingleHeaderName := "User-AgentCustom"
+	ruleAndStatement1FieldToMatchSingleHeaderName := "host"
 	ruleAndStatement1PositionalConstraint := ruleAndStatement0PositionalConstraint
 	ruleAndStatement1SearchString := ruleAndStatement0SearchString
 	ruleAndStatement1TextTransformations0Priority := int64(1)
@@ -239,7 +239,7 @@ func TestIsUpToDate(t *testing.T) {
 											{ByteMatchStatement: &svcsdk.ByteMatchStatement{
 												FieldToMatch: &svcsdk.FieldToMatch{
 													SingleHeader: &svcsdk.SingleHeader{
-														Name: aws.String("user-agent"),
+														Name: &ruleAndStatement0FieldToMatchSingleHeaderName,
 													},
 												},
 												PositionalConstraint: &ruleAndStatement0PositionalConstraint,
@@ -435,16 +435,16 @@ func TestIsUpToDate(t *testing.T) {
 										Allow: &svcapitypes.AllowAction{},
 									},
 									Statement: &svcapitypes.Statement{
-										ManagedRuleGroupStatement: &svcapitypes.ManagedRuleGroupStatement{
-											Name:       aws.String("AWSManagedRulesCommonRuleSet"),
-											VendorName: aws.String("AWS"),
-											RuleActionOverrides: []*svcapitypes.RuleActionOverride{
-												{
-													Name: aws.String("SizeRestrictions_BODY"),
-													ActionToUse: &svcapitypes.RuleAction{
-														Count: &svcapitypes.CountAction{},
-													},
+										ByteMatchStatement: &svcapitypes.ByteMatchStatement{
+											FieldToMatch: &svcapitypes.FieldToMatch{
+												SingleHeader: &svcapitypes.SingleHeader{
+													Name: aws.String("User-Agent"),
 												},
+											},
+											PositionalConstraint: aws.String("CONTAINS"),
+											SearchString:         []byte("YmFkQm90"),
+											TextTransformations: []*svcapitypes.TextTransformation{
+												{Priority: aws.Int64(1), Type: aws.String("NONE")},
 											},
 										},
 									},
@@ -478,14 +478,16 @@ func TestIsUpToDate(t *testing.T) {
 									Allow: &svcsdk.AllowAction{},
 								},
 								Statement: &svcsdk.Statement{
-									ManagedRuleGroupStatement: &svcsdk.ManagedRuleGroupStatement{
-										Name:       aws.String("AWSManagedRulesCommonRuleSet"),
-										VendorName: aws.String("AWS"),
-										RuleActionOverrides: []*svcsdk.RuleActionOverride{
-											{
-												Name:        aws.String("SizeRestrictions_BODY"),
-												ActionToUse: &svcsdk.RuleAction{Count: &svcsdk.CountAction{}},
+									ByteMatchStatement: &svcsdk.ByteMatchStatement{
+										FieldToMatch: &svcsdk.FieldToMatch{
+											SingleHeader: &svcsdk.SingleHeader{
+												Name: aws.String("user-agent"),
 											},
+										},
+										PositionalConstraint: aws.String("CONTAINS"),
+										SearchString:         []byte("YmFkQm90"),
+										TextTransformations: []*svcsdk.TextTransformation{
+											{Priority: aws.Int64(1), Type: aws.String("NONE")},
 										},
 									},
 								},

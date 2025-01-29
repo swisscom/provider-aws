@@ -27,7 +27,7 @@ spec:
                     {
                       "FieldToMatch": {
                         "SingleHeader": {
-                          "Name": "user-agent"
+                          "Name": "Host"
                         }
                       },
                       "PositionalConstraint": "CONTAINS",

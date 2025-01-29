@@ -19,7 +19,6 @@ import (
 	"fmt"
 	"reflect"
 	"strings"
-	"unsafe"
 
 	"github.com/aws/aws-sdk-go/aws"
 	svcsdk "github.com/aws/aws-sdk-go/service/wafv2"
@@ -210,28 +209,12 @@ func (s *shared) isUpToDate(_ context.Context, cr *svcapitypes.WebACL, resp *svc
 		// Name and Scope are immutables
 		cmpopts.IgnoreFields(svcapitypes.WebACLParameters{}, "Name", "Region", "Scope"),
 	}
-
 	diff = cmp.Diff(&svcapitypes.WebACLParameters{}, patch, opts...)
 	if diff != "" {
 		return false, "Found observed difference in wafv2 webacl " + diff, nil
 	}
 	return true, "", nil
 }
-
-//func cmpOptFilerValues(x, y interface{}) bool {
-//	rulesRef := reflect.TypeOf([]*svcapitypes.Rule{})
-//
-//	vx, vy := reflect.ValueOf(x), reflect.ValueOf(y)
-//	if vx.IsValid() && vy.IsValid() {
-//		fmt.Println(fmt.Sprintf("==========\nvx type is %s", vx.Type().String()))
-//		fmt.Println(fmt.Sprintf("vy type is %s", vy.Type().String()))
-//		fmt.Println(fmt.Sprintf("ref type is %s", rulesRef.String()))
-//	}
-//	if vx.IsValid() && vy.IsValid() && vx.Type() == rulesRef && vy.Type() == rulesRef {
-//		return false
-//	}
-//	return false
-//}
 
 func postObserve(_ context.Context, cr *svcapitypes.WebACL, output *svcsdk.GetWebACLOutput, obs managed.ExternalObservation, _ error) (managed.ExternalObservation, error) {
 	cr.SetConditions(xpv1.Available())
@@ -459,17 +442,18 @@ func changeToLowerCase(params any) {
 				field.Type == reflect.TypeOf(&svcsdk.SingleQueryArgument{}) {
 
 				fmt.Println(fmt.Sprintf("FieldToMatch.Name is found in %s", v.FieldByName(field.Name)))
-				caseInSensitiveName := v.FieldByName(field.Name).Elem().FieldByName("Name")
+				caseInSensitiveName := v.FieldByName(field.Name).Elem().FieldByName("Name").Elem()
+				fmt.Printf("caseInSensitiveName kind is %s and type %s isItValid(%t) is it CanSet(%t)", caseInSensitiveName.Kind().String(), caseInSensitiveName.Type().String(), caseInSensitiveName.IsValid(), caseInSensitiveName.CanSet())
 				if caseInSensitiveName.IsValid() && caseInSensitiveName.CanSet() {
-					lowerCasedName := strings.ToLower(caseInSensitiveName.Elem().String())
-					caseInSensitiveName.SetPointer(unsafe.Pointer(&lowerCasedName))
-					fmt.Println("transformed to lower case")
+					lowerCasedName := strings.ToLower(caseInSensitiveName.String())
+					caseInSensitiveName.SetString(lowerCasedName)
+					fmt.Printf("transformed to lower case - %s\n", caseInSensitiveName.String())
+					fmt.Println(fmt.Sprintf("new FieldToMatch.Name  %s", v.FieldByName(field.Name)))
 				}
 			}
 		}
 	}
 }
-
 
 func createPatch(currentParams *svcapitypes.WebACLParameters, resp *svcsdk.GetWebACLOutput, respTagList []*svcsdk.Tag) (*svcapitypes.WebACLParameters, error) {
 	targetConfig := currentParams.DeepCopy()
@@ -545,7 +529,8 @@ func createPatch(currentParams *svcapitypes.WebACLParameters, resp *svcsdk.GetWe
 	//	return patch, errors.New(fmt.Sprintf("external: %+v target: %+v", *externalConfig.Rules[0].Statement.AndStatement, *targetConfig.Rules[0].Statement.AndStatement))
 	//	return patch, errors.New(fmt.Sprintf("external: %s target: %s", gjson.Get(*externalConfig.Rules[0].Statement.AndStatement, "Statements.0.ByteMatchStatement.SearchString"), gjson.Get(*targetConfig.Rules[0].Statement.AndStatement, "Statements.0.ByteMatchStatement.SearchString")))
 	//}
-
+	//spew.Dump(externalConfig)
+	//spew.Dump(targetConfig)
 	jsonPatch, err := jsonpatch.CreateJSONPatch(externalConfig, targetConfig)
 	if err != nil {
 		return patch, err
@@ -639,4 +624,3 @@ func addJsonifiedRuleStatements(resp []*svcsdk.Rule, externalConfig svcapitypes.
 //	}
 //	return nil
 //}
-
