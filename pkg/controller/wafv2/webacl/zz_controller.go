@@ -140,9 +140,9 @@ func (e *external) Create(ctx context.Context, mg cpresource.Managed) (managed.E
 		cr.Status.AtProvider.LockToken = nil
 	}
 	if resp.Summary.Name != nil {
-		cr.Spec.ForProvider.Name = resp.Summary.Name
+		cr.Status.AtProvider.Name = resp.Summary.Name
 	} else {
-		cr.Spec.ForProvider.Name = nil
+		cr.Status.AtProvider.Name = nil
 	}
 
 	return e.postCreate(ctx, cr, resp, managed.ExternalCreation{}, err)

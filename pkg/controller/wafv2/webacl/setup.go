@@ -17,13 +17,13 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
 	"reflect"
 	"strings"
 
 	"github.com/aws/aws-sdk-go/aws"
 	svcsdk "github.com/aws/aws-sdk-go/service/wafv2"
 	svcsdkapi "github.com/aws/aws-sdk-go/service/wafv2/wafv2iface"
-	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
 	"github.com/crossplane/crossplane-runtime/pkg/connection"
 	"github.com/crossplane/crossplane-runtime/pkg/controller"
 	"github.com/crossplane/crossplane-runtime/pkg/event"
@@ -62,7 +62,7 @@ func SetupWebACL(mgr ctrl.Manager, o controller.Options) error {
 	}
 
 	reconcilerOpts := []managed.ReconcilerOption{
-		managed.WithInitializers(),
+		managed.WithInitializers(managed.NewNameAsExternalName(mgr.GetClient())),
 		managed.WithCriticalAnnotationUpdater(custommanaged.NewRetryingCriticalAnnotationUpdater(mgr.GetClient())),
 		managed.WithExternalConnecter(&customConnector{kube: mgr.GetClient()}),
 		managed.WithPollInterval(o.PollInterval),
@@ -91,10 +91,6 @@ type statementWithInfiniteRecursion interface {
 	svcsdk.Statement | svcsdk.AndStatement | svcsdk.OrStatement | svcsdk.NotStatement
 }
 
-type caseInsensitiveTypes interface {
-	svcsdk.SingleHeader | svcsdk.SingleQueryArgument
-}
-
 // customConnector is external connector with overridden Observe method due to ACK v0.38.1 doesn't correctly generate it.
 type customConnector struct {
 	kube client.Client
@@ -111,8 +107,7 @@ type shared struct {
 }
 
 type cache struct {
-	listWebACLsOutput *svcsdk.ListWebACLsOutput
-	tagListOutput     []*svcsdk.Tag
+	tagListOutput []*svcsdk.Tag
 }
 
 func newCustomExternal(kube client.Client, client svcsdkapi.WAFV2API) *customExternal {
@@ -121,14 +116,14 @@ func newCustomExternal(kube client.Client, client svcsdkapi.WAFV2API) *customExt
 		external{
 			kube:           kube,
 			client:         client,
-			preObserve:     preObserve,
-			postObserve:    postObserve,
+			preObserve:     nopPreObserve,
+			postObserve:    nopPostObserve,
 			isUpToDate:     shared.isUpToDate,
 			preCreate:      preCreate,
 			preDelete:      nopPreDelete,
 			preUpdate:      shared.preUpdate,
 			lateInitialize: nopLateInitialize,
-			postCreate:     postCreate,
+			postCreate:     nopPostCreate,
 			postDelete:     nopPostDelete,
 			postUpdate:     nopPostUpdate,
 		},
@@ -149,11 +144,6 @@ func (c *customConnector) Connect(ctx context.Context, mg cpresource.Managed) (m
 	return newCustomExternal(c.kube, svcsdk.New(sess)), nil
 }
 
-func preObserve(_ context.Context, cr *svcapitypes.WebACL, input *svcsdk.GetWebACLInput) error {
-	input.Id = aws.String(meta.GetExternalName(cr))
-	return nil
-}
-
 func (e *customExternal) Observe(ctx context.Context, mg cpresource.Managed) (managed.ExternalObservation, error) {
 	cr, ok := mg.(*svcapitypes.WebACL)
 	if !ok {
@@ -165,6 +155,25 @@ func (e *customExternal) Observe(ctx context.Context, mg cpresource.Managed) (ma
 		}, nil
 	}
 	input := GenerateGetWebACLInput(cr)
+	input.Name = aws.String(meta.GetExternalName(cr))
+	listWebACLInput := svcsdk.ListWebACLsInput{
+		Scope: cr.Spec.ForProvider.Scope,
+	}
+	ls, err := e.client.ListWebACLs(&listWebACLInput)
+	if err != nil {
+		return managed.ExternalObservation{}, err
+	}
+	for n, webACLSummary := range ls.WebACLs {
+		if aws.StringValue(webACLSummary.Name) == meta.GetExternalName(cr) {
+			input.Id = webACLSummary.Id
+			break
+		}
+		if n == len(ls.WebACLs)-1 {
+			return managed.ExternalObservation{
+				ResourceExists: false,
+			}, nil
+		}
+	}
 	if err := e.preObserve(ctx, cr, input); err != nil {
 		return managed.ExternalObservation{}, errors.Wrap(err, "pre-observe failed")
 	}
@@ -184,6 +193,12 @@ func (e *customExternal) Observe(ctx context.Context, mg cpresource.Managed) (ma
 		if err != nil {
 			return managed.ExternalObservation{}, errors.Wrap(err, "isUpToDate check failed")
 		}
+	}
+	cr.SetConditions(xpv1.Available())
+	cr.Status.AtProvider = svcapitypes.WebACLObservation{
+		ARN:       resp.WebACL.ARN,
+		ID:        resp.WebACL.Id,
+		LockToken: resp.LockToken,
 	}
 	return e.postObserve(ctx, cr, resp, managed.ExternalObservation{
 		ResourceExists:          true,
@@ -207,7 +222,7 @@ func (s *shared) isUpToDate(_ context.Context, cr *svcapitypes.WebACL, resp *svc
 	opts := []cmp.Option{
 		cmpopts.EquateEmpty(),
 		// Name and Scope are immutables
-		cmpopts.IgnoreFields(svcapitypes.WebACLParameters{}, "Name", "Region", "Scope"),
+		cmpopts.IgnoreFields(svcapitypes.WebACLParameters{}, "Region", "Scope"),
 	}
 	diff = cmp.Diff(&svcapitypes.WebACLParameters{}, patch, opts...)
 	if diff != "" {
@@ -216,18 +231,8 @@ func (s *shared) isUpToDate(_ context.Context, cr *svcapitypes.WebACL, resp *svc
 	return true, "", nil
 }
 
-func postObserve(_ context.Context, cr *svcapitypes.WebACL, output *svcsdk.GetWebACLOutput, obs managed.ExternalObservation, _ error) (managed.ExternalObservation, error) {
-	cr.SetConditions(xpv1.Available())
-	cr.Status.AtProvider = svcapitypes.WebACLObservation{
-		ARN:       output.WebACL.ARN,
-		ID:        output.WebACL.Id,
-		LockToken: output.LockToken,
-	}
-
-	return obs, nil
-}
-
 func preCreate(_ context.Context, cr *svcapitypes.WebACL, input *svcsdk.CreateWebACLInput) error {
+	input.Name = aws.String(meta.GetExternalName(cr))
 	err := setInputRuleStatementsFromJSON(cr, input.Rules)
 	if err != nil {
 		return err
@@ -235,17 +240,8 @@ func preCreate(_ context.Context, cr *svcapitypes.WebACL, input *svcsdk.CreateWe
 	return nil
 }
 
-func postCreate(_ context.Context, cr *svcapitypes.WebACL, output *svcsdk.CreateWebACLOutput, ec managed.ExternalCreation, err error) (managed.ExternalCreation, error) {
-	meta.SetExternalName(cr, ptr.Deref(output.Summary.Id, ""))
-	cr.Status.AtProvider = svcapitypes.WebACLObservation{
-		ARN:       output.Summary.ARN,
-		ID:        output.Summary.Id,
-		LockToken: output.Summary.LockToken,
-	}
-	return ec, err
-}
-
 func (s *shared) preUpdate(_ context.Context, cr *svcapitypes.WebACL, input *svcsdk.UpdateWebACLInput) error {
+	input.Name = aws.String(meta.GetExternalName(cr))
 	err := setInputRuleStatementsFromJSON(cr, input.Rules)
 	if err != nil {
 		return err
@@ -287,29 +283,26 @@ func (s *shared) preUpdate(_ context.Context, cr *svcapitypes.WebACL, input *svc
 	return nil
 }
 
-//func (s *shared) preDelete(_ context.Context, cr *svcapitypes.WebACL, input *svcsdk.DeleteWebACLInput) (bool, error) {
-//	lockToken, err := getLockToken(s.cache.listWebACLsOutput.WebACLs, cr)
-//	if err != nil {
-//		return false, err
-//	}
-//	input.LockToken = lockToken
-//	return false, nil
-//}
+func (s *shared) preDelete(_ context.Context, cr *svcapitypes.WebACL, input *svcsdk.DeleteWebACLInput) (bool, error) {
+	input.Name = aws.String(meta.GetExternalName(cr))
+	input.LockToken = cr.Status.AtProvider.LockToken
+	return false, nil
+}
 
 // getLockToken returns the lock token which is required for WebACL update and delete operations
-//func getLockToken(webACLs []*svcsdk.WebACLSummary, cr *svcapitypes.WebACL) (*string, error) {
-//	var lockToken *string
-//	for n, webACLSummary := range webACLs {
-//		if aws.StringValue(webACLSummary.Id) == meta.GetExternalName(cr) {
-//			lockToken = webACLSummary.LockToken
-//			break
-//		}
-//		if n == len(webACLs)-1 {
-//			return lockToken, errors.New(fmt.Sprintf("%s %s", errCouldNotFindWebACL, meta.GetExternalName(cr)))
-//		}
-//	}
-//	return lockToken, nil
-//}
+func getLockToken(webACLs []*svcsdk.WebACLSummary, cr *svcapitypes.WebACL) (*string, error) {
+	var lockToken *string
+	for n, webACLSummary := range webACLs {
+		if aws.StringValue(webACLSummary.Name) == meta.GetExternalName(cr) {
+			lockToken = webACLSummary.LockToken
+			break
+		}
+		if n == len(webACLs)-1 {
+			return lockToken, errors.New(fmt.Sprintf("%s %s", errCouldNotFindWebACL, meta.GetExternalName(cr)))
+		}
+	}
+	return lockToken, nil
+}
 
 // statementFromJSONString convert back to sdk types the rule statements which were ignored in generator-config.yaml and handled by the controller as string(json)
 func statementFromJSONString[S statementWithInfiniteRecursion](jsonPointer *string) (*S, error) {
@@ -369,7 +362,7 @@ func setInputRuleStatementsFromJSON(cr *svcapitypes.WebACL, rules []*svcsdk.Rule
 	return nil
 }
 
-func changeToLowerCase(params any) {
+func changeCaseInsensitiveFields(params any) {
 	v := reflect.Indirect(reflect.ValueOf(params))
 	if v.Kind() == reflect.Ptr {
 		fmt.Println(fmt.Sprintf("%s is a pointer!", v.Type().String()))
@@ -386,20 +379,20 @@ func changeToLowerCase(params any) {
 				for ri := 0; ri < v.FieldByName(field.Name).Len(); ri++ {
 					fmt.Println(fmt.Sprintf("run a nested loop for a rule #%d", ri))
 					rule := v.FieldByName(field.Name).Index(ri).Interface()
-					changeToLowerCase(rule)
+					changeCaseInsensitiveFields(rule)
 				}
 			}
 			if field.Type == reflect.TypeOf(&svcapitypes.Statement{}) || field.Type == reflect.TypeOf(&svcsdk.Statement{}) {
 				statement := v.FieldByName(field.Name).Interface()
 				fmt.Println("found a statement, run a nested loop")
-				changeToLowerCase(statement)
+				changeCaseInsensitiveFields(statement)
 			}
 			if field.Type == reflect.TypeOf([]*svcapitypes.Statement{}) || field.Type == reflect.TypeOf([]*svcsdk.Statement{}) {
 				fmt.Println("statements are found...")
 				for ri := 0; ri < v.FieldByName(field.Name).Len(); ri++ {
 					statement := v.FieldByName(field.Name).Index(ri).Interface()
 					fmt.Println(fmt.Sprintf("run a nested loop for statement with index %d", ri))
-					changeToLowerCase(statement)
+					changeCaseInsensitiveFields(statement)
 				}
 			}
 
@@ -409,7 +402,7 @@ func changeToLowerCase(params any) {
 
 				statement := v.FieldByName(field.Name).Interface()
 				fmt.Println(fmt.Sprintf("found a statement with nested statement(s) - %s, run a nested loop", field.Type.String()))
-				changeToLowerCase(statement)
+				changeCaseInsensitiveFields(statement)
 			}
 
 			if field.Type == reflect.TypeOf(&svcapitypes.ByteMatchStatement{}) ||
@@ -427,13 +420,13 @@ func changeToLowerCase(params any) {
 
 				fmt.Println(fmt.Sprintf("statement config is found - %s, run a nested loop", field.Type.String()))
 				statement := v.FieldByName(field.Name).Interface()
-				changeToLowerCase(statement)
+				changeCaseInsensitiveFields(statement)
 			}
 
 			if field.Type == reflect.TypeOf(&svcapitypes.FieldToMatch{}) || field.Type == reflect.TypeOf(&svcsdk.FieldToMatch{}) {
 				fmt.Println(fmt.Sprintf("found field to match, run a nested loop"))
 				fieldToMatch := v.FieldByName(field.Name).Interface()
-				changeToLowerCase(fieldToMatch)
+				changeCaseInsensitiveFields(fieldToMatch)
 			}
 
 			if field.Type == reflect.TypeOf(&svcapitypes.SingleHeader{}) ||
@@ -455,9 +448,10 @@ func changeToLowerCase(params any) {
 	}
 }
 
+// GenerateWebACL returns WebACLParameters with a diff between the current and external configuration
 func createPatch(currentParams *svcapitypes.WebACLParameters, resp *svcsdk.GetWebACLOutput, respTagList []*svcsdk.Tag) (*svcapitypes.WebACLParameters, error) {
 	targetConfig := currentParams.DeepCopy()
-	changeToLowerCase(targetConfig)
+	changeCaseInsensitiveFields(targetConfig)
 	externalConfig := GenerateWebACL(resp).Spec.ForProvider
 	patch := &svcapitypes.WebACLParameters{}
 	err := addJsonifiedRuleStatements(resp.WebACL.Rules, externalConfig)
@@ -469,12 +463,14 @@ func createPatch(currentParams *svcapitypes.WebACLParameters, resp *svcsdk.GetWe
 		// Unmarshalling the JSON string to the struct and marshaling it back to JSON string to further comparison with marshaled JSON string from the response
 		if rule.Statement.AndStatement != nil {
 			sdkStatement, err := statementFromJSONString[svcsdk.AndStatement](targetConfig.Rules[i].Statement.AndStatement)
-			changeToLowerCase(sdkStatement)
 			if err != nil {
 				return patch, err
 			}
+			// Change the case of the fields which are case-insensitive, so that the comparison is accurate.
+			// It is convinient to do it here, as we have the statement in the struct form(which is originally a json string)
+			changeCaseInsensitiveFields(sdkStatement)
+			// Marshal the struct back to JSON string, so that it can be compared with the JSON string from the response because the JSON string from the response is marshaled from the struct as well
 			targetConfig.Rules[i].Statement.AndStatement, err = statementToJSONString[svcsdk.AndStatement](*sdkStatement)
-
 			if err != nil {
 				return patch, err
 			}
@@ -524,13 +520,6 @@ func createPatch(currentParams *svcapitypes.WebACLParameters, resp *svcsdk.GetWe
 	for _, v := range respTagList {
 		externalConfig.Tags = append(externalConfig.Tags, &svcapitypes.Tag{Key: v.Key, Value: v.Value})
 	}
-
-	//if len(externalConfig.Rules) > 0 && externalConfig.Rules[0].Statement != nil && externalConfig.Rules[0].Statement.AndStatement != nil {
-	//	return patch, errors.New(fmt.Sprintf("external: %+v target: %+v", *externalConfig.Rules[0].Statement.AndStatement, *targetConfig.Rules[0].Statement.AndStatement))
-	//	return patch, errors.New(fmt.Sprintf("external: %s target: %s", gjson.Get(*externalConfig.Rules[0].Statement.AndStatement, "Statements.0.ByteMatchStatement.SearchString"), gjson.Get(*targetConfig.Rules[0].Statement.AndStatement, "Statements.0.ByteMatchStatement.SearchString")))
-	//}
-	//spew.Dump(externalConfig)
-	//spew.Dump(targetConfig)
 	jsonPatch, err := jsonpatch.CreateJSONPatch(externalConfig, targetConfig)
 	if err != nil {
 		return patch, err
@@ -545,14 +534,6 @@ func createPatch(currentParams *svcapitypes.WebACLParameters, resp *svcsdk.GetWe
 func addJsonifiedRuleStatements(resp []*svcsdk.Rule, externalConfig svcapitypes.WebACLParameters) error {
 	for i, rule := range resp {
 		if rule.Statement.AndStatement != nil {
-			//if rule.statementWithInfiniteRecursion.AndStatement.Statements != nil {
-			//for _, statement := range rule.statementWithInfiniteRecursion.AndStatement.Statements {
-			//	err := decodeRespBase64SearchStringIfExists(statement)
-			//	if err != nil {
-			//		return err
-			//	}
-			//}
-			//}
 			jsonStringStatement, err := statementToJSONString[svcsdk.AndStatement](*rule.Statement.AndStatement)
 			if err != nil {
 				return err
@@ -560,14 +541,6 @@ func addJsonifiedRuleStatements(resp []*svcsdk.Rule, externalConfig svcapitypes.
 			externalConfig.Rules[i].Statement.AndStatement = jsonStringStatement
 		}
 		if rule.Statement.OrStatement != nil {
-			//			if rule.statementWithInfiniteRecursion.OrStatement.Statements != nil {
-			//				for _, statement := range rule.statementWithInfiniteRecursion.OrStatement.Statements {
-			//					err := decodeRespBase64SearchStringIfExists(statement)
-			//					if err != nil {
-			//						return err
-			//					}
-			//				}
-			//			}
 			jsonStringStatement, err := statementToJSONString[svcsdk.OrStatement](*rule.Statement.OrStatement)
 			if err != nil {
 				return err
@@ -575,12 +548,6 @@ func addJsonifiedRuleStatements(resp []*svcsdk.Rule, externalConfig svcapitypes.
 			externalConfig.Rules[i].Statement.OrStatement = jsonStringStatement
 		}
 		if rule.Statement.NotStatement != nil {
-			//if rule.statementWithInfiniteRecursion.NotStatement.statementWithInfiniteRecursion != nil {
-			//				err := decodeRespBase64SearchStringIfExists(rule.statementWithInfiniteRecursion.NotStatement.statementWithInfiniteRecursion)
-			//				if err != nil {
-			//					return err
-			//				}
-			//}
 			jsonStringStatement, err := statementToJSONString[svcsdk.NotStatement](*rule.Statement.NotStatement)
 			if err != nil {
 				return err
@@ -588,10 +555,6 @@ func addJsonifiedRuleStatements(resp []*svcsdk.Rule, externalConfig svcapitypes.
 			externalConfig.Rules[i].Statement.NotStatement = jsonStringStatement
 		}
 		if rule.Statement.ManagedRuleGroupStatement != nil && rule.Statement.ManagedRuleGroupStatement.ScopeDownStatement != nil {
-			//			err := decodeRespBase64SearchStringIfExists(rule.statementWithInfiniteRecursion.ManagedRuleGroupStatement.ScopeDownStatement)
-			//			if err != nil {
-			//				return err
-			//			}
 			jsonStringStatement, err := statementToJSONString[svcsdk.Statement](*rule.Statement.ManagedRuleGroupStatement.ScopeDownStatement)
 			if err != nil {
 				return err
@@ -599,10 +562,6 @@ func addJsonifiedRuleStatements(resp []*svcsdk.Rule, externalConfig svcapitypes.
 			externalConfig.Rules[i].Statement.ManagedRuleGroupStatement.ScopeDownStatement = jsonStringStatement
 		}
 		if rule.Statement.RateBasedStatement != nil && rule.Statement.RateBasedStatement.ScopeDownStatement != nil {
-			//			err := decodeRespBase64SearchStringIfExists(rule.statementWithInfiniteRecursion.RateBasedStatement.ScopeDownStatement)
-			//			if err != nil {
-			//				return err
-			//			}
 			jsonStringStatement, err := statementToJSONString[svcsdk.Statement](*rule.Statement.RateBasedStatement.ScopeDownStatement)
 			if err != nil {
 				return err
@@ -612,15 +571,3 @@ func addJsonifiedRuleStatements(resp []*svcsdk.Rule, externalConfig svcapitypes.
 	}
 	return nil
 }
-
-//// decodeRespBase64SearchStringIfExists decodes the search string if it exists in the statement. It is needed before marshaling the statement to JSON otherwise it will be encoded to base64 second time.
-//func decodeRespBase64SearchStringIfExists(statement *svcsdk.statementWithInfiniteRecursion) error {
-//	if statement.ByteMatchStatement != nil && statement.ByteMatchStatement.SearchString != nil {
-//		decodedString, err := base64.StdEncoding.DecodeString(string(statement.ByteMatchStatement.SearchString))
-//		statement.ByteMatchStatement.SearchString = decodedString
-//		if err != nil {
-//			return err
-//		}
-//	}
-//	return nil
-//}

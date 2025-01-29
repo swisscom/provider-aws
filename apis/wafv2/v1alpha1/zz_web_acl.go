@@ -66,10 +66,6 @@ type WebACLParameters struct {
 	DefaultAction *DefaultAction `json:"defaultAction"`
 	// A description of the web ACL that helps with identification.
 	Description *string `json:"description,omitempty"`
-	// The name of the web ACL. You cannot change the name of a web ACL after you
-	// create it.
-	// +kubebuilder:validation:Required
-	Name *string `json:"name"`
 	// The Rule statements used to identify the web requests that you want to manage.
 	// Each rule includes one top-level statement that WAF uses to identify matching
 	// web requests, and parameters that govern how WAF handles them.
@@ -133,6 +129,9 @@ type WebACLObservation struct {
 	// If this happens, perform another get, and use the new token returned by that
 	// operation.
 	LockToken *string `json:"lockToken,omitempty"`
+	// The name of the web ACL. You cannot change the name of a web ACL after you
+	// create it.
+	Name *string `json:"name,omitempty"`
 }
 
 // WebACLStatus defines the observed state of WebACL.

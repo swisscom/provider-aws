@@ -6,11 +6,10 @@ ignore:
     - RegexPatternSet
     - RuleGroup
   field_paths:
-    - RuleGroup.Rules.Statement.AndStatement
-    - RuleGroup.Rules.Statement.OrStatement
-    - RuleGroup.Rules.Statement.NotStatement
-    - RuleGroup.Rules.Statement.ManagedRuleGroupStatement.ScopeDownStatement
-    - RuleGroup.Rules.Statement.RateBasedStatement.ScopeDownStatement
+    - CreateWebACLInput.Name
+    - UpdateWebACLInput.Name
+    - DeleteWebACLInput.Name
+    - GetWebACLInput.Name
     - WebACL.Rules.Statement.AndStatement
     - WebACL.Rules.Statement.OrStatement
     - WebACL.Rules.Statement.NotStatement
@@ -29,7 +28,6 @@ empty_shapes:
 operations:
   GetWebACL:
     output_wrapper_field_path: WebACL
-
 resources:
   WebACL:
     fields:
