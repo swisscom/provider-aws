@@ -239,7 +239,7 @@ func TestIsUpToDate(t *testing.T) {
 											{ByteMatchStatement: &svcsdk.ByteMatchStatement{
 												FieldToMatch: &svcsdk.FieldToMatch{
 													SingleHeader: &svcsdk.SingleHeader{
-														Name: aws.String("user-agenT"),
+														Name: aws.String("user-agent"),
 													},
 												},
 												PositionalConstraint: &ruleAndStatement0PositionalConstraint,

@@ -388,24 +388,27 @@ func setInputRuleStatementsFromJSON(cr *svcapitypes.WebACL, rules []*svcsdk.Rule
 
 func changeToLowerCase(params any) {
 	v := reflect.Indirect(reflect.ValueOf(params))
+	if v.Kind() == reflect.Ptr {
+		fmt.Println(fmt.Sprintf("%s is a pointer!", v.Type().String()))
+	}
 	fmt.Println(fmt.Sprintf("reflecting of type %s", v.Type().String()))
 
 	for i := 0; i < v.NumField(); i++ {
 		fmt.Println(fmt.Sprintf("i %d from v.NumField - %d", i, v.NumField()))
 		field := reflect.TypeOf(v.Interface()).Field(i)
-		fmt.Println(fmt.Sprintf("fieldName is %s", field.Name))
-		if v.FieldByName(field.Name).IsValid() {
+		if !v.FieldByName(field.Name).IsZero() {
+			fmt.Println(fmt.Sprintf("fieldName %s is not nil (type %s)", field.Name, field.Type.String()))
 			if field.Type == reflect.TypeOf([]*svcapitypes.Rule{}) || field.Type == reflect.TypeOf([]*svcsdk.Rule{}) {
 				fmt.Println("rules are found...")
 				for ri := 0; ri < v.FieldByName(field.Name).Len(); ri++ {
 					fmt.Println(fmt.Sprintf("run a nested loop for a rule #%d", ri))
-					rule := v.FieldByName(field.Name).Index(ri).Addr().Interface()
+					rule := v.FieldByName(field.Name).Index(ri).Interface()
 					changeToLowerCase(rule)
 				}
 			}
 			if field.Type == reflect.TypeOf(&svcapitypes.Statement{}) || field.Type == reflect.TypeOf(&svcsdk.Statement{}) {
-				statement := v.FieldByName(field.Name).Addr().Interface()
-				fmt.Println(fmt.Sprintf("found a statement, run a nested loop", field.Type.String()))
+				statement := v.FieldByName(field.Name).Interface()
+				fmt.Println("found a statement, run a nested loop")
 				changeToLowerCase(statement)
 			}
 			if field.Type == reflect.TypeOf([]*svcapitypes.Statement{}) || field.Type == reflect.TypeOf([]*svcsdk.Statement{}) {
@@ -417,11 +420,11 @@ func changeToLowerCase(params any) {
 				}
 			}
 
-			if field.Type == reflect.TypeOf(svcsdk.AndStatement{}) ||
-				field.Type == reflect.TypeOf(svcsdk.OrStatement{}) ||
-				field.Type == reflect.TypeOf(svcsdk.NotStatement{}) {
+			if field.Type == reflect.TypeOf(&svcsdk.AndStatement{}) ||
+				field.Type == reflect.TypeOf(&svcsdk.OrStatement{}) ||
+				field.Type == reflect.TypeOf(&svcsdk.NotStatement{}) {
 
-				statement := v.FieldByName(field.Name).Addr().Interface()
+				statement := v.FieldByName(field.Name).Interface()
 				fmt.Println(fmt.Sprintf("found a statement with nested statement(s) - %s, run a nested loop", field.Type.String()))
 				changeToLowerCase(statement)
 			}
@@ -439,15 +442,15 @@ func changeToLowerCase(params any) {
 				field.Type == reflect.TypeOf(&svcapitypes.XSSMatchStatement{}) ||
 				field.Type == reflect.TypeOf(&svcsdk.XssMatchStatement{}) {
 
-				fmt.Println(fmt.Sprintf("statement confug is found - %s", field.Type.String()))
-				for i := 0; i < v.FieldByName(field.Name).NumField(); i++ {
-					statementField := reflect.TypeOf(v.FieldByName(field.Name).Addr().Interface()).Field(i)
-					if statementField.Type == reflect.TypeOf(&svcsdk.FieldToMatch{}) || statementField.Type == reflect.TypeOf(&svcapitypes.FieldToMatch{}) {
-						fmt.Println("field to match is found, run a nested loop...")
-						fieldToMatch := v.FieldByName(field.Name).FieldByName(statementField.Name).Addr().Interface()
-						changeToLowerCase(fieldToMatch)
-					}
-				}
+				fmt.Println(fmt.Sprintf("statement config is found - %s, run a nested loop", field.Type.String()))
+				statement := v.FieldByName(field.Name).Interface()
+				changeToLowerCase(statement)
+			}
+
+			if field.Type == reflect.TypeOf(&svcapitypes.FieldToMatch{}) || field.Type == reflect.TypeOf(&svcsdk.FieldToMatch{}) {
+				fmt.Println(fmt.Sprintf("found field to match, run a nested loop"))
+				fieldToMatch := v.FieldByName(field.Name).Interface()
+				changeToLowerCase(fieldToMatch)
 			}
 
 			if field.Type == reflect.TypeOf(&svcapitypes.SingleHeader{}) ||
@@ -456,7 +459,7 @@ func changeToLowerCase(params any) {
 				field.Type == reflect.TypeOf(&svcsdk.SingleQueryArgument{}) {
 
 				fmt.Println(fmt.Sprintf("FieldToMatch.Name is found in %s", v.FieldByName(field.Name)))
-				caseInSensitiveName := v.FieldByName(field.Name).FieldByName("Name")
+				caseInSensitiveName := v.FieldByName(field.Name).Elem().FieldByName("Name")
 				if caseInSensitiveName.IsValid() && caseInSensitiveName.CanSet() {
 					lowerCasedName := strings.ToLower(caseInSensitiveName.Elem().String())
 					caseInSensitiveName.SetPointer(unsafe.Pointer(&lowerCasedName))
@@ -466,6 +469,7 @@ func changeToLowerCase(params any) {
 		}
 	}
 }
+
 
 func createPatch(currentParams *svcapitypes.WebACLParameters, resp *svcsdk.GetWebACLOutput, respTagList []*svcsdk.Tag) (*svcapitypes.WebACLParameters, error) {
 	targetConfig := currentParams.DeepCopy()
