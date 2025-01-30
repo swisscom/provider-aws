@@ -35,7 +35,7 @@ type args struct {
 	desired  *svcapitypes.WebACL
 	observed *svcsdk.GetWebACLOutput
 	client   *fake.MockWAFV2Client
-	cache    *cache
+	//	cache    *cache
 }
 
 func TestIsUpToDate(t *testing.T) {

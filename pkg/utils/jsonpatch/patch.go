@@ -18,6 +18,7 @@ package jsonpatch
 
 import (
 	"encoding/json"
+
 	jsonpatch "github.com/evanphx/json-patch"
 )
 

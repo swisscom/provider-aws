@@ -2,18 +2,18 @@
 apiVersion: wafv2.aws.crossplane.io/v1alpha1
 kind: WebACL
 metadata:
-  name: kir-test
+  name: web-acl-example
 spec:
   deletionPolicy: Delete
   forProvider:
     region: eu-central-1
     rules:
-      - name: rule1
+      - name: rule-1
         visibilityConfig:
-          metricName: 'kir-test'
+          metricName: 'metric-name'
           sampledRequestsEnabled: false
-          cloudWatchMetricsEnabled: false
-        priority: 1
+          cloudWatchMetricsEnabled: true
+        priority: 0
         action:
           allow: { }
         statement:
@@ -43,7 +43,7 @@ spec:
                     {
                       "FieldToMatch": {
                         "SingleHeader": {
-                          "Name": "User-AgentCustim"
+                          "Name": "User-Agent"
                         }
                       },
                       "PositionalConstraint": "CONTAINS",
@@ -58,10 +58,28 @@ spec:
                 }
               ]
             }
+      - name: rule-2
+        visibilityConfig:
+          metricName: 'metric-name'
+          sampledRequestsEnabled: false
+          cloudWatchMetricsEnabled: true
+        priority: 1
+        action:
+          allow: { }
+        statement:
+          byteMatchStatement:
+            fieldToMatch:
+              singleHeader:
+                 name: "User-Agent"
+            positionalConstraint: "CONTAINS"
+            searchString: "YmFkQm90"
+            textTransformations:
+              - priority: 1
+                type_: "NONE"
     visibilityConfig:
-      metricName: 'kir-test'
+      metricName: 'metric-name'
       sampledRequestsEnabled: false
-      cloudWatchMetricsEnabled: false
+      cloudWatchMetricsEnabled: true
     defaultAction:
       allow: { }
     scope: REGIONAL
@@ -69,4 +87,4 @@ spec:
       - key: "crossplane:managed"
         value: "true"
   providerConfigRef:
-    name: providerconfig-aws
+    name: provider-aws

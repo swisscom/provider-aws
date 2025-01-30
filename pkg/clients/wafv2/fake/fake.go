@@ -753,7 +753,7 @@ func (m *MockWAFV2Client) UpdateIPSetRequest(input *svcsdk.UpdateIPSetInput) (*r
 }
 
 func (m *MockWAFV2Client) UpdateManagedRuleSetVersionExpiryDate(input *svcsdk.UpdateManagedRuleSetVersionExpiryDateInput) (*svcsdk.UpdateManagedRuleSetVersionExpiryDateOutput, error) {
-	return m.UpdateManagedRuleSetVersionExpiryDate(input)
+	return m.MockUpdateManagedRuleSetVersionExpiryDate(input)
 }
 
 func (m *MockWAFV2Client) UpdateManagedRuleSetVersionExpiryDateWithContext(context aws.Context, input *svcsdk.UpdateManagedRuleSetVersionExpiryDateInput, option ...request.Option) (*svcsdk.UpdateManagedRuleSetVersionExpiryDateOutput, error) {
@@ -761,7 +761,7 @@ func (m *MockWAFV2Client) UpdateManagedRuleSetVersionExpiryDateWithContext(conte
 }
 
 func (m *MockWAFV2Client) UpdateManagedRuleSetVersionExpiryDateRequest(input *svcsdk.UpdateManagedRuleSetVersionExpiryDateInput) (*request.Request, *svcsdk.UpdateManagedRuleSetVersionExpiryDateOutput) {
-	return m.UpdateManagedRuleSetVersionExpiryDateRequest(input)
+	return m.MockUpdateManagedRuleSetVersionExpiryDateRequest(input)
 }
 
 func (m *MockWAFV2Client) UpdateRegexPatternSet(input *svcsdk.UpdateRegexPatternSetInput) (*svcsdk.UpdateRegexPatternSetOutput, error) {

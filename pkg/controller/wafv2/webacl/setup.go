@@ -16,14 +16,13 @@ package webacl
 import (
 	"context"
 	"encoding/json"
-	"fmt"
-	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
 	"reflect"
 	"strings"
 
 	"github.com/aws/aws-sdk-go/aws"
 	svcsdk "github.com/aws/aws-sdk-go/service/wafv2"
 	svcsdkapi "github.com/aws/aws-sdk-go/service/wafv2/wafv2iface"
+	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
 	"github.com/crossplane/crossplane-runtime/pkg/connection"
 	"github.com/crossplane/crossplane-runtime/pkg/controller"
 	"github.com/crossplane/crossplane-runtime/pkg/event"
@@ -46,10 +45,6 @@ import (
 	"github.com/crossplane-contrib/provider-aws/pkg/utils/jsonpatch"
 	custommanaged "github.com/crossplane-contrib/provider-aws/pkg/utils/reconciler/managed"
 	tagutils "github.com/crossplane-contrib/provider-aws/pkg/utils/tags"
-)
-
-const (
-	errCouldNotFindWebACL = "could not find WebACL"
 )
 
 // SetupWebACL adds a controller that reconciles SetupWebAcl.
@@ -144,7 +139,7 @@ func (c *customConnector) Connect(ctx context.Context, mg cpresource.Managed) (m
 	return newCustomExternal(c.kube, svcsdk.New(sess)), nil
 }
 
-func (e *customExternal) Observe(ctx context.Context, mg cpresource.Managed) (managed.ExternalObservation, error) {
+func (e *customExternal) Observe(ctx context.Context, mg cpresource.Managed) (managed.ExternalObservation, error) { //nolint:gocyclo
 	cr, ok := mg.(*svcapitypes.WebACL)
 	if !ok {
 		return managed.ExternalObservation{}, errors.New(errUnexpectedObject)
@@ -289,21 +284,6 @@ func preDelete(_ context.Context, cr *svcapitypes.WebACL, input *svcsdk.DeleteWe
 	return false, nil
 }
 
-// getLockToken returns the lock token which is required for WebACL update and delete operations
-func getLockToken(webACLs []*svcsdk.WebACLSummary, cr *svcapitypes.WebACL) (*string, error) {
-	var lockToken *string
-	for n, webACLSummary := range webACLs {
-		if aws.StringValue(webACLSummary.Name) == meta.GetExternalName(cr) {
-			lockToken = webACLSummary.LockToken
-			break
-		}
-		if n == len(webACLs)-1 {
-			return lockToken, errors.New(fmt.Sprintf("%s %s", errCouldNotFindWebACL, meta.GetExternalName(cr)))
-		}
-	}
-	return lockToken, nil
-}
-
 // statementFromJSONString convert back to sdk types the rule statements which were ignored in generator-config.yaml and handled by the controller as string(json)
 func statementFromJSONString[S statementWithInfiniteRecursion](jsonPointer *string) (*S, error) {
 	jsonString := ptr.Deref(jsonPointer, "")
@@ -326,7 +306,7 @@ func statementToJSONString[S statementWithInfiniteRecursion](statement S) (*stri
 }
 
 // setInputRuleStatementsFromJSON sets the input for rule statements which were ignored in generator-config.yaml and handled as string(json)
-func setInputRuleStatementsFromJSON(cr *svcapitypes.WebACL, rules []*svcsdk.Rule) (err error) {
+func setInputRuleStatementsFromJSON(cr *svcapitypes.WebACL, rules []*svcsdk.Rule) (err error) { //nolint:gocyclo
 	for i, rule := range cr.Spec.ForProvider.Rules {
 		if rule.Statement.OrStatement != nil {
 			rules[i].Statement.OrStatement, err = statementFromJSONString[svcsdk.OrStatement](rule.Statement.OrStatement)
@@ -352,7 +332,7 @@ func setInputRuleStatementsFromJSON(cr *svcapitypes.WebACL, rules []*svcsdk.Rule
 				return err
 			}
 		}
-		if rule.Statement.ByteMatchStatement != nil && rule.Statement.RateBasedStatement.ScopeDownStatement != nil {
+		if rule.Statement.RateBasedStatement != nil && rule.Statement.RateBasedStatement.ScopeDownStatement != nil {
 			rules[i].Statement.RateBasedStatement.ScopeDownStatement, err = statementFromJSONString[svcsdk.Statement](rule.Statement.RateBasedStatement.ScopeDownStatement)
 			if err != nil {
 				return err
@@ -369,7 +349,7 @@ func setInputRuleStatementsFromJSON(cr *svcapitypes.WebACL, rules []*svcsdk.Rule
 // These two fields are SingleHeader.Name and SingleQueryArgument.Name from FieldToMatch. FieldToMatch is used in ByteMatchStatement, RegexMatchStatement, RegexPatternSetReferenceStatement
 // SizeConstraintStatement, SQLIMatchStatement, XSSMatchStatement which in turn can be placed in AndStatement, OrStatement, NotStatement in any deeper level of nestedness.
 // This function works with svcsdk(aws-sdk) and svcapitypes(provider-aws) types because they have very similar structure
-func changeCaseInsensitiveFields(params any) {
+func changeCaseInsensitiveFields(params any) { //nolint:gocyclo
 	v := reflect.Indirect(reflect.ValueOf(params))
 	for i := 0; i < v.NumField(); i++ {
 		field := reflect.TypeOf(v.Interface()).Field(i)
@@ -456,7 +436,7 @@ func traverseStruct(field reflect.StructField, v reflect.Value) {
 }
 
 // GenerateWebACL returns WebACLParameters with a diff between the current and external configuration
-func createPatch(currentParams *svcapitypes.WebACLParameters, resp *svcsdk.GetWebACLOutput, respTagList []*svcsdk.Tag) (*svcapitypes.WebACLParameters, error) {
+func createPatch(currentParams *svcapitypes.WebACLParameters, resp *svcsdk.GetWebACLOutput, respTagList []*svcsdk.Tag) (*svcapitypes.WebACLParameters, error) { //nolint:gocyclo
 	targetConfig := currentParams.DeepCopy()
 	changeCaseInsensitiveFields(targetConfig)
 	externalConfig := GenerateWebACL(resp).Spec.ForProvider
@@ -505,7 +485,6 @@ func createPatch(currentParams *svcapitypes.WebACLParameters, resp *svcsdk.GetWe
 			}
 		}
 		if rule.Statement.ManagedRuleGroupStatement != nil && rule.Statement.ManagedRuleGroupStatement.ScopeDownStatement != nil {
-			return patch, errors.New("WTF I'M HERE")
 			sdkStatement, err := statementFromJSONString[svcsdk.Statement](targetConfig.Rules[i].Statement.ManagedRuleGroupStatement.ScopeDownStatement)
 			if err != nil {
 				return patch, err
@@ -542,7 +521,7 @@ func createPatch(currentParams *svcapitypes.WebACLParameters, resp *svcsdk.GetWe
 }
 
 // addJsonifiedRuleStatements adds the Jsonified rule statements to the externalConfig(other fields prepared by GenerateWebACL)
-func addJsonifiedRuleStatements(resp []*svcsdk.Rule, externalConfig svcapitypes.WebACLParameters) error {
+func addJsonifiedRuleStatements(resp []*svcsdk.Rule, externalConfig svcapitypes.WebACLParameters) error { //nolint:gocyclo
 	for i, rule := range resp {
 		if rule.Statement.AndStatement != nil {
 			jsonStringStatement, err := statementToJSONString[svcsdk.AndStatement](*rule.Statement.AndStatement)

@@ -571,6 +571,10 @@ spec:
                             For example specifications, see the examples section of CreateWebACL.
                           properties:
                             andStatement:
+                              description: |-
+                                A logical rule statement used to combine other rule statements with AND logic.
+                                You provide more than one Statement within the AndStatement as json string.
+                                ATTENTION: "SearchString" value should be base64 encoded
                               type: string
                             byteMatchStatement:
                               description: |-
@@ -1684,8 +1688,16 @@ spec:
                                   type: string
                               type: object
                             notStatement:
+                              description: |-
+                                A logical rule statement used to negate the results of another rule statement.
+                                You provide one Statement within the NotStatement as json string
+                                ATTENTION: "SearchString" value should be base64 encoded
                               type: string
                             orStatement:
+                              description: |-
+                                A logical rule statement used to combine other rule statements with OR logic.
+                                You provide more than one Statement within the OrStatement as json string
+                                ATTENTION: "SearchString" value should be base64 encoded
                               type: string
                             rateBasedStatement:
                               description: |-
