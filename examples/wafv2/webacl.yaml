@@ -3,11 +3,9 @@ apiVersion: wafv2.aws.crossplane.io/v1alpha1
 kind: WebACL
 metadata:
   name: kir-test
-    #  annotations:
-    #    crossplane.io/external-name: kir-test
 spec:
+  deletionPolicy: Delete
   forProvider:
-    name: kir-test
     region: eu-central-1
     rules:
       - name: rule1
@@ -31,7 +29,7 @@ spec:
                         }
                       },
                       "PositionalConstraint": "CONTAINS",
-                      "SearchString": "bmV3VmFsdWUh",
+                      "SearchString": "YmFkQm90",
                       "TextTransformations": [
                         {
                           "Priority": 0,

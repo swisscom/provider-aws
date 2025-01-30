@@ -117,15 +117,15 @@ func newCustomExternal(kube client.Client, client svcsdkapi.WAFV2API) *customExt
 			kube:           kube,
 			client:         client,
 			preObserve:     nopPreObserve,
-			postObserve:    nopPostObserve,
 			isUpToDate:     shared.isUpToDate,
-			preCreate:      preCreate,
-			preDelete:      nopPreDelete,
-			preUpdate:      shared.preUpdate,
 			lateInitialize: nopLateInitialize,
+			postObserve:    nopPostObserve,
+			preCreate:      preCreate,
 			postCreate:     nopPostCreate,
-			postDelete:     nopPostDelete,
+			preUpdate:      shared.preUpdate,
 			postUpdate:     nopPostUpdate,
+			preDelete:      preDelete,
+			postDelete:     nopPostDelete,
 		},
 		shared.cache,
 	}
@@ -283,7 +283,7 @@ func (s *shared) preUpdate(_ context.Context, cr *svcapitypes.WebACL, input *svc
 	return nil
 }
 
-func (s *shared) preDelete(_ context.Context, cr *svcapitypes.WebACL, input *svcsdk.DeleteWebACLInput) (bool, error) {
+func preDelete(_ context.Context, cr *svcapitypes.WebACL, input *svcsdk.DeleteWebACLInput) (bool, error) {
 	input.Name = aws.String(meta.GetExternalName(cr))
 	input.LockToken = cr.Status.AtProvider.LockToken
 	return false, nil
@@ -362,90 +362,97 @@ func setInputRuleStatementsFromJSON(cr *svcapitypes.WebACL, rules []*svcsdk.Rule
 	return nil
 }
 
+// TODO(teeverr): find an easier way to ignore case insensitive fields, probably is it possible via cmp.FilterPath/cmp.FilterValues? I didn't get how
+
+// changeCaseInsensitiveFields changes the case of two in case-insensitive fields in wafv2.WebACL(https://github.com/aws/aws-sdk-go/blob/main/service/wafv2/api.go#L26332)
+// which is important because current configuration might have different case than the external configuration(external has lower case every time) and isUpToDate will return false for an equal configuration
+// These two fields are SingleHeader.Name and SingleQueryArgument.Name from FieldToMatch. FieldToMatch is used in ByteMatchStatement, RegexMatchStatement, RegexPatternSetReferenceStatement
+// SizeConstraintStatement, SQLIMatchStatement, XSSMatchStatement which in turn can be placed in AndStatement, OrStatement, NotStatement in any deeper level of nestedness.
+// This function works with svcsdk(aws-sdk) and svcapitypes(provider-aws) types because they have very similar structure
 func changeCaseInsensitiveFields(params any) {
 	v := reflect.Indirect(reflect.ValueOf(params))
-	if v.Kind() == reflect.Ptr {
-		fmt.Println(fmt.Sprintf("%s is a pointer!", v.Type().String()))
-	}
-	fmt.Println(fmt.Sprintf("reflecting of type %s", v.Type().String()))
-
 	for i := 0; i < v.NumField(); i++ {
-		fmt.Println(fmt.Sprintf("i %d from v.NumField - %d", i, v.NumField()))
 		field := reflect.TypeOf(v.Interface()).Field(i)
 		if !v.FieldByName(field.Name).IsZero() {
-			fmt.Println(fmt.Sprintf("fieldName %s is not nil (type %s)", field.Name, field.Type.String()))
-			if field.Type == reflect.TypeOf([]*svcapitypes.Rule{}) || field.Type == reflect.TypeOf([]*svcsdk.Rule{}) {
-				fmt.Println("rules are found...")
-				for ri := 0; ri < v.FieldByName(field.Name).Len(); ri++ {
-					fmt.Println(fmt.Sprintf("run a nested loop for a rule #%d", ri))
-					rule := v.FieldByName(field.Name).Index(ri).Interface()
-					changeCaseInsensitiveFields(rule)
-				}
-			}
-			if field.Type == reflect.TypeOf(&svcapitypes.Statement{}) || field.Type == reflect.TypeOf(&svcsdk.Statement{}) {
-				statement := v.FieldByName(field.Name).Interface()
-				fmt.Println("found a statement, run a nested loop")
-				changeCaseInsensitiveFields(statement)
-			}
-			if field.Type == reflect.TypeOf([]*svcapitypes.Statement{}) || field.Type == reflect.TypeOf([]*svcsdk.Statement{}) {
-				fmt.Println("statements are found...")
-				for ri := 0; ri < v.FieldByName(field.Name).Len(); ri++ {
-					statement := v.FieldByName(field.Name).Index(ri).Interface()
-					fmt.Println(fmt.Sprintf("run a nested loop for statement with index %d", ri))
-					changeCaseInsensitiveFields(statement)
-				}
-			}
-
-			if field.Type == reflect.TypeOf(&svcsdk.AndStatement{}) ||
-				field.Type == reflect.TypeOf(&svcsdk.OrStatement{}) ||
-				field.Type == reflect.TypeOf(&svcsdk.NotStatement{}) {
-
-				statement := v.FieldByName(field.Name).Interface()
-				fmt.Println(fmt.Sprintf("found a statement with nested statement(s) - %s, run a nested loop", field.Type.String()))
-				changeCaseInsensitiveFields(statement)
-			}
-
-			if field.Type == reflect.TypeOf(&svcapitypes.ByteMatchStatement{}) ||
-				field.Type == reflect.TypeOf(&svcsdk.ByteMatchStatement{}) ||
-				field.Type == reflect.TypeOf(&svcapitypes.RegexMatchStatement{}) ||
-				field.Type == reflect.TypeOf(&svcsdk.RegexMatchStatement{}) ||
-				field.Type == reflect.TypeOf(&svcapitypes.RegexPatternSetReferenceStatement{}) ||
-				field.Type == reflect.TypeOf(&svcsdk.RegexPatternSetReferenceStatement{}) ||
-				field.Type == reflect.TypeOf(&svcapitypes.SizeConstraintStatement{}) ||
-				field.Type == reflect.TypeOf(&svcsdk.SizeConstraintStatement{}) ||
-				field.Type == reflect.TypeOf(&svcapitypes.SQLIMatchStatement{}) ||
-				field.Type == reflect.TypeOf(&svcsdk.SqliMatchStatement{}) ||
-				field.Type == reflect.TypeOf(&svcapitypes.XSSMatchStatement{}) ||
-				field.Type == reflect.TypeOf(&svcsdk.XssMatchStatement{}) {
-
-				fmt.Println(fmt.Sprintf("statement config is found - %s, run a nested loop", field.Type.String()))
-				statement := v.FieldByName(field.Name).Interface()
-				changeCaseInsensitiveFields(statement)
-			}
-
-			if field.Type == reflect.TypeOf(&svcapitypes.FieldToMatch{}) || field.Type == reflect.TypeOf(&svcsdk.FieldToMatch{}) {
-				fmt.Println(fmt.Sprintf("found field to match, run a nested loop"))
-				fieldToMatch := v.FieldByName(field.Name).Interface()
-				changeCaseInsensitiveFields(fieldToMatch)
-			}
-
-			if field.Type == reflect.TypeOf(&svcapitypes.SingleHeader{}) ||
-				field.Type == reflect.TypeOf(&svcsdk.SingleHeader{}) ||
-				field.Type == reflect.TypeOf(&svcapitypes.SingleQueryArgument{}) ||
-				field.Type == reflect.TypeOf(&svcsdk.SingleQueryArgument{}) {
-
-				fmt.Println(fmt.Sprintf("FieldToMatch.Name is found in %s", v.FieldByName(field.Name)))
-				caseInSensitiveName := v.FieldByName(field.Name).Elem().FieldByName("Name").Elem()
-				fmt.Printf("caseInSensitiveName kind is %s and type %s isItValid(%t) is it CanSet(%t)", caseInSensitiveName.Kind().String(), caseInSensitiveName.Type().String(), caseInSensitiveName.IsValid(), caseInSensitiveName.CanSet())
-				if caseInSensitiveName.IsValid() && caseInSensitiveName.CanSet() {
-					lowerCasedName := strings.ToLower(caseInSensitiveName.String())
-					caseInSensitiveName.SetString(lowerCasedName)
-					fmt.Printf("transformed to lower case - %s\n", caseInSensitiveName.String())
-					fmt.Println(fmt.Sprintf("new FieldToMatch.Name  %s", v.FieldByName(field.Name)))
-				}
+			switch field.Type {
+			case reflect.TypeOf([]*svcapitypes.Rule{}):
+				traverseStuctList(field, v)
+			case reflect.TypeOf([]*svcsdk.Rule{}):
+				traverseStuctList(field, v)
+			case reflect.TypeOf(&svcapitypes.Statement{}):
+				traverseStruct(field, v)
+			case reflect.TypeOf(&svcsdk.Statement{}):
+				traverseStruct(field, v)
+			case reflect.TypeOf([]*svcapitypes.Statement{}):
+				traverseStuctList(field, v)
+			case reflect.TypeOf([]*svcsdk.Statement{}):
+				traverseStuctList(field, v)
+				// AndStatement, AndStatement, NotStatement in svcapitypes have type *string and ingored here
+			case reflect.TypeOf(&svcsdk.AndStatement{}):
+				traverseStruct(field, v)
+			case reflect.TypeOf(&svcsdk.OrStatement{}):
+				traverseStruct(field, v)
+			case reflect.TypeOf(&svcsdk.NotStatement{}):
+				traverseStruct(field, v)
+			case reflect.TypeOf(&svcapitypes.ByteMatchStatement{}):
+				traverseStruct(field, v)
+			case reflect.TypeOf(&svcsdk.ByteMatchStatement{}):
+				traverseStruct(field, v)
+			case reflect.TypeOf(&svcapitypes.RegexMatchStatement{}):
+				traverseStruct(field, v)
+			case reflect.TypeOf(&svcsdk.RegexMatchStatement{}):
+				traverseStruct(field, v)
+			case reflect.TypeOf(&svcapitypes.RegexPatternSetReferenceStatement{}):
+				traverseStruct(field, v)
+			case reflect.TypeOf(&svcsdk.RegexPatternSetReferenceStatement{}):
+				traverseStruct(field, v)
+			case reflect.TypeOf(&svcapitypes.SizeConstraintStatement{}):
+				traverseStruct(field, v)
+			case reflect.TypeOf(&svcsdk.SizeConstraintStatement{}):
+				traverseStruct(field, v)
+			case reflect.TypeOf(&svcapitypes.SQLIMatchStatement{}):
+				traverseStruct(field, v)
+			case reflect.TypeOf(&svcsdk.SqliMatchStatement{}):
+				traverseStruct(field, v)
+			case reflect.TypeOf(&svcapitypes.XSSMatchStatement{}):
+				traverseStruct(field, v)
+			case reflect.TypeOf(&svcsdk.XssMatchStatement{}):
+				traverseStruct(field, v)
+			case reflect.TypeOf(&svcapitypes.FieldToMatch{}):
+				traverseStruct(field, v)
+			case reflect.TypeOf(&svcsdk.FieldToMatch{}):
+				traverseStruct(field, v)
+			case reflect.TypeOf(&svcapitypes.SingleHeader{}):
+				setToLower(field, v)
+			case reflect.TypeOf(&svcsdk.SingleHeader{}):
+				setToLower(field, v)
+			case reflect.TypeOf(&svcapitypes.SingleQueryArgument{}):
+				setToLower(field, v)
+			case reflect.TypeOf(&svcsdk.SingleQueryArgument{}):
+				setToLower(field, v)
 			}
 		}
 	}
+}
+
+func setToLower(field reflect.StructField, v reflect.Value) {
+	caseInSensitiveName := v.FieldByName(field.Name).Elem().FieldByName("Name").Elem()
+	if caseInSensitiveName.IsValid() && caseInSensitiveName.CanSet() {
+		lowerCasedName := strings.ToLower(caseInSensitiveName.String())
+		caseInSensitiveName.SetString(lowerCasedName)
+	}
+}
+
+func traverseStuctList(field reflect.StructField, v reflect.Value) {
+	for i := 0; i < v.FieldByName(field.Name).Len(); i++ {
+		interfaceValue := v.FieldByName(field.Name).Index(i).Interface()
+		changeCaseInsensitiveFields(interfaceValue)
+	}
+}
+
+func traverseStruct(field reflect.StructField, v reflect.Value) {
+	interfaceValue := v.FieldByName(field.Name).Interface()
+	changeCaseInsensitiveFields(interfaceValue)
 }
 
 // GenerateWebACL returns WebACLParameters with a diff between the current and external configuration
@@ -468,8 +475,8 @@ func createPatch(currentParams *svcapitypes.WebACLParameters, resp *svcsdk.GetWe
 			}
 			// Change the case of the fields which are case-insensitive, so that the comparison is accurate.
 			// It is convinient to do it here, as we have the statement in the struct form(which is originally a json string)
-			changeCaseInsensitiveFields(sdkStatement)
 			// Marshal the struct back to JSON string, so that it can be compared with the JSON string from the response because the JSON string from the response is marshaled from the struct as well
+			changeCaseInsensitiveFields(sdkStatement)
 			targetConfig.Rules[i].Statement.AndStatement, err = statementToJSONString[svcsdk.AndStatement](*sdkStatement)
 			if err != nil {
 				return patch, err
@@ -480,6 +487,7 @@ func createPatch(currentParams *svcapitypes.WebACLParameters, resp *svcsdk.GetWe
 			if err != nil {
 				return patch, err
 			}
+			changeCaseInsensitiveFields(sdkStatement)
 			targetConfig.Rules[i].Statement.OrStatement, err = statementToJSONString[svcsdk.OrStatement](*sdkStatement)
 			if err != nil {
 				return patch, err
@@ -490,6 +498,7 @@ func createPatch(currentParams *svcapitypes.WebACLParameters, resp *svcsdk.GetWe
 			if err != nil {
 				return patch, err
 			}
+			changeCaseInsensitiveFields(sdkStatement)
 			targetConfig.Rules[i].Statement.NotStatement, err = statementToJSONString[svcsdk.NotStatement](*sdkStatement)
 			if err != nil {
 				return patch, err
@@ -501,6 +510,7 @@ func createPatch(currentParams *svcapitypes.WebACLParameters, resp *svcsdk.GetWe
 			if err != nil {
 				return patch, err
 			}
+			changeCaseInsensitiveFields(sdkStatement)
 			targetConfig.Rules[i].Statement.ManagedRuleGroupStatement.ScopeDownStatement, err = statementToJSONString[svcsdk.Statement](*sdkStatement)
 			if err != nil {
 				return patch, err
@@ -511,6 +521,7 @@ func createPatch(currentParams *svcapitypes.WebACLParameters, resp *svcsdk.GetWe
 			if err != nil {
 				return patch, err
 			}
+			changeCaseInsensitiveFields(sdkStatement)
 			targetConfig.Rules[i].Statement.RateBasedStatement.ScopeDownStatement, err = statementToJSONString[svcsdk.Statement](*sdkStatement)
 			if err != nil {
 				return patch, err
