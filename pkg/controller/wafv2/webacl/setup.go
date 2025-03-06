@@ -95,7 +95,6 @@ type customConnector struct {
 	logger logging.Logger
 }
 
-// customExternal is external connector with overridden Observe method due to ACK doesn't correctly generate it.
 type customExternal struct {
 	external
 	cache *cache
@@ -110,6 +109,12 @@ type shared struct {
 type cache struct {
 	tagListOutput               []*svcsdk.Tag
 	observedAssociatedResources []*string
+	// Observe function updates the status, Update func retrieves some required input params from the status,
+	// and Update might be triggered in the same reconciliation loop but the status will be updated only in the next one
+	// which leads to errors in case of taking control over existing webacl with difference configuration(ds is different)
+	// in the very first loop. Because in this case the status is empty. Caching resolve this problem and allows to share
+	// the status in the same reconciliation loop
+	status svcapitypes.WebACLObservation
 }
 
 func newCustomExternal(kube client.Client, client svcsdkapi.WAFV2API, logger logging.Logger) *customExternal {
@@ -179,6 +184,8 @@ func (e *customExternal) Observe(ctx context.Context, cr *svcapitypes.WebACL) (m
 		return managed.ExternalObservation{}, errors.Wrap(err, "late-init failed")
 	}
 	GenerateWebACL(resp).Status.AtProvider.DeepCopyInto(&cr.Status.AtProvider)
+	cr.Status.AtProvider.LockToken = resp.LockToken
+	e.cache.status = cr.Status.AtProvider
 	upToDate := true
 	diff := ""
 	if !meta.WasDeleted(cr) { // There is no need to run isUpToDate if the resource is deleted
@@ -188,7 +195,6 @@ func (e *customExternal) Observe(ctx context.Context, cr *svcapitypes.WebACL) (m
 		}
 	}
 	cr.SetConditions(xpv1.Available())
-	cr.Status.AtProvider.LockToken = resp.LockToken
 	return e.postObserve(ctx, cr, resp, managed.ExternalObservation{
 		ResourceExists:          true,
 		ResourceUpToDate:        upToDate,
@@ -255,6 +261,8 @@ func (s *shared) postCreate(_ context.Context, cr *svcapitypes.WebACL, resp *svc
 
 func (s *shared) preUpdate(_ context.Context, cr *svcapitypes.WebACL, input *svcsdk.UpdateWebACLInput) error { //nolint:gocyclo
 	input.Name = aws.String(meta.GetExternalName(cr))
+	input.Id = s.cache.status.ID
+	input.LockToken = s.cache.status.LockToken
 	err := setInputRuleStatementsFromJSON(cr, input.Rules)
 	if err != nil {
 		return err
@@ -295,11 +303,11 @@ func (s *shared) preUpdate(_ context.Context, cr *svcapitypes.WebACL, input *svc
 
 	// Associate and disassociate resources are implemented only for REGIONAL scope yet
 	if *cr.Spec.ForProvider.Scope == "REGIONAL" {
-		desiredAssotiatedResources := make([]*string, 0)
+		desiredAssociatedResources := make([]*string, 0)
 		for _, associatedResource := range cr.Spec.ForProvider.AssociatedAWSResources {
-			desiredAssotiatedResources = append(desiredAssotiatedResources, associatedResource.ResourceARN)
+			desiredAssociatedResources = append(desiredAssociatedResources, associatedResource.ResourceARN)
 		}
-		resourcesToAssociate, resourcesToDisassociate := diffAssociatedResources(desiredAssotiatedResources, s.cache.observedAssociatedResources)
+		resourcesToAssociate, resourcesToDisassociate := diffAssociatedResources(desiredAssociatedResources, s.cache.observedAssociatedResources)
 		for _, res := range resourcesToAssociate {
 			associateWebACLInput := svcsdk.AssociateWebACLInput{
 				ResourceArn: res,
