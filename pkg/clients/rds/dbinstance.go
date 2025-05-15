@@ -202,7 +202,7 @@ func GenerateRestoreDBInstanceToPointInTimeInput(name string, p *v1alpha1.DBInst
 }
 
 // GenerateCreateDBInstanceReadReplicaInput returns a create input.
-func GenerateCreateDBInstanceReadReplicaInput(cr *v1alpha1.DBInstance) *svcsdk.CreateDBInstanceReadReplicaInput {
+func GenerateCreateDBInstanceReadReplicaInput(cr *v1alpha1.DBInstance) *svcsdk.CreateDBInstanceReadReplicaInput { //nolint:gocyclo
 	res := &svcsdk.CreateDBInstanceReadReplicaInput{}
 
 	if cr.Spec.ForProvider.AllocatedStorage != nil {

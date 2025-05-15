@@ -2,11 +2,11 @@
 apiVersion: rds.aws.crossplane.io/v1alpha1
 kind: DBInstance
 metadata:
-  name: read-replica-1
+  name: example-read-replica-1
 spec:
   forProvider:
     region: eu-central-1
-    replicateSourceDBInstanceID: kir-test
+    replicateSourceDBInstanceID: example-dbinstance
     engine: mariadb
     dbInstanceClass: db.t3.micro
     autoMinorVersionUpgrade: true
@@ -18,10 +18,10 @@ spec:
 #      name: replica-test
 #      namespace: default
   writeConnectionSecretToRef:
-    name: read-replica-1
+    name: example-read-replica-1
     namespace: default
   providerConfigRef:
-    name: providerconfig-aws
+    name: provider-aws
 
 # By default, the read replica has the master user credentials as the source database.
 #---

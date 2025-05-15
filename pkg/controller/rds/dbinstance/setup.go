@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws"
 	svcsdk "github.com/aws/aws-sdk-go/service/rds"
 	svcsdkapi "github.com/aws/aws-sdk-go/service/rds/rdsiface"
 	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
@@ -34,6 +35,7 @@ import (
 	"github.com/crossplane-contrib/provider-aws/pkg/controller/rds/utils"
 	"github.com/crossplane-contrib/provider-aws/pkg/features"
 	connectaws "github.com/crossplane-contrib/provider-aws/pkg/utils/connect/aws"
+	connectaws "github.com/crossplane-contrib/provider-aws/pkg/utils/connect/aws"
 	errorutils "github.com/crossplane-contrib/provider-aws/pkg/utils/errors"
 	"github.com/crossplane-contrib/provider-aws/pkg/utils/jsonpatch"
 	"github.com/crossplane-contrib/provider-aws/pkg/utils/pointer"
@@ -42,6 +44,7 @@ import (
 
 // error constants
 const (
+	errCreateReadReplica        = "cannot creat DB instance read replica"
 	errCreateReadReplica        = "cannot creat DB instance read replica"
 	errS3RestoreFailed          = "cannot restore DB instance from S3 backup"
 	errSnapshotRestoreFailed    = "cannot restore DB instance from snapshot"
@@ -55,6 +58,13 @@ const (
 const (
 	maintenanceWindowFormat = "Mon:15:04"
 	backupWindowFormat      = "15:04"
+)
+
+// database roles
+const (
+	databaseRoleStandalone  = "Instance"
+	databaseRolePrimary     = "Primary"
+	databaseRoleReadReplica = "Replica"
 )
 
 // database roles
@@ -80,6 +90,7 @@ func SetupDBInstance(mgr ctrl.Manager, o controller.Options) error {
 
 	reconcilerOpts := []managed.ReconcilerOption{
 		managed.WithCriticalAnnotationUpdater(custommanaged.NewRetryingCriticalAnnotationUpdater(mgr.GetClient())),
+		managed.WithTypedExternalConnector(&customConnector{kube: mgr.GetClient()}),
 		managed.WithTypedExternalConnector(&customConnector{kube: mgr.GetClient()}),
 		managed.WithPollInterval(o.PollInterval),
 		managed.WithLogger(o.Logger.WithValues("controller", name)),
@@ -156,7 +167,9 @@ func (c *customConnector) Connect(ctx context.Context, cr *svcapitypes.DBInstanc
 }
 
 func (c *customExternal) Create(ctx context.Context, cr *svcapitypes.DBInstance) (managed.ExternalCreation, error) {
-	if cr.Spec.ForProvider.ReplicateSourceDBInstanceID != nil || cr.Spec.ForProvider.ReplicateSourceDBClusterID != nil {
+	if cr.Spec.ForProvider.ReplicateSourceDBInstanceID != nil || cr.Spec.ForProvider.ReplicateSourceDBInstanceIDRef != nil ||
+		cr.Spec.ForProvider.ReplicateSourceDBInstanceIDSelector != nil || cr.Spec.ForProvider.ReplicateSourceDBClusterID != nil ||
+		cr.Spec.ForProvider.ReplicateSourceDBClusterIDRef != nil || cr.Spec.ForProvider.ReplicateSourceDBClusterIDSelector != nil {
 		cr.Status.SetConditions(xpv1.Creating())
 		cr.Status.AtProvider.DatabaseRole = aws.String(databaseRoleReadReplica)
 
@@ -180,7 +193,9 @@ func preObserve(_ context.Context, cr *svcapitypes.DBInstance, obj *svcsdk.Descr
 
 func (s *shared) preCreate(ctx context.Context, cr *svcapitypes.DBInstance, obj *svcsdk.CreateDBInstanceInput) (err error) { //nolint:gocyclo
 	// If the DBInstance is going to be created as a read replica, we do not need to set the MasterUserPassword and the others
-	if cr.Spec.ForProvider.ReplicateSourceDBInstanceID != nil || cr.Spec.ForProvider.ReplicateSourceDBClusterID != nil {
+	if cr.Spec.ForProvider.ReplicateSourceDBInstanceID != nil || cr.Spec.ForProvider.ReplicateSourceDBInstanceIDRef != nil ||
+		cr.Spec.ForProvider.ReplicateSourceDBInstanceIDSelector != nil || cr.Spec.ForProvider.ReplicateSourceDBClusterID != nil ||
+		cr.Spec.ForProvider.ReplicateSourceDBClusterIDRef != nil || cr.Spec.ForProvider.ReplicateSourceDBClusterIDSelector != nil {
 		return nil
 	}
 	restoreFrom := cr.Spec.ForProvider.RestoreFrom
@@ -198,6 +213,7 @@ func (s *shared) preCreate(ctx context.Context, cr *svcapitypes.DBInstance, obj 
 		pw, err = password.Generate()
 	case masterUserPasswordSecretRef != nil && autogenerate,
 		masterUserPasswordSecretRef != nil && !autogenerate:
+		pw, err = dbinstance.GetSecretValue(ctx, s.kube, masterUserPasswordSecretRef)
 		pw, err = dbinstance.GetSecretValue(ctx, s.kube, masterUserPasswordSecretRef)
 	}
 	if err != nil {
@@ -234,16 +250,19 @@ func (s *shared) preCreate(ctx context.Context, cr *svcapitypes.DBInstance, obj 
 		switch *restoreFrom.Source {
 		case "S3":
 			_, err := s.client.RestoreDBInstanceFromS3WithContext(ctx, dbinstance.GenerateRestoreDBInstanceFromS3Input(meta.GetExternalName(cr), pw, &cr.Spec.ForProvider))
+			_, err := s.client.RestoreDBInstanceFromS3WithContext(ctx, dbinstance.GenerateRestoreDBInstanceFromS3Input(meta.GetExternalName(cr), pw, &cr.Spec.ForProvider))
 			if err != nil {
 				return errorutils.Wrap(err, errS3RestoreFailed)
 			}
 
 		case "Snapshot":
 			_, err := s.client.RestoreDBInstanceFromDBSnapshotWithContext(ctx, dbinstance.GenerateRestoreDBInstanceFromSnapshotInput(meta.GetExternalName(cr), &cr.Spec.ForProvider))
+			_, err := s.client.RestoreDBInstanceFromDBSnapshotWithContext(ctx, dbinstance.GenerateRestoreDBInstanceFromSnapshotInput(meta.GetExternalName(cr), &cr.Spec.ForProvider))
 			if err != nil {
 				return errorutils.Wrap(err, errSnapshotRestoreFailed)
 			}
 		case "PointInTime":
+			_, err := s.client.RestoreDBInstanceToPointInTimeWithContext(ctx, dbinstance.GenerateRestoreDBInstanceToPointInTimeInput(meta.GetExternalName(cr), &cr.Spec.ForProvider))
 			_, err := s.client.RestoreDBInstanceToPointInTimeWithContext(ctx, dbinstance.GenerateRestoreDBInstanceToPointInTimeInput(meta.GetExternalName(cr), &cr.Spec.ForProvider))
 			if err != nil {
 				return errorutils.Wrap(err, errPointInTimeRestoreFailed)
@@ -257,6 +276,7 @@ func (s *shared) preCreate(ctx context.Context, cr *svcapitypes.DBInstance, obj 
 		obj.EngineVersion = cr.Spec.ForProvider.EngineVersion
 	}
 
+	if _, err = dbinstance.Cache(ctx, s.kube, cr, passwordRestoreInfo); err != nil {
 	if _, err = dbinstance.Cache(ctx, s.kube, cr, passwordRestoreInfo); err != nil {
 		return errors.Wrap(err, dbinstance.ErrCachePassword)
 	}
@@ -273,6 +293,7 @@ func (s *shared) preCreate(ctx context.Context, cr *svcapitypes.DBInstance, obj 
 }
 
 func (s *shared) updateConnectionDetails(ctx context.Context, cr *svcapitypes.DBInstance, details managed.ConnectionDetails) (managed.ConnectionDetails, error) {
+func (s *shared) updateConnectionDetails(ctx context.Context, cr *svcapitypes.DBInstance, details managed.ConnectionDetails) (managed.ConnectionDetails, error) {
 	if details == nil {
 		details = managed.ConnectionDetails{}
 	}
@@ -284,7 +305,14 @@ func (s *shared) updateConnectionDetails(ctx context.Context, cr *svcapitypes.DB
 			return details, errors.Wrap(err, dbinstance.ErrGetCachedPassword)
 		}
 		s.cache.desiredPassword = pw
+	if s.cache.desiredPassword == "" {
+		pw, err := dbinstance.GetDesiredPassword(ctx, s.kube, cr)
+		if err != nil && pointer.StringValue(cr.Status.AtProvider.DatabaseRole) != databaseRoleReadReplica {
+			return details, errors.Wrap(err, dbinstance.ErrGetCachedPassword)
+		}
+		s.cache.desiredPassword = pw
 	}
+	details[xpv1.ResourceCredentialsSecretPasswordKey] = []byte(s.cache.desiredPassword)
 	details[xpv1.ResourceCredentialsSecretPasswordKey] = []byte(s.cache.desiredPassword)
 
 	if cr.Status.AtProvider.Endpoint == nil {
@@ -301,8 +329,10 @@ func (s *shared) updateConnectionDetails(ctx context.Context, cr *svcapitypes.DB
 }
 
 func (s *shared) preUpdate(ctx context.Context, cr *svcapitypes.DBInstance, obj *svcsdk.ModifyDBInstanceInput) (err error) {
+func (s *shared) preUpdate(ctx context.Context, cr *svcapitypes.DBInstance, obj *svcsdk.ModifyDBInstanceInput) (err error) {
 	obj.DBInstanceIdentifier = pointer.ToOrNilIfZeroValue(meta.GetExternalName(cr))
 	obj.ApplyImmediately = cr.Spec.ForProvider.ApplyImmediately
+	obj.MasterUserPassword = pointer.ToOrNilIfZeroValue(s.cache.desiredPassword)
 	obj.MasterUserPassword = pointer.ToOrNilIfZeroValue(s.cache.desiredPassword)
 
 	// VpcSecurityGroupIds cannot be set on an instance that belongs to a DBCluster
@@ -328,6 +358,7 @@ func (s *shared) preUpdate(ctx context.Context, cr *svcapitypes.DBInstance, obj 
 	input := GenerateDescribeDBInstancesInput(cr)
 
 	out, err := s.client.DescribeDBInstancesWithContext(ctx, input)
+	out, err := s.client.DescribeDBInstancesWithContext(ctx, input)
 	if err != nil {
 		return errors.Wrap(err, dbinstance.ErrDescribe)
 	}
@@ -339,12 +370,23 @@ func (s *shared) preUpdate(ctx context.Context, cr *svcapitypes.DBInstance, obj 
 }
 
 func (s *shared) postUpdate(ctx context.Context, cr *svcapitypes.DBInstance, out *svcsdk.ModifyDBInstanceOutput, upd managed.ExternalUpdate, err error) (managed.ExternalUpdate, error) {
+func (s *shared) postUpdate(ctx context.Context, cr *svcapitypes.DBInstance, out *svcsdk.ModifyDBInstanceOutput, upd managed.ExternalUpdate, err error) (managed.ExternalUpdate, error) {
 	if err != nil {
 		return upd, err
 	}
 
 	upd.ConnectionDetails, err = s.updateConnectionDetails(ctx, cr, upd.ConnectionDetails)
+	upd.ConnectionDetails, err = s.updateConnectionDetails(ctx, cr, upd.ConnectionDetails)
 
+	if s.cache.desiredPassword != "" {
+		_, err = dbinstance.Cache(ctx, s.kube, cr, map[string]string{
+			dbinstance.PasswordCacheKey:    s.cache.desiredPassword,
+			dbinstance.RestoreFlagCacheKay: "", // reset restore flag
+		})
+		if err != nil {
+			return upd, errors.Wrap(err, dbinstance.ErrCachePassword)
+		}
+	}
 	if s.cache.desiredPassword != "" {
 		_, err = dbinstance.Cache(ctx, s.kube, cr, map[string]string{
 			dbinstance.PasswordCacheKey:    s.cache.desiredPassword,
@@ -358,7 +400,10 @@ func (s *shared) postUpdate(ctx context.Context, cr *svcapitypes.DBInstance, out
 	// Update tags if necessary
 	if len(s.cache.addTags) > 0 {
 		_, err := s.client.AddTagsToResourceWithContext(ctx, &svcsdk.AddTagsToResourceInput{
+	if len(s.cache.addTags) > 0 {
+		_, err := s.client.AddTagsToResourceWithContext(ctx, &svcsdk.AddTagsToResourceInput{
 			ResourceName: out.DBInstance.DBInstanceArn,
+			Tags:         s.cache.addTags,
 			Tags:         s.cache.addTags,
 		})
 		if err != nil {
@@ -367,7 +412,10 @@ func (s *shared) postUpdate(ctx context.Context, cr *svcapitypes.DBInstance, out
 	}
 	if len(s.cache.removeTags) > 0 {
 		_, err := s.client.RemoveTagsFromResourceWithContext(ctx, &svcsdk.RemoveTagsFromResourceInput{
+	if len(s.cache.removeTags) > 0 {
+		_, err := s.client.RemoveTagsFromResourceWithContext(ctx, &svcsdk.RemoveTagsFromResourceInput{
 			ResourceName: out.DBInstance.DBInstanceArn,
+			TagKeys:      s.cache.removeTags,
 			TagKeys:      s.cache.removeTags,
 		})
 		if err != nil {
@@ -379,11 +427,13 @@ func (s *shared) postUpdate(ctx context.Context, cr *svcapitypes.DBInstance, out
 }
 
 func (s *shared) preDelete(ctx context.Context, cr *svcapitypes.DBInstance, obj *svcsdk.DeleteDBInstanceInput) (bool, error) {
+func (s *shared) preDelete(ctx context.Context, cr *svcapitypes.DBInstance, obj *svcsdk.DeleteDBInstanceInput) (bool, error) {
 	obj.DBInstanceIdentifier = pointer.ToOrNilIfZeroValue(meta.GetExternalName(cr))
 	obj.FinalDBSnapshotIdentifier = pointer.ToOrNilIfZeroValue(cr.Spec.ForProvider.FinalDBSnapshotIdentifier)
 	obj.SkipFinalSnapshot = pointer.ToOrNilIfZeroValue(cr.Spec.ForProvider.SkipFinalSnapshot)
 	obj.DeleteAutomatedBackups = cr.Spec.ForProvider.DeleteAutomatedBackups
 
+	_, _ = s.external.Update(ctx, cr)
 	_, _ = s.external.Update(ctx, cr)
 	if *cr.Status.AtProvider.DBInstanceStatus == statusDeleting {
 		return true, nil
@@ -392,13 +442,16 @@ func (s *shared) preDelete(ctx context.Context, cr *svcapitypes.DBInstance, obj 
 }
 
 func (s *shared) postDelete(ctx context.Context, cr *svcapitypes.DBInstance, obj *svcsdk.DeleteDBInstanceOutput, err error) (managed.ExternalDelete, error) {
+func (s *shared) postDelete(ctx context.Context, cr *svcapitypes.DBInstance, obj *svcsdk.DeleteDBInstanceOutput, err error) (managed.ExternalDelete, error) {
 	if err != nil {
 		return managed.ExternalDelete{}, err
 	}
 
 	return managed.ExternalDelete{}, dbinstance.DeleteCache(ctx, s.kube, cr)
+	return managed.ExternalDelete{}, dbinstance.DeleteCache(ctx, s.kube, cr)
 }
 
+func (s *shared) postObserve(ctx context.Context, cr *svcapitypes.DBInstance, resp *svcsdk.DescribeDBInstancesOutput, obs managed.ExternalObservation, err error) (managed.ExternalObservation, error) {
 func (s *shared) postObserve(ctx context.Context, cr *svcapitypes.DBInstance, resp *svcsdk.DescribeDBInstancesOutput, obs managed.ExternalObservation, err error) (managed.ExternalObservation, error) {
 	if err != nil {
 		return obs, err
@@ -421,6 +474,7 @@ func (s *shared) postObserve(ctx context.Context, cr *svcapitypes.DBInstance, re
 		cr.SetConditions(xpv1.Unavailable().WithMessage("DB Instance is " + pointer.StringValue(resp.DBInstances[0].DBInstanceStatus)))
 	}
 
+	obs.ConnectionDetails, err = s.updateConnectionDetails(ctx, cr, obs.ConnectionDetails)
 	obs.ConnectionDetails, err = s.updateConnectionDetails(ctx, cr, obs.ConnectionDetails)
 	return obs, err
 }
@@ -516,6 +570,7 @@ func lateInitialize(in *svcapitypes.DBInstanceParameters, out *svcsdk.DescribeDB
 }
 
 func (s *shared) isUpToDate(ctx context.Context, cr *svcapitypes.DBInstance, out *svcsdk.DescribeDBInstancesOutput) (upToDate bool, diff string, err error) { //nolint:gocyclo
+func (s *shared) isUpToDate(ctx context.Context, cr *svcapitypes.DBInstance, out *svcsdk.DescribeDBInstancesOutput) (upToDate bool, diff string, err error) { //nolint:gocyclo
 	db := out.DBInstances[0]
 
 	patch, err := createPatch(out, &cr.Spec.ForProvider)
@@ -532,11 +587,12 @@ func (s *shared) isUpToDate(ctx context.Context, cr *svcapitypes.DBInstance, out
 	if status == "modifying" || status == "upgrading" || status == "rebooting" || status == "creating" || status == "deleting" {
 		return true, "", nil
 	}
-	if db.ReadReplicaDBClusterIdentifiers != nil || db.ReadReplicaDBInstanceIdentifiers != nil {
+	switch {
+	case db.ReadReplicaDBClusterIdentifiers != nil || db.ReadReplicaDBInstanceIdentifiers != nil:
 		cr.Status.AtProvider.DatabaseRole = aws.String(databaseRolePrimary)
-	} else if db.ReadReplicaSourceDBClusterIdentifier != nil || db.ReadReplicaSourceDBInstanceIdentifier != nil {
+	case db.ReadReplicaSourceDBClusterIdentifier != nil || db.ReadReplicaSourceDBInstanceIdentifier != nil:
 		cr.Status.AtProvider.DatabaseRole = aws.String(databaseRoleReadReplica)
-	} else {
+	default:
 		cr.Status.AtProvider.DatabaseRole = aws.String(databaseRoleStandalone)
 	}
 
@@ -575,6 +631,7 @@ func (s *shared) isUpToDate(ctx context.Context, cr *svcapitypes.DBInstance, out
 	}
 
 	// Depending on whether the instance was created as gp2 or modified from another type (s.g. gp3) to gp2,
+	// Depending on whether the instance was created as gp2 or modified from another type (s.g. gp3) to gp2,
 	// AWS provides different responses for IOPS/StorageThroughput (either 0 or nil).
 	// Therefore, we consider both 0 and nil to be equivalent.
 	iopsChanged := !(pointer.Int64Value(cr.Spec.ForProvider.IOPS) == pointer.Int64Value(db.Iops))
@@ -606,24 +663,12 @@ func (s *shared) isUpToDate(ctx context.Context, cr *svcapitypes.DBInstance, out
 		cmpopts.IgnoreFields(svcapitypes.CustomDBInstanceParameters{}, "RestoreFrom"),
 		cmpopts.IgnoreFields(svcapitypes.CustomDBInstanceParameters{}, "VPCSecurityGroupIDs"),
 		cmpopts.IgnoreFields(svcapitypes.CustomDBInstanceParameters{}, "DeleteAutomatedBackups"),
-		cmpopts.IgnoreFields(svcapitypes.CustomDBInstanceParameters{}, "ReplicateSourceDBInstanceID", "ReplicateSourceDBClusterID"),
-		cmpopts.IgnoreFields(svcapitypes.CustomDBInstanceParameters{}, "TagIgnorePrefixes"),
+		cmpopts.IgnoreFields(svcapitypes.CustomDBInstanceParameters{},
+			"ReplicateSourceDBClusterID", "ReplicateSourceDBClusterIDRef", "ReplicateSourceDBClusterIDSelector",
+			"ReplicateSourceDBInstanceID", "ReplicateSourceDBInstanceIDRef", "ReplicateSourceDBInstanceIDSelector"),
 	)
 
-	ignore := append([]string{"aws:"}, cr.Spec.ForProvider.TagIgnorePrefixes...)
-	var observedTags []*svcsdk.Tag
-	if db.TagList != nil {
-		for _, tag := range db.TagList { // index discarded with _
-			if utils.ShouldIgnore(pointer.StringValue(tag.Key), ignore) {
-				continue
-			}
-			observedTags = append(observedTags, &svcsdk.Tag{
-				Key:   tag.Key,
-				Value: tag.Value,
-			})
-		}
-	}
-	s.cache.addTags, s.cache.removeTags = utils.DiffTags(cr.Spec.ForProvider.Tags, observedTags)
+	s.cache.addTags, s.cache.removeTags = utils.DiffTags(cr.Spec.ForProvider.Tags, db.TagList)
 	tagsChanged := len(s.cache.addTags) != 0 || len(s.cache.removeTags) != 0
 
 	if diff == "" && !maintenanceWindowChanged && !backupWindowChanged && !iopsChanged && !storageThroughputChanged && !versionChanged && !vpcSGsChanged && !dbParameterGroupChanged && !optionGroupChanged && !tagsChanged {
@@ -665,6 +710,7 @@ func (s *shared) isUpToDate(ctx context.Context, cr *svcapitypes.DBInstance, out
 		diff += fmt.Sprintf("\ndesired optionGroupName: %s \nobserved optionGroupName: %s ", pointer.StringValue(cr.Spec.ForProvider.OptionGroupName), pointer.StringValue(db.OptionGroupMemberships[0].OptionGroupName))
 	}
 	if tagsChanged {
+		diff += fmt.Sprintf("\nadd %d tag(s) and remove %d tag(s)", len(s.cache.addTags), len(s.cache.removeTags))
 		diff += fmt.Sprintf("\nadd %d tag(s) and remove %d tag(s)", len(s.cache.addTags), len(s.cache.removeTags))
 	}
 

@@ -693,7 +693,6 @@ type CustomDBInstanceParameters struct {
 	//    as the read replica. Cross-Region replication isn't supported.
 	// +immutable
 	// +crossplane:generate:reference:type=github.com/crossplane-contrib/provider-aws/apis/rds/v1alpha1.DBCluster
-	// +crossplane:generate:reference:extractor=github.com/crossplane-contrib/provider-aws/apis/rds/v1alpha1.DBCluster()
 	ReplicateSourceDBClusterID *string `json:"replicateSourceDBClusterID,omitempty"`
 
 	// ReplicateSourceDBClusterIDRef is a reference to a DBCluster used to set
@@ -731,7 +730,6 @@ type CustomDBInstanceParameters struct {
 	// [Version and licensing considerations for RDS for Oracle replicas]: https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/oracle-read-replicas.limitations.html#oracle-read-replicas.limitations.versions-and-licenses
 	// +immutable
 	// +crossplane:generate:reference:type=github.com/crossplane-contrib/provider-aws/apis/rds/v1alpha1.DBInstance
-	// +crossplane:generate:reference:extractor=github.com/crossplane-contrib/provider-aws/apis/rds/v1alpha1.DBInstance()
 	ReplicateSourceDBInstanceID *string `json:"replicateSourceDBInstanceID,omitempty"`
 
 	// ReplicateSourceDBInstanceIDRef is a reference to a DBInstance used to set
@@ -817,6 +815,13 @@ type CustomDBInstanceParameters struct {
 }
 
 // CustomDBInstanceObservation includes the custom status fields of DBInstance.
+type CustomDBInstanceObservation struct {
+	// AWS API calls don't return any field which explicitly indicates the role of database, which would be really convenient.
+	// DatabaseRole works on the similar principle as the Role field in AWS UI("Aurora and RDS" > "Databases").
+
+	// The database role may be Standalone, Primary or Replica.
+	DatabaseRole *string `json:"databaseRole,omitempty"`
+}
 type CustomDBInstanceObservation struct {
 	// AWS API calls don't return any field which explicitly indicates the role of database, which would be really convenient.
 	// DatabaseRole works on the similar principle as the Role field in AWS UI("Aurora and RDS" > "Databases").
