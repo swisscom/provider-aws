@@ -681,6 +681,7 @@ func (in *CustomDBInstanceParameters) DeepCopyInto(out *CustomDBInstanceParamete
 		*out = new(v1.Selector)
 		(*in).DeepCopyInto(*out)
 	}
+<<<<<<< HEAD
 	if in.ReplicateSourceDBClusterID != nil {
 		in, out := &in.ReplicateSourceDBClusterID, &out.ReplicateSourceDBClusterID
 		*out = new(string)
@@ -711,6 +712,18 @@ func (in *CustomDBInstanceParameters) DeepCopyInto(out *CustomDBInstanceParamete
 		*out = new(v1.Selector)
 		(*in).DeepCopyInto(*out)
 	}
+=======
+	if in.SourceDBClusterIdentifier != nil {
+		in, out := &in.SourceDBClusterIdentifier, &out.SourceDBClusterIdentifier
+		*out = new(string)
+		**out = **in
+	}
+	if in.SourceDBInstanceIdentifier != nil {
+		in, out := &in.SourceDBInstanceIdentifier, &out.SourceDBInstanceIdentifier
+		*out = new(string)
+		**out = **in
+	}
+>>>>>>> 63e323bc (add rds db-instance read replica, draft#2)
 	if in.VPCSecurityGroupIDs != nil {
 		in, out := &in.VPCSecurityGroupIDs, &out.VPCSecurityGroupIDs
 		*out = make([]string, len(*in))
