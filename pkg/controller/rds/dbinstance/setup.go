@@ -578,7 +578,7 @@ func (e *shared) isUpToDate(ctx context.Context, cr *svcapitypes.DBInstance, out
 	if db.TagList != nil {
 		for i, tag := range db.TagList {
 			// ignore system tags
-			if strings.HasPrefix(*tag.Key, "aws:") {
+			if strings.HasPrefix(*tag.Key, "aws:") || strings.HasPrefix(*tag.Key, "c7n:") {
 				continue
 			}
 			observedTags[i] = &svcsdk.Tag{
