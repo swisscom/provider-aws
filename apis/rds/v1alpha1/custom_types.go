@@ -784,6 +784,11 @@ type CustomDBInstanceParameters struct {
 	// deleted.
 	// +optional
 	DeleteAutomatedBackups *bool `json:"deleteAutomatedBackups,omitempty"`
+
+	// TagIgnorePrefixes tells the reconciler to pretend tags with these
+	// prefixes don't exist during diff/updates.
+	// +optional
+	TagIgnorePrefixes []string `json:"tagIgnorePrefixes,omitempty"`
 }
 
 // CustomDBInstanceObservation includes the custom status fields of DBInstance.

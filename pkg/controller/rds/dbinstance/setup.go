@@ -574,17 +574,17 @@ func (e *shared) isUpToDate(ctx context.Context, cr *svcapitypes.DBInstance, out
 		cmpopts.IgnoreFields(svcapitypes.CustomDBInstanceParameters{}, "SourceDBInstanceIdentifier", "SourceDBClusterIdentifier"),
 	)
 
+	ignore := append([]string{"aws:", "c7n:"}, cr.Spec.ForProvider.TagIgnorePrefixes...)
 	var observedTags []*svcsdk.Tag
 	if db.TagList != nil {
-		for i, tag := range db.TagList {
-			// ignore system tags
-			if strings.HasPrefix(*tag.Key, "aws:") || strings.HasPrefix(*tag.Key, "c7n:") {
+		for _, tag := range db.TagList { // index discarded with _
+			if utils.ShouldIgnore(pointer.StringValue(tag.Key), ignore) {
 				continue
 			}
-			observedTags[i] = &svcsdk.Tag{
+			observedTags = append(observedTags, &svcsdk.Tag{
 				Key:   tag.Key,
 				Value: tag.Value,
-			}
+			})
 		}
 	}
 	e.cache.addTags, e.cache.removeTags = utils.DiffTags(cr.Spec.ForProvider.Tags, observedTags)
