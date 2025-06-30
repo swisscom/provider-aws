@@ -13,6 +13,7 @@ import (
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws"
 	svcsdk "github.com/aws/aws-sdk-go/service/rds"
 	svcsdkapi "github.com/aws/aws-sdk-go/service/rds/rdsiface"
 	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
@@ -64,14 +65,12 @@ const (
 
 // database roles
 const (
-	databaseRoleStandalone  = "Instance"
 	databaseRolePrimary     = "Primary"
 	databaseRoleReadReplica = "Replica"
 )
 
 // database roles
 const (
-	databaseRoleStandalone  = "Instance"
 	databaseRolePrimary     = "Primary"
 	databaseRoleReadReplica = "Replica"
 )
@@ -132,8 +131,9 @@ type shared struct {
 }
 
 type cache struct {
-	addTags    []*svcsdk.Tag
-	removeTags []*string
+	addTags         []*svcsdk.Tag
+	removeTags      []*string
+	desiredPassword string
 }
 
 func newCustomExternal(kube client.Client, client svcsdkapi.RDSAPI) *customExternal {
@@ -166,10 +166,11 @@ func (c *customConnector) Connect(ctx context.Context, cr *svcapitypes.DBInstanc
 }
 
 func (c *customExternal) Create(ctx context.Context, cr *svcapitypes.DBInstance) (managed.ExternalCreation, error) {
-	if cr.Spec.ForProvider.SourceDBInstanceIdentifier != nil || cr.Spec.ForProvider.SourceDBClusterIdentifier != nil {
+	if cr.Spec.ForProvider.ReplicateSourceDBInstanceID != nil || cr.Spec.ForProvider.ReplicateSourceDBClusterID != nil {
 		cr.Status.SetConditions(xpv1.Creating())
+		cr.Status.AtProvider.DatabaseRole = aws.String(databaseRoleReadReplica)
 
-		createDBInstanceReadReplicaInput := GenerateCreateDBInstanceReadReplicaInput(cr)
+		createDBInstanceReadReplicaInput := dbinstance.GenerateCreateDBInstanceReadReplicaInput(cr)
 		createDBInstanceReadReplicaInput.DBInstanceIdentifier = pointer.ToOrNilIfZeroValue(meta.GetExternalName(cr))
 
 		_, err := c.client.CreateDBInstanceReadReplicaWithContext(ctx, createDBInstanceReadReplicaInput)
@@ -178,6 +179,7 @@ func (c *customExternal) Create(ctx context.Context, cr *svcapitypes.DBInstance)
 		}
 		return managed.ExternalCreation{}, nil
 	}
+	cr.Status.AtProvider.DatabaseRole = aws.String(databaseRolePrimary)
 	return c.external.Create(ctx, cr)
 }
 
@@ -186,7 +188,11 @@ func preObserve(_ context.Context, cr *svcapitypes.DBInstance, obj *svcsdk.Descr
 	return nil
 }
 
-func (e *shared) preCreate(ctx context.Context, cr *svcapitypes.DBInstance, obj *svcsdk.CreateDBInstanceInput) (err error) { //nolint:gocyclo
+func (s *shared) preCreate(ctx context.Context, cr *svcapitypes.DBInstance, obj *svcsdk.CreateDBInstanceInput) (err error) { //nolint:gocyclo
+	// If the DBInstance is going to be created as a read replica, we do not need to set the MasterUserPassword and the others
+	if cr.Spec.ForProvider.ReplicateSourceDBInstanceID != nil || cr.Spec.ForProvider.ReplicateSourceDBClusterID != nil {
+		return nil
+	}
 	restoreFrom := cr.Spec.ForProvider.RestoreFrom
 	autogenerate := cr.Spec.ForProvider.AutogeneratePassword
 	masterUserPasswordSecretRef := cr.Spec.ForProvider.MasterUserPasswordSecretRef
@@ -202,6 +208,7 @@ func (e *shared) preCreate(ctx context.Context, cr *svcapitypes.DBInstance, obj 
 		pw, err = password.Generate()
 	case masterUserPasswordSecretRef != nil && autogenerate,
 		masterUserPasswordSecretRef != nil && !autogenerate:
+		pw, err = dbinstance.GetSecretValue(ctx, s.kube, masterUserPasswordSecretRef)
 		pw, err = dbinstance.GetSecretValue(ctx, s.kube, masterUserPasswordSecretRef)
 		pw, err = dbinstance.GetSecretValue(ctx, s.kube, masterUserPasswordSecretRef)
 	}
@@ -240,6 +247,7 @@ func (e *shared) preCreate(ctx context.Context, cr *svcapitypes.DBInstance, obj 
 		case "S3":
 			_, err := s.client.RestoreDBInstanceFromS3WithContext(ctx, dbinstance.GenerateRestoreDBInstanceFromS3Input(meta.GetExternalName(cr), pw, &cr.Spec.ForProvider))
 			_, err := s.client.RestoreDBInstanceFromS3WithContext(ctx, dbinstance.GenerateRestoreDBInstanceFromS3Input(meta.GetExternalName(cr), pw, &cr.Spec.ForProvider))
+			_, err := s.client.RestoreDBInstanceFromS3WithContext(ctx, dbinstance.GenerateRestoreDBInstanceFromS3Input(meta.GetExternalName(cr), pw, &cr.Spec.ForProvider))
 			if err != nil {
 				return errorutils.Wrap(err, errS3RestoreFailed)
 			}
@@ -247,10 +255,12 @@ func (e *shared) preCreate(ctx context.Context, cr *svcapitypes.DBInstance, obj 
 		case "Snapshot":
 			_, err := s.client.RestoreDBInstanceFromDBSnapshotWithContext(ctx, dbinstance.GenerateRestoreDBInstanceFromSnapshotInput(meta.GetExternalName(cr), &cr.Spec.ForProvider))
 			_, err := s.client.RestoreDBInstanceFromDBSnapshotWithContext(ctx, dbinstance.GenerateRestoreDBInstanceFromSnapshotInput(meta.GetExternalName(cr), &cr.Spec.ForProvider))
+			_, err := s.client.RestoreDBInstanceFromDBSnapshotWithContext(ctx, dbinstance.GenerateRestoreDBInstanceFromSnapshotInput(meta.GetExternalName(cr), &cr.Spec.ForProvider))
 			if err != nil {
 				return errorutils.Wrap(err, errSnapshotRestoreFailed)
 			}
 		case "PointInTime":
+			_, err := s.client.RestoreDBInstanceToPointInTimeWithContext(ctx, dbinstance.GenerateRestoreDBInstanceToPointInTimeInput(meta.GetExternalName(cr), &cr.Spec.ForProvider))
 			_, err := s.client.RestoreDBInstanceToPointInTimeWithContext(ctx, dbinstance.GenerateRestoreDBInstanceToPointInTimeInput(meta.GetExternalName(cr), &cr.Spec.ForProvider))
 			_, err := s.client.RestoreDBInstanceToPointInTimeWithContext(ctx, dbinstance.GenerateRestoreDBInstanceToPointInTimeInput(meta.GetExternalName(cr), &cr.Spec.ForProvider))
 			if err != nil {
@@ -267,6 +277,7 @@ func (e *shared) preCreate(ctx context.Context, cr *svcapitypes.DBInstance, obj 
 
 	if _, err = dbinstance.Cache(ctx, s.kube, cr, passwordRestoreInfo); err != nil {
 	if _, err = dbinstance.Cache(ctx, s.kube, cr, passwordRestoreInfo); err != nil {
+	if _, err = dbinstance.Cache(ctx, s.kube, cr, passwordRestoreInfo); err != nil {
 		return errors.Wrap(err, dbinstance.ErrCachePassword)
 	}
 
@@ -281,17 +292,18 @@ func (e *shared) preCreate(ctx context.Context, cr *svcapitypes.DBInstance, obj 
 	return nil
 }
 
-func (e *shared) updateConnectionDetails(ctx context.Context, cr *svcapitypes.DBInstance, details managed.ConnectionDetails) (managed.ConnectionDetails, error) {
+func (s *shared) updateConnectionDetails(ctx context.Context, cr *svcapitypes.DBInstance, details managed.ConnectionDetails) (managed.ConnectionDetails, error) {
 	if details == nil {
 		details = managed.ConnectionDetails{}
 	}
 
 	details[xpv1.ResourceCredentialsSecretUserKey] = []byte(pointer.StringValue(cr.Spec.ForProvider.MasterUsername))
 
-	pw, err := dbinstance.GetDesiredPassword(ctx, e.kube, cr)
-	if err != nil {
+	pw, err := dbinstance.GetDesiredPassword(ctx, s.kube, cr)
+	if err != nil && pointer.StringValue(cr.Status.AtProvider.DatabaseRole) != databaseRoleReadReplica {
 		return details, errors.Wrap(err, dbinstance.ErrGetCachedPassword)
 	}
+	s.cache.desiredPassword = pw
 	details[xpv1.ResourceCredentialsSecretPasswordKey] = []byte(pw)
 
 	if cr.Status.AtProvider.Endpoint == nil {
@@ -307,9 +319,10 @@ func (e *shared) updateConnectionDetails(ctx context.Context, cr *svcapitypes.DB
 	return details, nil
 }
 
-func (e *shared) preUpdate(ctx context.Context, cr *svcapitypes.DBInstance, obj *svcsdk.ModifyDBInstanceInput) (err error) {
+func (s *shared) preUpdate(ctx context.Context, cr *svcapitypes.DBInstance, obj *svcsdk.ModifyDBInstanceInput) (err error) {
 	obj.DBInstanceIdentifier = pointer.ToOrNilIfZeroValue(meta.GetExternalName(cr))
 	obj.ApplyImmediately = cr.Spec.ForProvider.ApplyImmediately
+	obj.MasterUserPassword = pointer.ToOrNilIfZeroValue(s.cache.desiredPassword)
 	obj.MasterUserPassword = pointer.ToOrNilIfZeroValue(s.cache.desiredPassword)
 	obj.MasterUserPassword = pointer.ToOrNilIfZeroValue(s.cache.desiredPassword)
 
@@ -337,6 +350,7 @@ func (e *shared) preUpdate(ctx context.Context, cr *svcapitypes.DBInstance, obj 
 
 	out, err := s.client.DescribeDBInstancesWithContext(ctx, input)
 	out, err := s.client.DescribeDBInstancesWithContext(ctx, input)
+	out, err := s.client.DescribeDBInstancesWithContext(ctx, input)
 	if err != nil {
 		return errors.Wrap(err, dbinstance.ErrDescribe)
 	}
@@ -347,39 +361,36 @@ func (e *shared) preUpdate(ctx context.Context, cr *svcapitypes.DBInstance, obj 
 	return nil
 }
 
-func (e *shared) postUpdate(ctx context.Context, cr *svcapitypes.DBInstance, out *svcsdk.ModifyDBInstanceOutput, upd managed.ExternalUpdate, err error) (managed.ExternalUpdate, error) {
+func (s *shared) postUpdate(ctx context.Context, cr *svcapitypes.DBInstance, out *svcsdk.ModifyDBInstanceOutput, upd managed.ExternalUpdate, err error) (managed.ExternalUpdate, error) {
 	if err != nil {
 		return upd, err
 	}
 
-	upd.ConnectionDetails, err = s.updateConnectionDetails(ctx, cr, upd.ConnectionDetails)
-	upd.ConnectionDetails, err = s.updateConnectionDetails(ctx, cr, upd.ConnectionDetails)
+	if pointer.StringValue()
+	desiredPassword, err := dbinstance.GetDesiredPassword(ctx, s.kube, cr)
+	if err != nil {
+		return upd, errors.Wrap(err, dbinstance.ErrRetrievePasswordForUpdate)
+	}
 
-	if s.cache.desiredPassword != "" {
-		_, err = dbinstance.Cache(ctx, s.kube, cr, map[string]string{
-			dbinstance.PasswordCacheKey:    s.cache.desiredPassword,
-			dbinstance.RestoreFlagCacheKay: "", // reset restore flag
-		})
-		if err != nil {
-			return upd, errors.Wrap(err, dbinstance.ErrCachePassword)
-		}
+	_, err = dbinstance.Cache(ctx, s.kube, cr, map[string]string{
+		dbinstance.PasswordCacheKey:    desiredPassword,
+		dbinstance.RestoreFlagCacheKay: "", // reset restore flag
+	})
+	if err != nil {
+		return upd, errors.Wrap(err, dbinstance.ErrCachePassword)
 	}
-	if s.cache.desiredPassword != "" {
-		_, err = dbinstance.Cache(ctx, s.kube, cr, map[string]string{
-			dbinstance.PasswordCacheKey:    s.cache.desiredPassword,
-			dbinstance.RestoreFlagCacheKay: "", // reset restore flag
-		})
-		if err != nil {
-			return upd, errors.Wrap(err, dbinstance.ErrCachePassword)
-		}
-	}
+
+	upd.ConnectionDetails, err = s.updateConnectionDetails(ctx, cr, upd.ConnectionDetails)
 
 	// Update tags if necessary
 	if len(s.cache.addTags) > 0 {
 		_, err := s.client.AddTagsToResourceWithContext(ctx, &svcsdk.AddTagsToResourceInput{
 	if len(s.cache.addTags) > 0 {
 		_, err := s.client.AddTagsToResourceWithContext(ctx, &svcsdk.AddTagsToResourceInput{
+	if len(s.cache.addTags) > 0 {
+		_, err := s.client.AddTagsToResourceWithContext(ctx, &svcsdk.AddTagsToResourceInput{
 			ResourceName: out.DBInstance.DBInstanceArn,
+			Tags:         s.cache.addTags,
 			Tags:         s.cache.addTags,
 			Tags:         s.cache.addTags,
 		})
@@ -391,7 +402,10 @@ func (e *shared) postUpdate(ctx context.Context, cr *svcapitypes.DBInstance, out
 		_, err := s.client.RemoveTagsFromResourceWithContext(ctx, &svcsdk.RemoveTagsFromResourceInput{
 	if len(s.cache.removeTags) > 0 {
 		_, err := s.client.RemoveTagsFromResourceWithContext(ctx, &svcsdk.RemoveTagsFromResourceInput{
+	if len(s.cache.removeTags) > 0 {
+		_, err := s.client.RemoveTagsFromResourceWithContext(ctx, &svcsdk.RemoveTagsFromResourceInput{
 			ResourceName: out.DBInstance.DBInstanceArn,
+			TagKeys:      s.cache.removeTags,
 			TagKeys:      s.cache.removeTags,
 			TagKeys:      s.cache.removeTags,
 		})
@@ -403,12 +417,13 @@ func (e *shared) postUpdate(ctx context.Context, cr *svcapitypes.DBInstance, out
 	return upd, err
 }
 
-func (e *shared) preDelete(ctx context.Context, cr *svcapitypes.DBInstance, obj *svcsdk.DeleteDBInstanceInput) (bool, error) {
+func (s *shared) preDelete(ctx context.Context, cr *svcapitypes.DBInstance, obj *svcsdk.DeleteDBInstanceInput) (bool, error) {
 	obj.DBInstanceIdentifier = pointer.ToOrNilIfZeroValue(meta.GetExternalName(cr))
 	obj.FinalDBSnapshotIdentifier = pointer.ToOrNilIfZeroValue(cr.Spec.ForProvider.FinalDBSnapshotIdentifier)
 	obj.SkipFinalSnapshot = pointer.ToOrNilIfZeroValue(cr.Spec.ForProvider.SkipFinalSnapshot)
 	obj.DeleteAutomatedBackups = cr.Spec.ForProvider.DeleteAutomatedBackups
 
+	_, _ = s.external.Update(ctx, cr)
 	_, _ = s.external.Update(ctx, cr)
 	_, _ = s.external.Update(ctx, cr)
 	if *cr.Status.AtProvider.DBInstanceStatus == statusDeleting {
@@ -417,16 +432,17 @@ func (e *shared) preDelete(ctx context.Context, cr *svcapitypes.DBInstance, obj 
 	return false, nil
 }
 
-func (e *shared) postDelete(ctx context.Context, cr *svcapitypes.DBInstance, obj *svcsdk.DeleteDBInstanceOutput, err error) (managed.ExternalDelete, error) {
+func (s *shared) postDelete(ctx context.Context, cr *svcapitypes.DBInstance, obj *svcsdk.DeleteDBInstanceOutput, err error) (managed.ExternalDelete, error) {
 	if err != nil {
 		return managed.ExternalDelete{}, err
 	}
 
 	return managed.ExternalDelete{}, dbinstance.DeleteCache(ctx, s.kube, cr)
 	return managed.ExternalDelete{}, dbinstance.DeleteCache(ctx, s.kube, cr)
+	return managed.ExternalDelete{}, dbinstance.DeleteCache(ctx, s.kube, cr)
 }
 
-func (e *shared) postObserve(ctx context.Context, cr *svcapitypes.DBInstance, resp *svcsdk.DescribeDBInstancesOutput, obs managed.ExternalObservation, err error) (managed.ExternalObservation, error) {
+func (s *shared) postObserve(ctx context.Context, cr *svcapitypes.DBInstance, resp *svcsdk.DescribeDBInstancesOutput, obs managed.ExternalObservation, err error) (managed.ExternalObservation, error) {
 	if err != nil {
 		return obs, err
 	}
@@ -448,6 +464,7 @@ func (e *shared) postObserve(ctx context.Context, cr *svcapitypes.DBInstance, re
 		cr.SetConditions(xpv1.Unavailable().WithMessage("DB Instance is " + pointer.StringValue(resp.DBInstances[0].DBInstanceStatus)))
 	}
 
+	obs.ConnectionDetails, err = s.updateConnectionDetails(ctx, cr, obs.ConnectionDetails)
 	obs.ConnectionDetails, err = s.updateConnectionDetails(ctx, cr, obs.ConnectionDetails)
 	obs.ConnectionDetails, err = s.updateConnectionDetails(ctx, cr, obs.ConnectionDetails)
 	return obs, err
@@ -543,7 +560,7 @@ func lateInitialize(in *svcapitypes.DBInstanceParameters, out *svcsdk.DescribeDB
 	return nil
 }
 
-func (e *shared) isUpToDate(ctx context.Context, cr *svcapitypes.DBInstance, out *svcsdk.DescribeDBInstancesOutput) (upToDate bool, diff string, err error) { //nolint:gocyclo
+func (s *shared) isUpToDate(ctx context.Context, cr *svcapitypes.DBInstance, out *svcsdk.DescribeDBInstancesOutput) (upToDate bool, diff string, err error) { //nolint:gocyclo
 	db := out.DBInstances[0]
 
 	patch, err := createPatch(out, &cr.Spec.ForProvider)
@@ -560,13 +577,11 @@ func (e *shared) isUpToDate(ctx context.Context, cr *svcapitypes.DBInstance, out
 	if status == "modifying" || status == "upgrading" || status == "rebooting" || status == "creating" || status == "deleting" {
 		return true, "", nil
 	}
-	switch {
-	case db.ReadReplicaDBClusterIdentifiers != nil || db.ReadReplicaDBInstanceIdentifiers != nil:
-		cr.Status.AtProvider.DatabaseRole = aws.String(databaseRolePrimary)
-	case db.ReadReplicaSourceDBClusterIdentifier != nil || db.ReadReplicaSourceDBInstanceIdentifier != nil:
+
+	if db.ReadReplicaSourceDBClusterIdentifier != nil || db.ReadReplicaSourceDBInstanceIdentifier != nil {
 		cr.Status.AtProvider.DatabaseRole = aws.String(databaseRoleReadReplica)
-	default:
-		cr.Status.AtProvider.DatabaseRole = aws.String(databaseRoleStandalone)
+	} else {
+		cr.Status.AtProvider.DatabaseRole = aws.String(databaseRolePrimary)
 	}
 
 	autogenerate := cr.Spec.ForProvider.AutogeneratePassword
@@ -577,9 +592,9 @@ func (e *shared) isUpToDate(ctx context.Context, cr *svcapitypes.DBInstance, out
 		cachedMasterPasswordExist = false
 	}
 
-	// If the instance is a read replica and the password was not created before, and it is not assumed to be
-	// generated/created(by autogenerate or masterUserPasswordSecretRef), we don't check the password. By
-	// default, a read replica has the same credentials as the primary instance.
+	// If the instance is a read replica and the desiredPassword was not generated before, and it is not assumed to be
+	// generated(by autogenerate or masterUserPasswordSecretRef), we don't check the desiredPassword. By defaults desiredPassword is
+	// replicated from the source(another instance or cluster)
 	if !(pointer.StringValue(cr.Status.AtProvider.DatabaseRole) == databaseRoleReadReplica &&
 		!autogenerate && masterUserPasswordSecretRef == nil && !cachedMasterPasswordExist) {
 
@@ -603,6 +618,7 @@ func (e *shared) isUpToDate(ctx context.Context, cr *svcapitypes.DBInstance, out
 		return false, "", err
 	}
 
+	// Depending on whether the instance was created as gp2 or modified from another type (s.g. gp3) to gp2,
 	// Depending on whether the instance was created as gp2 or modified from another type (s.g. gp3) to gp2,
 	// Depending on whether the instance was created as gp2 or modified from another type (s.g. gp3) to gp2,
 	// AWS provides different responses for IOPS/StorageThroughput (either 0 or nil).
@@ -636,7 +652,7 @@ func (e *shared) isUpToDate(ctx context.Context, cr *svcapitypes.DBInstance, out
 		cmpopts.IgnoreFields(svcapitypes.CustomDBInstanceParameters{}, "RestoreFrom"),
 		cmpopts.IgnoreFields(svcapitypes.CustomDBInstanceParameters{}, "VPCSecurityGroupIDs"),
 		cmpopts.IgnoreFields(svcapitypes.CustomDBInstanceParameters{}, "DeleteAutomatedBackups"),
-		cmpopts.IgnoreFields(svcapitypes.CustomDBInstanceParameters{}, "SourceDBInstanceIdentifier", "SourceDBClusterIdentifier"),
+		cmpopts.IgnoreFields(svcapitypes.CustomDBInstanceParameters{}, "ReplicateSourceDBInstanceID", "ReplicateSourceDBClusterID"),
 	)
 
 	var observedTags []*svcsdk.Tag
@@ -649,11 +665,11 @@ func (e *shared) isUpToDate(ctx context.Context, cr *svcapitypes.DBInstance, out
 			observedTags[i] = &svcsdk.Tag{
 				Key:   tag.Key,
 				Value: tag.Value,
-			}
+			})
 		}
 	}
-	e.cache.addTags, e.cache.removeTags = utils.DiffTags(cr.Spec.ForProvider.Tags, observedTags)
-	tagsChanged := len(e.cache.addTags) != 0 || len(e.cache.removeTags) != 0
+	s.cache.addTags, s.cache.removeTags = utils.DiffTags(cr.Spec.ForProvider.Tags, observedTags)
+	tagsChanged := len(s.cache.addTags) != 0 || len(s.cache.removeTags) != 0
 
 	if diff == "" && !maintenanceWindowChanged && !backupWindowChanged && !iopsChanged && !storageThroughputChanged && !versionChanged && !vpcSGsChanged && !dbParameterGroupChanged && !optionGroupChanged && !tagsChanged {
 		return true, diff, nil
@@ -694,6 +710,7 @@ func (e *shared) isUpToDate(ctx context.Context, cr *svcapitypes.DBInstance, out
 		diff += fmt.Sprintf("\ndesired optionGroupName: %s \nobserved optionGroupName: %s ", pointer.StringValue(cr.Spec.ForProvider.OptionGroupName), pointer.StringValue(db.OptionGroupMemberships[0].OptionGroupName))
 	}
 	if tagsChanged {
+		diff += fmt.Sprintf("\nadd %d tag(s) and remove %d tag(s)", len(s.cache.addTags), len(s.cache.removeTags))
 		diff += fmt.Sprintf("\nadd %d tag(s) and remove %d tag(s)", len(s.cache.addTags), len(s.cache.removeTags))
 		diff += fmt.Sprintf("\nadd %d tag(s) and remove %d tag(s)", len(s.cache.addTags), len(s.cache.removeTags))
 	}
@@ -899,155 +916,4 @@ func isStorageTypeGP3BelowAllocatedStorageThreshold(cr *svcapitypes.DBInstance) 
 	}
 
 	return false
-}
-
-// GenerateCreateDBInstanceReadReplicaInput returns a create input.
-func GenerateCreateDBInstanceReadReplicaInput(cr *svcapitypes.DBInstance) *svcsdk.CreateDBInstanceReadReplicaInput {
-	res := &svcsdk.CreateDBInstanceReadReplicaInput{}
-
-	if cr.Spec.ForProvider.AllocatedStorage != nil {
-		res.SetAllocatedStorage(*cr.Spec.ForProvider.AllocatedStorage)
-	}
-	if cr.Spec.ForProvider.AutoMinorVersionUpgrade != nil {
-		res.SetAutoMinorVersionUpgrade(*cr.Spec.ForProvider.AutoMinorVersionUpgrade)
-	}
-	if cr.Spec.ForProvider.AvailabilityZone != nil {
-		res.SetAvailabilityZone(*cr.Spec.ForProvider.AvailabilityZone)
-	}
-	if cr.Spec.ForProvider.CopyTagsToSnapshot != nil {
-		res.SetCopyTagsToSnapshot(*cr.Spec.ForProvider.CopyTagsToSnapshot)
-	}
-	if cr.Spec.ForProvider.CustomIAMInstanceProfile != nil {
-		res.SetCustomIamInstanceProfile(*cr.Spec.ForProvider.CustomIAMInstanceProfile)
-	}
-	if cr.Spec.ForProvider.DBInstanceClass != nil {
-		res.SetDBInstanceClass(*cr.Spec.ForProvider.DBInstanceClass)
-	}
-	if cr.Spec.ForProvider.DBParameterGroupName != nil {
-		res.SetDBParameterGroupName(*cr.Spec.ForProvider.DBParameterGroupName)
-	}
-	if cr.Spec.ForProvider.DBSubnetGroupName != nil {
-		res.SetDBSubnetGroupName(*cr.Spec.ForProvider.DBSubnetGroupName)
-	}
-	if cr.Spec.ForProvider.DedicatedLogVolume != nil {
-		res.SetDedicatedLogVolume(*cr.Spec.ForProvider.DedicatedLogVolume)
-	}
-	if cr.Spec.ForProvider.DeletionProtection != nil {
-		res.SetDeletionProtection(*cr.Spec.ForProvider.DeletionProtection)
-	}
-	if cr.Spec.ForProvider.Domain != nil {
-		res.SetDomain(*cr.Spec.ForProvider.Domain)
-	}
-	if cr.Spec.ForProvider.DomainAuthSecretARN != nil {
-		res.SetDomainAuthSecretArn(*cr.Spec.ForProvider.DomainAuthSecretARN)
-	}
-	if cr.Spec.ForProvider.DomainDNSIPs != nil {
-		res.SetDomainDnsIps(cr.Spec.ForProvider.DomainDNSIPs)
-	}
-	if cr.Spec.ForProvider.DomainFqdn != nil {
-		res.SetDomainFqdn(*cr.Spec.ForProvider.DomainFqdn)
-	}
-	if cr.Spec.ForProvider.DomainIAMRoleName != nil {
-		res.SetDomainIAMRoleName(*cr.Spec.ForProvider.DomainIAMRoleName)
-	}
-	if cr.Spec.ForProvider.DomainOu != nil {
-		res.SetDomainOu(*cr.Spec.ForProvider.DomainOu)
-	}
-	if cr.Spec.ForProvider.EnableCloudwatchLogsExports != nil {
-		res.SetEnableCloudwatchLogsExports(cr.Spec.ForProvider.EnableCloudwatchLogsExports)
-	}
-	if cr.Spec.ForProvider.EnableCustomerOwnedIP != nil {
-		res.SetEnableCustomerOwnedIp(*cr.Spec.ForProvider.EnableCustomerOwnedIP)
-	}
-	if cr.Spec.ForProvider.EnableIAMDatabaseAuthentication != nil {
-		res.SetEnableIAMDatabaseAuthentication(*cr.Spec.ForProvider.EnableIAMDatabaseAuthentication)
-	}
-	if cr.Spec.ForProvider.EnablePerformanceInsights != nil {
-		res.SetEnablePerformanceInsights(*cr.Spec.ForProvider.EnablePerformanceInsights)
-	}
-	if cr.Spec.ForProvider.IOPS != nil {
-		res.SetIops(*cr.Spec.ForProvider.IOPS)
-	}
-	if cr.Spec.ForProvider.KMSKeyID != nil {
-		res.SetKmsKeyId(*cr.Spec.ForProvider.KMSKeyID)
-
-	}
-	if cr.Spec.ForProvider.MaxAllocatedStorage != nil {
-		res.SetMaxAllocatedStorage(*cr.Spec.ForProvider.MaxAllocatedStorage)
-	}
-	if cr.Spec.ForProvider.MonitoringInterval != nil {
-		res.SetMonitoringInterval(*cr.Spec.ForProvider.MonitoringInterval)
-	}
-	if cr.Spec.ForProvider.MonitoringRoleARN != nil {
-		res.SetMonitoringRoleArn(*cr.Spec.ForProvider.MonitoringRoleARN)
-	}
-	if cr.Spec.ForProvider.MultiAZ != nil {
-		res.SetMultiAZ(*cr.Spec.ForProvider.MultiAZ)
-	}
-	if cr.Spec.ForProvider.NetworkType != nil {
-		res.SetNetworkType(*cr.Spec.ForProvider.NetworkType)
-	}
-	if cr.Spec.ForProvider.OptionGroupName != nil {
-		res.SetOptionGroupName(*cr.Spec.ForProvider.OptionGroupName)
-	}
-	if cr.Spec.ForProvider.PerformanceInsightsKMSKeyID != nil {
-		res.SetPerformanceInsightsKMSKeyId(*cr.Spec.ForProvider.PerformanceInsightsKMSKeyID)
-	}
-	if cr.Spec.ForProvider.PerformanceInsightsRetentionPeriod != nil {
-		res.SetPerformanceInsightsRetentionPeriod(*cr.Spec.ForProvider.PerformanceInsightsRetentionPeriod)
-	}
-	if cr.Spec.ForProvider.Port != nil {
-		res.SetPort(*cr.Spec.ForProvider.Port)
-	}
-	if cr.Spec.ForProvider.ProcessorFeatures != nil {
-		var processorFeatures []*svcsdk.ProcessorFeature
-		for _, pf := range cr.Spec.ForProvider.ProcessorFeatures {
-			pfeature := &svcsdk.ProcessorFeature{}
-			if pf.Name != nil {
-				pfeature.SetName(*pf.Name)
-			}
-			if pf.Value != nil {
-				pfeature.SetValue(*pf.Value)
-			}
-			processorFeatures = append(processorFeatures, pfeature)
-		}
-		res.SetProcessorFeatures(processorFeatures)
-	}
-	if cr.Spec.ForProvider.PubliclyAccessible != nil {
-		res.SetPubliclyAccessible(*cr.Spec.ForProvider.PubliclyAccessible)
-	}
-	if cr.Spec.ForProvider.SourceDBClusterIdentifier != nil {
-		res.SetSourceDBClusterIdentifier(*cr.Spec.ForProvider.SourceDBClusterIdentifier)
-	}
-	if cr.Spec.ForProvider.SourceDBInstanceIdentifier != nil {
-		res.SetSourceDBInstanceIdentifier(*cr.Spec.ForProvider.SourceDBInstanceIdentifier)
-	}
-	if cr.Spec.ForProvider.StorageThroughput != nil {
-		res.SetStorageThroughput(*cr.Spec.ForProvider.StorageThroughput)
-	}
-	if cr.Spec.ForProvider.StorageType != nil {
-		res.SetStorageType(*cr.Spec.ForProvider.StorageType)
-	}
-	if cr.Spec.ForProvider.Tags != nil {
-		var tags []*svcsdk.Tag
-		for _, t := range cr.Spec.ForProvider.Tags {
-			tag := &svcsdk.Tag{}
-			if t.Key != nil {
-				tag.SetKey(*t.Key)
-			}
-			if t.Value != nil {
-				tag.SetValue(*t.Value)
-			}
-			tags = append(tags, tag)
-		}
-		res.SetTags(tags)
-	}
-	if cr.Spec.ForProvider.VPCSecurityGroupIDs != nil {
-		var vpcSecurityGroupIDs []*string
-		for _, v := range cr.Spec.ForProvider.VPCSecurityGroupIDs {
-			vpcSecurityGroupIDs = append(vpcSecurityGroupIDs, &v)
-		}
-		res.SetVpcSecurityGroupIds(vpcSecurityGroupIDs)
-	}
-	return res
 }
