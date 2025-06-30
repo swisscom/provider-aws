@@ -1,0 +1,24 @@
+apiVersion: rds.aws.crossplane.io/v1alpha1
+kind: DBInstance
+metadata:
+  name: replica-test-which-already-implemented
+spec:
+  forProvider:
+    region: eu-central-1
+    replicateSourceDBInstanceID: kir-test
+    engine: mariadb
+    dbInstanceClass: db.t3.micro
+    autoMinorVersionUpgrade: true
+    allowMajorVersionUpgrade: true # unset per default (Note: supported dbInstanceClass and dbParameterGroup with correct dbParameterGroupFamily needed, before majorVersion upgrade possible; applyImmediately matters)
+    applyImmediately: true
+  providerConfigRef:
+    name: providerconfig-aws
+#---
+#apiVersion: v1
+#kind: Secret
+#metadata:
+#  name: example-dbinstance
+#  namespace: crossplane-system
+#type: Opaque
+#data:
+#  password: dGVzdFBhc3N3b3JkITEyMw== # testPassword!123

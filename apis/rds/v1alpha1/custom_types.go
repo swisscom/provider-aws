@@ -691,7 +691,20 @@ type CustomDBInstanceParameters struct {
 	//
 	//    * The source DB cluster must be in the same Amazon Web Services Region
 	//    as the read replica. Cross-Region replication isn't supported.
-	SourceDBClusterIdentifier *string `json:"sourceDBClusterIdentifier,omitempty"`
+	// +immutable
+	// +crossplane:generate:reference:type=github.com/crossplane-contrib/provider-aws/apis/rds/v1alpha1.DBCluster
+	// +crossplane:generate:reference:extractor=github.com/crossplane-contrib/provider-aws/apis/rds/v1alpha1.DBCluster()
+	ReplicateSourceDBClusterID *string `json:"replicateSourceDBClusterID,omitempty"`
+
+	// ReplicateSourceDBClusterIDRef is a reference to a DBCluster used to set
+	// ReplicateSourceDBClusterID.
+	// +optional
+	ReplicateSourceDBClusterIDRef *xpv1.Reference `json:"replicateSourceDBClusterIDRef,omitempty"`
+
+	// ReplicateSourceDBClusterIDSelector selects a reference to a DBCluster used to
+	// set ReplicateSourceDBClusterID.
+	// +optional
+	ReplicateSourceDBClusterIDSelector *xpv1.Selector `json:"replicateSourceDBClusterIDSelector,omitempty"`
 
 	// The identifier of the DB instance that will act as the source for the read
 	// replica. Each DB instance can have up to 15 read replicas, with the exception of
@@ -716,8 +729,20 @@ type CustomDBInstanceParameters struct {
 	//
 	// [Read replica limitations with SQL Server]: https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/SQLServer.ReadReplicas.html#SQLServer.ReadReplicas.Limitations
 	// [Version and licensing considerations for RDS for Oracle replicas]: https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/oracle-read-replicas.limitations.html#oracle-read-replicas.limitations.versions-and-licenses
+	// +immutable
+	// +crossplane:generate:reference:type=github.com/crossplane-contrib/provider-aws/apis/rds/v1alpha1.DBInstance
+	// +crossplane:generate:reference:extractor=github.com/crossplane-contrib/provider-aws/apis/rds/v1alpha1.DBInstance()
+	ReplicateSourceDBInstanceID *string `json:"replicateSourceDBInstanceID,omitempty"`
+
+	// ReplicateSourceDBInstanceIDRef is a reference to a DBInstance used to set
+	// ReplicateSourceDBInstanceID.
 	// +optional
-	SourceDBInstanceIdentifier *string `json:"sourceDBInstanceIdentifier,omitempty"`
+	ReplicateSourceDBInstanceIDRef *xpv1.Reference `json:"replicateSourceDBInstanceIDRef,omitempty"`
+
+	// ReplicateSourceDBInstanceIDSelector selects a reference to a DBInstance used to
+	// set ReplicateSourceDBInstanceID.
+	// +optional
+	ReplicateSourceDBInstanceIDSelector *xpv1.Selector `json:"replicateSourceDBInstanceIDSelector,omitempty"`
 
 	// A list of Amazon EC2 VPC security groups to authorize on this DB instance.
 	// This change is asynchronously applied as soon as possible.
@@ -792,7 +817,10 @@ type CustomDBInstanceParameters struct {
 }
 
 // CustomDBInstanceObservation includes the custom status fields of DBInstance.
-type CustomDBInstanceObservation struct{}
+type CustomDBInstanceObservation struct {
+	// The database role may be Primary, Replica.
+	DatabaseRole *string `json:"databaseRole,omitempty"`
+}
 
 // CustomDBInstanceRoleAssociationParameters are custom parameters for the DBInstanceRoleAssociation
 type CustomDBInstanceRoleAssociationParameters struct {
