@@ -137,23 +137,25 @@ type cache struct {
 }
 
 func newCustomExternal(kube client.Client, client svcsdkapi.RDSAPI) *customExternal {
-	shared := &shared{cache: &cache{}}
+	s := &shared{cache: &cache{}}
+	e := external{
+		kube:           kube,
+		client:         client,
+		lateInitialize: lateInitialize,
+		isUpToDate:     s.isUpToDate,
+		preObserve:     preObserve,
+		postObserve:    s.postObserve,
+		preCreate:      s.preCreate,
+		preDelete:      s.preDelete,
+		postDelete:     s.postDelete,
+		filterList:     filterList,
+		preUpdate:      s.preUpdate,
+		postUpdate:     s.postUpdate,
+	}
+	s.external = e
 	return &customExternal{
-		external{
-			kube:           kube,
-			client:         client,
-			lateInitialize: lateInitialize,
-			isUpToDate:     shared.isUpToDate,
-			preObserve:     preObserve,
-			postObserve:    shared.postObserve,
-			preCreate:      shared.preCreate,
-			preDelete:      shared.preDelete,
-			postDelete:     shared.postDelete,
-			filterList:     filterList,
-			preUpdate:      shared.preUpdate,
-			postUpdate:     shared.postUpdate,
-		},
-		shared,
+		external: e,
+		shared:   s,
 	}
 }
 
@@ -298,13 +300,14 @@ func (s *shared) updateConnectionDetails(ctx context.Context, cr *svcapitypes.DB
 	}
 
 	details[xpv1.ResourceCredentialsSecretUserKey] = []byte(pointer.StringValue(cr.Spec.ForProvider.MasterUsername))
-
-	pw, err := dbinstance.GetDesiredPassword(ctx, s.kube, cr)
-	if err != nil && pointer.StringValue(cr.Status.AtProvider.DatabaseRole) != databaseRoleReadReplica {
-		return details, errors.Wrap(err, dbinstance.ErrGetCachedPassword)
+	if s.cache.desiredPassword == "" {
+		pw, err := dbinstance.GetDesiredPassword(ctx, s.kube, cr)
+		if err != nil && pointer.StringValue(cr.Status.AtProvider.DatabaseRole) != databaseRoleReadReplica {
+			return details, errors.Wrap(err, dbinstance.ErrGetCachedPassword)
+		}
+		s.cache.desiredPassword = pw
 	}
-	s.cache.desiredPassword = pw
-	details[xpv1.ResourceCredentialsSecretPasswordKey] = []byte(pw)
+	details[xpv1.ResourceCredentialsSecretPasswordKey] = []byte(s.cache.desiredPassword)
 
 	if cr.Status.AtProvider.Endpoint == nil {
 		return details, nil
@@ -366,21 +369,15 @@ func (s *shared) postUpdate(ctx context.Context, cr *svcapitypes.DBInstance, out
 		return upd, err
 	}
 
-	if pointer.StringValue()
-	desiredPassword, err := dbinstance.GetDesiredPassword(ctx, s.kube, cr)
-	if err != nil {
-		return upd, errors.Wrap(err, dbinstance.ErrRetrievePasswordForUpdate)
-	}
+	upd.ConnectionDetails, err = s.updateConnectionDetails(ctx, cr, upd.ConnectionDetails)
 
 	_, err = dbinstance.Cache(ctx, s.kube, cr, map[string]string{
-		dbinstance.PasswordCacheKey:    desiredPassword,
+		dbinstance.PasswordCacheKey:    s.cache.desiredPassword,
 		dbinstance.RestoreFlagCacheKay: "", // reset restore flag
 	})
 	if err != nil {
 		return upd, errors.Wrap(err, dbinstance.ErrCachePassword)
 	}
-
-	upd.ConnectionDetails, err = s.updateConnectionDetails(ctx, cr, upd.ConnectionDetails)
 
 	// Update tags if necessary
 	if len(s.cache.addTags) > 0 {
@@ -593,8 +590,7 @@ func (s *shared) isUpToDate(ctx context.Context, cr *svcapitypes.DBInstance, out
 	}
 
 	// If the instance is a read replica and the desiredPassword was not generated before, and it is not assumed to be
-	// generated(by autogenerate or masterUserPasswordSecretRef), we don't check the desiredPassword. By defaults desiredPassword is
-	// replicated from the source(another instance or cluster)
+	// generated(by autogenerate or masterUserPassw:539ordSecretRef), we don't check the password.
 	if !(pointer.StringValue(cr.Status.AtProvider.DatabaseRole) == databaseRoleReadReplica &&
 		!autogenerate && masterUserPasswordSecretRef == nil && !cachedMasterPasswordExist) {
 
