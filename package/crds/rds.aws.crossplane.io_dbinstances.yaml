@@ -2362,6 +2362,9 @@ spec:
                       For more information about CoIPs, see Customer-owned IP addresses (https://docs.aws.amazon.com/outposts/latest/userguide/routing.html#ip-addressing)
                       in the Amazon Web Services Outposts User Guide.
                     type: boolean
+                  databaseRole:
+                    description: The database role may be Primary, Replica.
+                    type: string
                   dbClusterIdentifier:
                     description: |-
                       If the DB instance is a member of a DB cluster, indicates the name of the
