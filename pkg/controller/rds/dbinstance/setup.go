@@ -534,7 +534,7 @@ func (e *custom) isUpToDate(ctx context.Context, cr *svcapitypes.DBInstance, out
 		cmpopts.IgnoreFields(svcapitypes.CustomDBInstanceParameters{}, "DeleteAutomatedBackups"),
 	)
 
-	ignore := append([]string{"aws:", "c7n:"}, cr.Spec.ForProvider.TagIgnorePrefixes...)
+	ignore := append([]string{"aws:"}, cr.Spec.ForProvider.TagIgnorePrefixes...)
 	var observedTags []*svcsdk.Tag
 	if db.TagList != nil {
 		for _, tag := range db.TagList { // index discarded with _
