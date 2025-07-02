@@ -1,7 +1,7 @@
 apiVersion: rds.aws.crossplane.io/v1alpha1
 kind: DBInstance
 metadata:
-  name: replica-test
+  name: standalone-test
 spec:
   forProvider:
     region: eu-central-1
@@ -11,6 +11,7 @@ spec:
     autoMinorVersionUpgrade: true
     allowMajorVersionUpgrade: true # unset per default (Note: supported dbInstanceClass and dbParameterGroup with correct dbParameterGroupFamily needed, before majorVersion upgrade possible; applyImmediately matters)
     applyImmediately: true
+    skipFinalSnapshot: true
     masterUserPasswordSecretRef:
       key: password
       name: replica-test
