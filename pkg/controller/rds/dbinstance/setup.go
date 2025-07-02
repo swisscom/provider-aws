@@ -141,16 +141,17 @@ func newCustomExternal(kube client.Client, client svcsdkapi.RDSAPI) *customExter
 	e := external{
 		kube:           kube,
 		client:         client,
-		lateInitialize: lateInitialize,
-		isUpToDate:     s.isUpToDate,
 		preObserve:     preObserve,
+		isUpToDate:     s.isUpToDate,
 		postObserve:    s.postObserve,
+		preUpdate:      s.preUpdate,
+		postUpdate:     s.postUpdate,
 		preCreate:      s.preCreate,
+		postCreate:     nopPostCreate,
 		preDelete:      s.preDelete,
 		postDelete:     s.postDelete,
 		filterList:     filterList,
-		preUpdate:      s.preUpdate,
-		postUpdate:     s.postUpdate,
+		lateInitialize: lateInitialize,
 	}
 	s.external = e
 	return &customExternal{
