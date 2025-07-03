@@ -2363,7 +2363,7 @@ spec:
                       in the Amazon Web Services Outposts User Guide.
                     type: boolean
                   databaseRole:
-                    description: The database role may be Primary, Replica.
+                    description: The database role may be Standalone, Primary or Replica.
                     type: string
                   dbClusterIdentifier:
                     description: |-

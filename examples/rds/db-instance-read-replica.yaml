@@ -1,7 +1,8 @@
+---
 apiVersion: rds.aws.crossplane.io/v1alpha1
 kind: DBInstance
 metadata:
-  name: standalone-test
+  name: read-replica-1
 spec:
   forProvider:
     region: eu-central-1
@@ -12,21 +13,23 @@ spec:
     allowMajorVersionUpgrade: true # unset per default (Note: supported dbInstanceClass and dbParameterGroup with correct dbParameterGroupFamily needed, before majorVersion upgrade possible; applyImmediately matters)
     applyImmediately: true
     skipFinalSnapshot: true
-    masterUserPasswordSecretRef:
-      key: password
-      name: replica-test
-      namespace: default
+#    masterUserPasswordSecretRef:
+#      key: password
+#      name: replica-test
+#      namespace: default
   writeConnectionSecretToRef:
-    name: replica-test-out
+    name: read-replica-1
     namespace: default
   providerConfigRef:
     name: providerconfig-aws
----
-apiVersion: v1
-kind: Secret
-metadata:
-  name:  replica-test
-  namespace: default
-type: Opaque
-data:
-  password: dGVzdFBhc3N3b3JkITEyMw== # testPassword!123
+
+# By default, the read replica has the master user credentials as the source database.
+#---
+#apiVersion: v1
+#kind: Secret
+#metadata:
+#  name:  replica-test
+#  namespace: default
+#type: Opaque
+#data:
+#  password: dGVzdFBhc3N3b3JkITEyMw== # testPassword!123

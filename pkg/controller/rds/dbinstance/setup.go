@@ -58,6 +58,7 @@ const (
 
 // database roles
 const (
+	databaseRoleStandalone  = "Instance"
 	databaseRolePrimary     = "Primary"
 	databaseRoleReadReplica = "Replica"
 )
@@ -167,7 +168,7 @@ func (c *customExternal) Create(ctx context.Context, cr *svcapitypes.DBInstance)
 		}
 		return managed.ExternalCreation{}, nil
 	}
-	cr.Status.AtProvider.DatabaseRole = aws.String(databaseRolePrimary)
+	cr.Status.AtProvider.DatabaseRole = aws.String(databaseRoleStandalone)
 	return c.external.Create(ctx, cr)
 }
 
@@ -343,12 +344,14 @@ func (s *shared) postUpdate(ctx context.Context, cr *svcapitypes.DBInstance, out
 
 	upd.ConnectionDetails, err = s.updateConnectionDetails(ctx, cr, upd.ConnectionDetails)
 
-	_, err = dbinstance.Cache(ctx, s.kube, cr, map[string]string{
-		dbinstance.PasswordCacheKey:    s.cache.desiredPassword,
-		dbinstance.RestoreFlagCacheKay: "", // reset restore flag
-	})
-	if err != nil {
-		return upd, errors.Wrap(err, dbinstance.ErrCachePassword)
+	if s.cache.desiredPassword != "" {
+		_, err = dbinstance.Cache(ctx, s.kube, cr, map[string]string{
+			dbinstance.PasswordCacheKey:    s.cache.desiredPassword,
+			dbinstance.RestoreFlagCacheKay: "", // reset restore flag
+		})
+		if err != nil {
+			return upd, errors.Wrap(err, dbinstance.ErrCachePassword)
+		}
 	}
 
 	// Update tags if necessary
@@ -528,11 +531,12 @@ func (s *shared) isUpToDate(ctx context.Context, cr *svcapitypes.DBInstance, out
 	if status == "modifying" || status == "upgrading" || status == "rebooting" || status == "creating" || status == "deleting" {
 		return true, "", nil
 	}
-
-	if db.ReadReplicaSourceDBClusterIdentifier != nil || db.ReadReplicaSourceDBInstanceIdentifier != nil {
+	if db.ReadReplicaDBClusterIdentifiers != nil || db.ReadReplicaDBInstanceIdentifiers != nil {
+		cr.Status.AtProvider.DatabaseRole = aws.String(databaseRolePrimary)
+	} else if db.ReadReplicaSourceDBClusterIdentifier != nil || db.ReadReplicaSourceDBInstanceIdentifier != nil {
 		cr.Status.AtProvider.DatabaseRole = aws.String(databaseRoleReadReplica)
 	} else {
-		cr.Status.AtProvider.DatabaseRole = aws.String(databaseRolePrimary)
+		cr.Status.AtProvider.DatabaseRole = aws.String(databaseRoleStandalone)
 	}
 
 	autogenerate := cr.Spec.ForProvider.AutogeneratePassword
@@ -543,8 +547,9 @@ func (s *shared) isUpToDate(ctx context.Context, cr *svcapitypes.DBInstance, out
 		cachedMasterPasswordExist = false
 	}
 
-	// If the instance is a read replica and the desiredPassword was not generated before, and it is not assumed to be
-	// generated(by autogenerate or masterUserPassw:539ordSecretRef), we don't check the password.
+	// If the instance is a read replica and the password was not created before, and it is not assumed to be
+	// generated/created(by autogenerate or masterUserPasswordSecretRef), we don't check the password. By
+	// default, a read replica has the same credentials as the primary instance.
 	if !(pointer.StringValue(cr.Status.AtProvider.DatabaseRole) == databaseRoleReadReplica &&
 		!autogenerate && masterUserPasswordSecretRef == nil && !cachedMasterPasswordExist) {
 

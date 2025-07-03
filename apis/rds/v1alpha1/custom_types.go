@@ -818,7 +818,10 @@ type CustomDBInstanceParameters struct {
 
 // CustomDBInstanceObservation includes the custom status fields of DBInstance.
 type CustomDBInstanceObservation struct {
-	// The database role may be Primary, Replica.
+	// AWS API calls don't return any field which explicitly indicates the role of database, which would be really convenient.
+	// DatabaseRole works on the similar principle as the Role field in AWS UI("Aurora and RDS" > "Databases").
+
+	// The database role may be Standalone, Primary or Replica.
 	DatabaseRole *string `json:"databaseRole,omitempty"`
 }
 
