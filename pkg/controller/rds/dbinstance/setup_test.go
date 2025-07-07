@@ -209,7 +209,7 @@ func TestIsUpToDate(t *testing.T) {
 				},
 			},
 		},
-		"Ignores Tags with TagIgnorePrefixes": {
+		"IgnoresTagswithTagIgnorePrefixes": {
 			args: args{
 				cr: &svcapitypes.DBInstance{
 					Spec: svcapitypes.DBInstanceSpec{
