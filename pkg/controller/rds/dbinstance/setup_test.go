@@ -107,3 +107,162 @@ func TestCreate(t *testing.T) {
 		})
 	}
 }
+
+func TestIsUpToDate(t *testing.T) {
+	type args struct {
+		kube client.Client
+		cr   *svcapitypes.DBInstance
+		out  *svcsdk.DescribeDBInstancesOutput
+	}
+
+	type want struct {
+		upToDate         bool
+		err              error
+		statusAtProvider *svcapitypes.CustomDBInstanceObservation
+	}
+
+	cases := map[string]struct {
+		args
+		want
+	}{
+		"UpToDateReadReplicaWithReplicatedMasterCredentials": {
+			args: args{
+				cr: &svcapitypes.DBInstance{
+					Spec: svcapitypes.DBInstanceSpec{
+						ForProvider: svcapitypes.DBInstanceParameters{
+							DeletionProtection: aws.Bool(true),
+						},
+					},
+				},
+				out: &svcsdk.DescribeDBInstancesOutput{
+					DBInstances: []*svcsdk.DBInstance{
+						{
+							DeletionProtection:                   aws.Bool(true),
+							ReadReplicaSourceDBClusterIdentifier: aws.String("source-db-instance-id"),
+						},
+					},
+				},
+				kube: &test.MockClient{
+					MockGet: func(ctx context.Context, key client.ObjectKey, obj client.Object) error {
+						return errors.New("not found")
+					},
+				},
+			},
+			want: want{
+				upToDate: true,
+				err:      nil,
+				statusAtProvider: &svcapitypes.CustomDBInstanceObservation{
+					DatabaseRole: aws.String(databaseRoleReadReplica),
+				},
+			},
+		},
+		"databaseRolePrimary": {
+			args: args{
+				cr: &svcapitypes.DBInstance{
+					Spec: svcapitypes.DBInstanceSpec{
+						ForProvider: svcapitypes.DBInstanceParameters{
+							DeletionProtection: aws.Bool(true),
+						},
+					},
+				},
+				out: &svcsdk.DescribeDBInstancesOutput{
+					DBInstances: []*svcsdk.DBInstance{
+						{
+							DeletionProtection:               aws.Bool(true),
+							ReadReplicaDBInstanceIdentifiers: []*string{aws.String("db-read-replica-id")},
+						},
+					},
+				},
+				kube: test.NewMockClient(),
+			},
+			want: want{
+				upToDate: true,
+				err:      nil,
+				statusAtProvider: &svcapitypes.CustomDBInstanceObservation{
+					DatabaseRole: aws.String(databaseRolePrimary),
+				},
+			},
+		},
+		"UpToDateStandaloneInstance": {
+			args: args{
+				cr: &svcapitypes.DBInstance{
+					Spec: svcapitypes.DBInstanceSpec{
+						ForProvider: svcapitypes.DBInstanceParameters{
+							DeletionProtection: aws.Bool(true),
+						},
+					},
+				},
+				out: &svcsdk.DescribeDBInstancesOutput{
+					DBInstances: []*svcsdk.DBInstance{
+						{
+							DeletionProtection: aws.Bool(true),
+						},
+					},
+				},
+				kube: test.NewMockClient(),
+			},
+			want: want{
+				upToDate: true,
+				err:      nil,
+				statusAtProvider: &svcapitypes.CustomDBInstanceObservation{
+					DatabaseRole: aws.String(databaseRoleStandalone),
+				},
+			},
+		},
+		"Ignores Tags with TagIgnorePrefixes": {
+			args: args{
+				cr: &svcapitypes.DBInstance{
+					Spec: svcapitypes.DBInstanceSpec{
+						ForProvider: svcapitypes.DBInstanceParameters{
+							CustomDBInstanceParameters: svcapitypes.CustomDBInstanceParameters{
+								TagIgnorePrefixes: []string{"aws:", "c7n:"},
+							},
+							Tags: []*svcapitypes.Tag{
+								{Key: aws.String("env"), Value: aws.String("prod")},
+							},
+							DeletionProtection: aws.Bool(true),
+						},
+					},
+				},
+				out: &svcsdk.DescribeDBInstancesOutput{
+					DBInstances: []*svcsdk.DBInstance{
+						{
+							DeletionProtection: aws.Bool(true),
+							TagList: []*svcsdk.Tag{
+								{Key: aws.String("aws:createdBy"), Value: aws.String("terraform")},
+								{Key: aws.String("c7n:policy"), Value: aws.String("auto")},
+								{Key: aws.String("env"), Value: aws.String("prod")},
+							},
+						},
+					},
+				},
+				kube: test.NewMockClient(),
+			},
+			want: want{
+				upToDate: true,
+				err:      nil,
+				statusAtProvider: &svcapitypes.CustomDBInstanceObservation{
+					DatabaseRole: aws.String(databaseRoleStandalone),
+				},
+			},
+		},
+	}
+
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			cr := tc.args.cr
+			ce := newCustomExternal(tc.kube, nil)
+			upToDate, _, err := ce.isUpToDate(context.TODO(), cr, tc.args.out)
+
+			if diff := cmp.Diff(tc.want.err, err); diff != "" {
+				t.Errorf("r: -want, +got error: \n%s", diff)
+			}
+			if diff := cmp.Diff(tc.want.upToDate, upToDate); diff != "" {
+				t.Errorf("r: -want, +got: \n%s", diff)
+			}
+			if diff := cmp.Diff(tc.want.statusAtProvider.DatabaseRole, cr.Status.AtProvider.DatabaseRole); diff != "" {
+				t.Errorf("r: -want, +got: \n%s", diff)
+			}
+		})
+	}
+}
