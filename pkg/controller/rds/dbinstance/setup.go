@@ -606,6 +606,7 @@ func (s *shared) isUpToDate(ctx context.Context, cr *svcapitypes.DBInstance, out
 		cmpopts.IgnoreFields(svcapitypes.CustomDBInstanceParameters{}, "VPCSecurityGroupIDs"),
 		cmpopts.IgnoreFields(svcapitypes.CustomDBInstanceParameters{}, "DeleteAutomatedBackups"),
 		cmpopts.IgnoreFields(svcapitypes.CustomDBInstanceParameters{}, "ReplicateSourceDBInstanceID", "ReplicateSourceDBClusterID"),
+		cmpopts.IgnoreFields(svcapitypes.CustomDBInstanceParameters{}, "TagIgnorePrefixes"),
 	)
 
 	ignore := append([]string{"aws:"}, cr.Spec.ForProvider.TagIgnorePrefixes...)
