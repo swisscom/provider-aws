@@ -532,11 +532,12 @@ func (s *shared) isUpToDate(ctx context.Context, cr *svcapitypes.DBInstance, out
 	if status == "modifying" || status == "upgrading" || status == "rebooting" || status == "creating" || status == "deleting" {
 		return true, "", nil
 	}
-	if db.ReadReplicaDBClusterIdentifiers != nil || db.ReadReplicaDBInstanceIdentifiers != nil {
+	switch {
+	case db.ReadReplicaDBClusterIdentifiers != nil || db.ReadReplicaDBInstanceIdentifiers != nil:
 		cr.Status.AtProvider.DatabaseRole = aws.String(databaseRolePrimary)
-	} else if db.ReadReplicaSourceDBClusterIdentifier != nil || db.ReadReplicaSourceDBInstanceIdentifier != nil {
+	case db.ReadReplicaSourceDBClusterIdentifier != nil || db.ReadReplicaSourceDBInstanceIdentifier != nil:
 		cr.Status.AtProvider.DatabaseRole = aws.String(databaseRoleReadReplica)
-	} else {
+	default:
 		cr.Status.AtProvider.DatabaseRole = aws.String(databaseRoleStandalone)
 	}
 
