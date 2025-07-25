@@ -1971,7 +1971,9 @@ spec:
                       Default: io1, if the Iops parameter is specified. Otherwise, gp2.
                     type: string
                   tagIgnorePrefixes:
-                    description: List of tag prefixes to be ignored during reconciliation.
+                    description: |-
+                      TagIgnorePrefixes defines a list of tag key prefixes that should be ignored
+                      during tag comparison and updates by the reconciler.
                     items:
                       type: string
                     type: array
