@@ -628,8 +628,8 @@ func (s *shared) isUpToDate(ctx context.Context, cr *svcapitypes.DBInstance, out
 			})
 		}
 	}
-	e.cache.addTags, e.cache.removeTags = utils.DiffTags(cr.Spec.ForProvider.Tags, observedTags)
-	tagsChanged := len(e.cache.addTags) != 0 || len(e.cache.removeTags) != 0
+	s.cache.addTags, s.cache.removeTags = utils.DiffTags(cr.Spec.ForProvider.Tags, observedTags)
+	tagsChanged := len(s.cache.addTags) != 0 || len(s.cache.removeTags) != 0
 
 	if diff == "" && !maintenanceWindowChanged && !backupWindowChanged && !iopsChanged && !storageThroughputChanged && !versionChanged && !vpcSGsChanged && !dbParameterGroupChanged && !optionGroupChanged && !tagsChanged {
 		return true, diff, nil
