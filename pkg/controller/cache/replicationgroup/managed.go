@@ -18,6 +18,8 @@ package replicationgroup
 
 import (
 	"context"
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"reflect"
 	"strconv"
 	"strings"
@@ -54,6 +56,7 @@ const (
 	errNotReplicationGroup                 = "managed resource is not an ElastiCache replication group"
 	errDescribeReplicationGroup            = "cannot describe ElastiCache replication group"
 	errGenerateAuthToken                   = "cannot generate ElastiCache auth token"
+	errGetPasswordSecret                   = "cannot get ElastiCache auth password from secret"
 	errCreateReplicationGroup              = "cannot create ElastiCache replication group"
 	errModifyReplicationGroup              = "cannot modify ElastiCache replication group"
 	errDeleteReplicationGroup              = "cannot delete ElastiCache replication group"
@@ -116,12 +119,18 @@ func (c *connector) Connect(ctx context.Context, mg resource.Managed) (managed.E
 	if err != nil {
 		return nil, err
 	}
-	return &external{c.newClientFn(*cfg), c.kube}, nil
+	return &external{&cache{}, c.newClientFn(*cfg), c.kube}, nil
 }
 
 type external struct {
+	cache  *cache
 	client elasticache.Client
 	kube   client.Client
+}
+
+type cache struct {
+	currentPassword string
+	desiredPassword string
 }
 
 func (e *external) Observe(ctx context.Context, mg resource.Managed) (managed.ExternalObservation, error) { //nolint:gocyclo
@@ -177,11 +186,26 @@ func (e *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 	}
 
 	rgDiff := elasticache.ReplicationGroupNeedsUpdate(cr.Spec.ForProvider, rg, ccList)
+	if e.cache.currentPassword == "" {
+		pw, err := getCurrentPassword(ctx, e.kube, cr)
+		if err != nil {
+			return managed.ExternalObservation{}, errorutils.Wrap(err, errGetPasswordSecret)
+		}
+		e.cache.currentPassword = pw
+	}
+	dsPw, err := getSecretPassword(ctx, e.kube, cr.GetPasswordSecretRef())
+	e.cache.desiredPassword = dsPw
+	if err != nil {
+		return managed.ExternalObservation{}, errorutils.Wrap(err, errGetPasswordSecret)
+	}
+	pwChanged := e.cache.currentPassword != dsPw
+
 	return managed.ExternalObservation{
 		ResourceExists: true,
 		ResourceUpToDate: rgDiff == "" &&
 			!elasticache.ReplicationGroupShardConfigurationNeedsUpdate(cr.Spec.ForProvider, rg) &&
-			!tagsNeedUpdate,
+			!tagsNeedUpdate &&
+			!pwChanged,
 		ConnectionDetails: elasticache.ConnectionEndpoint(rg),
 		Diff:              rgDiff,
 	}, nil
@@ -200,23 +224,30 @@ func (e *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 	// submit the request as the operator intended and let the reconcile fail
 	// with an explanatory message from AWS explaining that transit encryption
 	// is required.
-	var token *string
-	if aws.ToBool(cr.Spec.ForProvider.AuthEnabled) {
+	var token string
+	if cr.Spec.ForProvider.AuthTokenSecretRef != nil {
+		t, err := getSecretPassword(ctx, e.kube, cr.GetPasswordSecretRef())
+		if err != nil {
+			return managed.ExternalCreation{}, errorutils.Wrap(err, errGetPasswordSecret)
+		}
+		token = t
+	} else if aws.ToBool(cr.Spec.ForProvider.AuthEnabled) {
 		t, err := password.Generate()
 		if err != nil {
 			return managed.ExternalCreation{}, errorutils.Wrap(err, errGenerateAuthToken)
 		}
-		token = &t
+		token = t
 	}
-	_, err := e.client.CreateReplicationGroup(ctx, elasticache.NewCreateReplicationGroupInput(cr.Spec.ForProvider, meta.GetExternalName(cr), token))
+	_, err := e.client.CreateReplicationGroup(ctx, elasticache.NewCreateReplicationGroupInput(cr.Spec.ForProvider, meta.GetExternalName(cr), &token))
 	if err != nil {
 		return managed.ExternalCreation{}, errorutils.Wrap(resource.Ignore(elasticache.IsAlreadyExists, err), errCreateReplicationGroup)
 	}
-	if token != nil {
+	if token != "" {
+		e.cache.currentPassword = token
 		return managed.ExternalCreation{
 
 			ConnectionDetails: managed.ConnectionDetails{
-				xpv1.ResourceCredentialsSecretPasswordKey: []byte(*token),
+				xpv1.ResourceCredentialsSecretPasswordKey: []byte(token),
 			},
 		}, nil
 	}
@@ -270,11 +301,12 @@ func (e *external) Update(ctx context.Context, mg resource.Managed) (managed.Ext
 		return managed.ExternalUpdate{}, nil
 	}
 
-	if diff := elasticache.ReplicationGroupNeedsUpdate(cr.Spec.ForProvider, rg, ccList); diff != "" {
-		_, err = e.client.ModifyReplicationGroup(ctx, elasticache.NewModifyReplicationGroupInput(cr.Spec.ForProvider, meta.GetExternalName(cr)))
+	if diff := elasticache.ReplicationGroupNeedsUpdate(cr.Spec.ForProvider, rg, ccList); diff != "" || e.cache.currentPassword != e.cache.desiredPassword {
+		_, err = e.client.ModifyReplicationGroup(ctx, elasticache.NewModifyReplicationGroupInput(cr.Spec.ForProvider, meta.GetExternalName(cr), &e.cache.desiredPassword))
 		if err != nil {
 			return managed.ExternalUpdate{}, errorutils.Wrap(err, errModifyReplicationGroup)
 		}
+		e.cache.currentPassword = e.cache.desiredPassword
 		return managed.ExternalUpdate{}, nil
 
 	}
@@ -380,4 +412,25 @@ func getVersion(version *string) (*string, error) {
 		}
 	}
 	return &versionOut, nil
+}
+
+// GetSecretValue retrieves the value of a secret key from a Kubernetes Secret.
+func getSecretPassword(ctx context.Context, kube client.Client, slr *xpv1.SecretKeySelector) (pw string, err error) {
+	secret := new(corev1.Secret)
+	ref := slr.SecretReference
+	err = kube.Get(ctx, types.NamespacedName{Name: ref.Name, Namespace: ref.Namespace}, secret)
+	if err != nil {
+		return "", err
+	}
+	pwdRaw := secret.Data[slr.Key]
+	return string(pwdRaw), nil
+}
+
+// GetCurrentPassword retrieves the current password from the connection secret of the managed resource.
+func getCurrentPassword(ctx context.Context, kube client.Client, mg resource.Managed) (pw string, err error) {
+	secretKeyRef := &xpv1.SecretKeySelector{
+		SecretReference: *mg.GetWriteConnectionSecretToReference(),
+		Key:             xpv1.ResourceCredentialsSecretPasswordKey,
+	}
+	return getSecretPassword(ctx, kube, secretKeyRef)
 }

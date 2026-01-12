@@ -278,9 +278,56 @@ type ReplicationGroupParameters struct {
 	// group object as closely as possible, we expose a boolean here rather than
 	// requiring the operator pass in a string authentication token. Crossplane
 	// will generate a token automatically and expose it via a Secret.
+	// If AuthTokenSecretRef is specified, this field is ignored.
 	// +immutable
 	// +optional
 	AuthEnabled *bool `json:"authEnabled,omitempty"`
+
+	// Specifies the strategy to use to update the AUTH token. This parameter must be
+	// specified with the auth-token parameter. Possible values:
+	//
+	//   - ROTATE - default, if no update strategy is provided
+	//
+	//   - SET - allowed only after ROTATE
+	//
+	//   - DELETE - allowed only when transitioning to RBAC
+	//
+	// For more information, see [Authenticating Users with AUTH]
+	//
+	// [Authenticating Users with AUTH]: http://docs.aws.amazon.com/AmazonElastiCache/latest/dg/auth.html
+
+	// The password used to access a password protected server.
+	// This parameter works with the AuthTokenUpdateStrategy(has "ROTATE" value by default)
+	// Attention: AuthTokenUpdateStrategy "ROTATE" adds a new auth token, while the old one remains working.
+	// If auth token wasn't specified or generated, unauthenticated access will remain possible until you set AuthTokenUpdateStrategy to "SET",
+	// which will remove the old auth token and allow only the new one to work.
+	//
+	// Password constraints:
+	//
+	//   - Must be only printable ASCII characters
+	//
+	//   - Must be at least 16 characters and no more than 128 characters in length
+	//
+	//   - Cannot contain any of the following characters: '/', '"', or '@', '%'
+	//
+	// For more information, see AUTH password at [AUTH].
+	//
+	// [AUTH]: http://redis.io/commands/AUTH
+	AuthTokenSecretRef *xpv1.SecretKeySelector `json:"authTokenSecretRef,omitempty"`
+
+	// Specifies the strategy to use to update the AUTH token. This parameter must be
+	// specified with the auth-token parameter. Possible values:
+	//
+	//   - ROTATE - default, if no update strategy is provided
+	//
+	//   - SET - allowed only after ROTATE
+	//
+	//   - DELETE - allowed only when transitioning to RBAC(not supported by the provider yet)
+	//
+	// For more information, see [Authenticating Users with AUTH]
+	//
+	// [Authenticating Users with AUTH]: http://docs.aws.amazon.com/AmazonElastiCache/latest/dg/auth.html
+	AuthTokenUpdateStrategy string `json:"authTokenUpdateStrategy,omitempty"`
 
 	// AutomaticFailoverEnabled specifies whether a read-only replica is
 	// automatically promoted to read/write primary if the existing primary

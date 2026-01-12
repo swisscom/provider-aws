@@ -138,10 +138,12 @@ func NewCreateReplicationGroupInput(g v1beta1.ReplicationGroupParameters, id str
 
 // NewModifyReplicationGroupInput returns ElastiCache replication group
 // modification input suitable for use with the AWS API.
-func NewModifyReplicationGroupInput(g v1beta1.ReplicationGroupParameters, id string) *elasticache.ModifyReplicationGroupInput {
+func NewModifyReplicationGroupInput(g v1beta1.ReplicationGroupParameters, id string, token *string) *elasticache.ModifyReplicationGroupInput {
 	return &elasticache.ModifyReplicationGroupInput{
 		ReplicationGroupId:          aws.String(id),
 		ApplyImmediately:            &g.ApplyModificationsImmediately,
+		AuthToken:                   token,
+		AuthTokenUpdateStrategy:     elasticachetypes.AuthTokenUpdateStrategyType(g.AuthTokenUpdateStrategy),
 		AutomaticFailoverEnabled:    g.AutomaticFailoverEnabled,
 		CacheNodeType:               aws.String(g.CacheNodeType),
 		CacheParameterGroupName:     g.CacheParameterGroupName,
