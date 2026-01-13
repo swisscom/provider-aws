@@ -311,7 +311,12 @@ func (e *external) Update(ctx context.Context, mg resource.Managed) (managed.Ext
 
 	}
 	err = e.updateTags(ctx, cr.Spec.ForProvider.Tags, rg.ARN)
-	return managed.ExternalUpdate{}, errorutils.Wrap(err, errUpdateReplicationGroupTags)
+	if err != nil {
+		return managed.ExternalUpdate{}, errorutils.Wrap(err, errUpdateReplicationGroupTags)
+	}
+	return managed.ExternalUpdate{ConnectionDetails: managed.ConnectionDetails{
+		xpv1.ResourceCredentialsSecretPasswordKey: []byte(e.cache.currentPassword),
+	}}, nil
 }
 
 func (e *external) Delete(ctx context.Context, mg resource.Managed) (managed.ExternalDelete, error) {

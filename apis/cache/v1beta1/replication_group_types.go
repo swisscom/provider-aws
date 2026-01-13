@@ -313,6 +313,7 @@ type ReplicationGroupParameters struct {
 	// For more information, see AUTH password at [AUTH].
 	//
 	// [AUTH]: http://redis.io/commands/AUTH
+	// +optional
 	AuthTokenSecretRef *xpv1.SecretKeySelector `json:"authTokenSecretRef,omitempty"`
 
 	// Specifies the strategy to use to update the AUTH token. This parameter must be
@@ -327,6 +328,7 @@ type ReplicationGroupParameters struct {
 	// For more information, see [Authenticating Users with AUTH]
 	//
 	// [Authenticating Users with AUTH]: http://docs.aws.amazon.com/AmazonElastiCache/latest/dg/auth.html
+	// +optional
 	AuthTokenUpdateStrategy string `json:"authTokenUpdateStrategy,omitempty"`
 
 	// AutomaticFailoverEnabled specifies whether a read-only replica is
