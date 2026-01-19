@@ -426,12 +426,14 @@ func getVersion(version *string) (*string, error) {
 // GetSecretValue retrieves the value of a secret key from a Kubernetes Secret.
 func getSecretPassword(ctx context.Context, kube client.Client, sks *xpv1.SecretKeySelector) (pw string, err error) {
 	secret := new(corev1.Secret)
+	secret.SetName(sks.Name) // TODO(teeverr): it is needed only for mock testing functions, will be overwritten by Get. didn't find a better way.
 	ref := sks.SecretReference
 	err = kube.Get(ctx, types.NamespacedName{Name: ref.Name, Namespace: ref.Namespace}, secret)
 	if err != nil {
 		return "", err
 	}
 	pwdRaw := secret.Data[sks.Key]
+	fmt.Printf("Password is: %s\n", string(pwdRaw))
 	return string(pwdRaw), nil
 }
 

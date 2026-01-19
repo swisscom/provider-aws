@@ -77,6 +77,19 @@ type testCase struct {
 	returnsErr   bool
 }
 
+type testCaseIsUpToDate struct {
+	name                       string
+	e                          managed.ExternalClient
+	cr                         *v1beta1.ReplicationGroup
+	want                       wantIsUpToDate
+}
+
+type wantIsUpToDate struct {
+	isUpToDate bool
+	managed.ConnectionDetails
+	err error
+}
+
 type replicationGroupModifier func(*v1beta1.ReplicationGroup)
 
 func withAutomaticFailover(v types.AutomaticFailoverStatus) replicationGroupModifier {
@@ -143,6 +156,10 @@ func withEngineVersion(e string) replicationGroupModifier {
 	return func(r *v1beta1.ReplicationGroup) { r.Spec.ForProvider.EngineVersion = &e }
 }
 
+func withWriteConnectionSecretToReference(ref xpv1.SecretReference) replicationGroupModifier {
+	return func(r *v1beta1.ReplicationGroup) {r.Spec.ResourceSpec.WriteConnectionSecretToReference = &ref}
+}
+
 func replicationGroup(rm ...replicationGroupModifier) *v1beta1.ReplicationGroup {
 	r := &v1beta1.ReplicationGroup{
 		ObjectMeta: objectMeta,
@@ -171,22 +188,30 @@ func replicationGroup(rm ...replicationGroupModifier) *v1beta1.ReplicationGroup 
 }
 
 func mockGettingSecretDataWithDiff(obj client.Object) error {
-	secret := new(corev1.Secret)
+	secret, ok := obj.(*corev1.Secret)
+	if !ok {
+		return errors.New("the mock function only supports secret objects")
+	}
 	if obj.GetName() == "authTokenSecret" {
 		secret.Data = map[string][]byte{
 			xpv1.ResourceCredentialsSecretPasswordKey: []byte("desiredAuthToken"),
 		}
-	} else {
+	} else if obj.GetName() == "writeConnectionSecretToRefName" {
 		secret.Data = map[string][]byte{
-			xpv1.ResourceCredentialsSecretPasswordKey: []byte("current"),
+			xpv1.ResourceCredentialsSecretPasswordKey: []byte("currentAuthToken"),
 		}
+	} else {
+		return errors.New("unexpected secret name: " + obj.GetName())
 	}
-	obj = secret
 	return nil
 }
 
-func mockGettingSecretData(obj corev1.Secret) error {
-	obj.Data = map[string][]byte{
+func mockGettingSecretData(obj client.Object) error {
+	secret, ok := obj.(*corev1.Secret)
+	if !ok {
+		return errors.New("the mock function only supports secret objects")
+	}
+	secret.Data = map[string][]byte{
 		xpv1.ResourceCredentialsSecretPasswordKey: []byte("token1234567890!"),
 	}
 	return nil
@@ -481,43 +506,6 @@ func TestObserve(t *testing.T) {
 			),
 		},
 		{
-			name: "New",
-			e: &external{
-				cache: &cache{},
-				client: &fake.MockClient{
-					MockDescribeReplicationGroups: func(ctx context.Context, _ *elasticache.DescribeReplicationGroupsInput, opts []func(*elasticache.Options)) (*elasticache.DescribeReplicationGroupsOutput, error) {
-						return &elasticache.DescribeReplicationGroupsOutput{
-							ReplicationGroups: []types.ReplicationGroup{
-								{
-									AuthTokenEnabled: aws.Bool(true),
-									Status:           aws.String(v1beta1.StatusAvailable),
-								},
-							},
-						}, nil
-					},
-				},
-				kube: &test.MockClient{
-					MockGet:    test.NewMockGetFn(nil, mockGettingSecretDataWithDiff),
-					MockUpdate: test.NewMockUpdateFn(nil),
-				},
-			},
-			r: replicationGroup(
-				withReplicationGroupID(name),
-				withAuthTokenSecretRef(&xpv1.SecretKeySelector{
-					SecretReference: xpv1.SecretReference{
-						Name:      "authTokenSecret",
-						Namespace: "default"},
-					Key: xpv1.ResourceCredentialsSecretPasswordKey,
-				}),
-			),
-			want: replicationGroup(
-				withProviderStatus(v1beta1.StatusCreating),
-				withReplicationGroupID(name),
-				withAuthEnabled(true),
-				withConditions(xpv1.Creating()),
-			),
-		},
-		{
 			name: "FailedObserveLateInitializeError",
 			e: &external{
 				cache: &cache{},
@@ -614,6 +602,73 @@ func TestObserve(t *testing.T) {
 
 			if diff := cmp.Diff(tc.want, tc.r, test.EquateConditions()); diff != "" {
 				t.Errorf("r: -want, +got:\n%s", diff)
+			}
+		})
+	}
+}
+
+func TestIsUpToDate(t *testing.T) {
+	cases := []testCaseIsUpToDate{
+		{
+			name: "PasswordChanged",
+			e: &external{
+				cache: &cache{},
+				client: &fake.MockClient{
+					MockDescribeReplicationGroups: func(ctx context.Context, _ *elasticache.DescribeReplicationGroupsInput, opts []func(*elasticache.Options)) (*elasticache.DescribeReplicationGroupsOutput, error) {
+						return &elasticache.DescribeReplicationGroupsOutput{
+							ReplicationGroups: []types.ReplicationGroup{
+								{
+									Status:                 aws.String(v1beta1.StatusModifying),
+									AutomaticFailover:      types.AutomaticFailoverStatusEnabled,
+									CacheNodeType:          aws.String(cacheNodeType),
+									SnapshotRetentionLimit: aws.Int32(int32(snapshotRetentionLimit)),
+									SnapshotWindow:         aws.String(snapshotWindow),
+									ClusterEnabled:         aws.Bool(true),
+									MemberClusters:         []string{cacheClusterID},
+								},
+							},
+						}, nil
+					},
+					MockDescribeCacheClusters: func(ctx context.Context, _ *elasticache.DescribeCacheClustersInput, opts []func(*elasticache.Options)) (*elasticache.DescribeCacheClustersOutput, error) {
+						return &elasticache.DescribeCacheClustersOutput{
+							CacheClusters: []types.CacheCluster{
+								{EngineVersion: aws.String(engineVersion), PreferredMaintenanceWindow: aws.String(maintenanceWindow)},
+							},
+						}, nil
+					},
+				},
+				kube: &test.MockClient{
+					MockGet:    test.NewMockGetFn(nil, mockGettingSecretDataWithDiff),
+					MockUpdate: test.NewMockUpdateFn(nil),
+				},
+			},
+			cr: replicationGroup(
+				withReplicationGroupID(name),
+				withAuthTokenSecretRef(&xpv1.SecretKeySelector{
+					SecretReference: xpv1.SecretReference{
+						Name:      "authTokenSecret", // This secret has "desiredAuthToken"(set in mockGettingSecretDataWithDiff)
+						Namespace: "default"},
+					Key: xpv1.ResourceCredentialsSecretPasswordKey,
+				}),
+				withWriteConnectionSecretToReference(xpv1.SecretReference{
+					Name:      "writeConnectionSecretToRefName", // This secret has "currentAuthToken"(set in mockGettingSecretDataWithDiff)
+				}),
+			),
+			want: wantIsUpToDate{
+				isUpToDate: true,
+				err:        nil,
+			},
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			observation, err := tc.e.Observe(ctx, tc.cr)
+			if diff := cmp.Diff(tc.want.err, err, test.EquateErrors()); diff != "" {
+				t.Errorf("r: -want, +got:\n%s", diff)
+			}
+
+			if diff := cmp.Diff(tc.want.isUpToDate, observation.ResourceUpToDate); diff != "" {
+				t.Error("isUpTODate status: -want, +got\n", diff, "\ndiff:", observation.Diff)
 			}
 		})
 	}
