@@ -18,8 +18,7 @@ package replicationgroup
 
 import (
 	"context"
-	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/types"
+	"fmt"
 	"reflect"
 	"strconv"
 	"strings"
@@ -36,6 +35,8 @@ import (
 	"github.com/crossplane/crossplane-runtime/pkg/reconciler/managed"
 	"github.com/crossplane/crossplane-runtime/pkg/resource"
 	"github.com/pkg/errors"
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -129,8 +130,8 @@ type external struct {
 }
 
 type cache struct {
-	currentPassword string
-	desiredPassword string
+	currentAuthToken string
+	desiredAuthToken string
 }
 
 func (e *external) Observe(ctx context.Context, mg resource.Managed) (managed.ExternalObservation, error) { //nolint:gocyclo
@@ -186,19 +187,27 @@ func (e *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 	}
 
 	rgDiff := elasticache.ReplicationGroupNeedsUpdate(cr.Spec.ForProvider, rg, ccList)
-	if e.cache.currentPassword == "" {
-		pw, err := getCurrentPassword(ctx, e.kube, cr)
-		if err != nil {
-			return managed.ExternalObservation{}, errorutils.Wrap(err, errGetPasswordSecret)
-		}
-		e.cache.currentPassword = pw
-	}
-	dsPw, err := getSecretPassword(ctx, e.kube, cr.GetPasswordSecretRef())
-	e.cache.desiredPassword = dsPw
+	crPass, err := getCurrentPassword(ctx, e.kube, cr)
 	if err != nil {
 		return managed.ExternalObservation{}, errorutils.Wrap(err, errGetPasswordSecret)
 	}
-	pwChanged := e.cache.currentPassword != dsPw
+	e.cache.currentAuthToken = crPass
+	if cr.GetAuthTokenSecretRef() != nil {
+		dsPass, err := getSecretPassword(ctx, e.kube, cr.GetAuthTokenSecretRef())
+		e.cache.desiredAuthToken = dsPass
+		if err != nil {
+			return managed.ExternalObservation{}, errorutils.Wrap(err, errGetPasswordSecret)
+		}
+	}
+	// If authTokenSecretRef is not set and auth is enabled, we want to keep using the
+	// current password.
+	if e.cache.desiredAuthToken == "" && aws.ToBool(cr.Spec.ForProvider.AuthEnabled) {
+		e.cache.desiredAuthToken = e.cache.currentAuthToken
+	}
+	// AuthTokenUpdateStrategy is not declarative parameter from aws perspective, so there is no api call to check if it is up to date.
+	// We track the last applied strategy in status and compare it with the desired one.
+	pwChanged := e.cache.currentAuthToken != e.cache.desiredAuthToken || cr.Status.AtProvider.LastAppliedAuthTokenAppliedStrategy != cr.Spec.ForProvider.AuthTokenUpdateStrategy
+	diff := fmt.Sprintf("ReplicationGroup diff: '%s', Tags need update: %t, AuthToken changed: %t", rgDiff, tagsNeedUpdate, pwChanged)
 
 	return managed.ExternalObservation{
 		ResourceExists: true,
@@ -207,7 +216,7 @@ func (e *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 			!tagsNeedUpdate &&
 			!pwChanged,
 		ConnectionDetails: elasticache.ConnectionEndpoint(rg),
-		Diff:              rgDiff,
+		Diff:              diff,
 	}, nil
 }
 
@@ -226,7 +235,7 @@ func (e *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 	// is required.
 	var token string
 	if cr.Spec.ForProvider.AuthTokenSecretRef != nil {
-		t, err := getSecretPassword(ctx, e.kube, cr.GetPasswordSecretRef())
+		t, err := getSecretPassword(ctx, e.kube, cr.GetAuthTokenSecretRef())
 		if err != nil {
 			return managed.ExternalCreation{}, errorutils.Wrap(err, errGetPasswordSecret)
 		}
@@ -243,7 +252,7 @@ func (e *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 		return managed.ExternalCreation{}, errorutils.Wrap(resource.Ignore(elasticache.IsAlreadyExists, err), errCreateReplicationGroup)
 	}
 	if token != "" {
-		e.cache.currentPassword = token
+		e.cache.currentAuthToken = token
 		return managed.ExternalCreation{
 
 			ConnectionDetails: managed.ConnectionDetails{
@@ -301,21 +310,16 @@ func (e *external) Update(ctx context.Context, mg resource.Managed) (managed.Ext
 		return managed.ExternalUpdate{}, nil
 	}
 
-	if diff := elasticache.ReplicationGroupNeedsUpdate(cr.Spec.ForProvider, rg, ccList); diff != "" || e.cache.currentPassword != e.cache.desiredPassword {
-		_, err = e.client.ModifyReplicationGroup(ctx, elasticache.NewModifyReplicationGroupInput(cr.Spec.ForProvider, meta.GetExternalName(cr), &e.cache.desiredPassword))
+	if diff := elasticache.ReplicationGroupNeedsUpdate(cr.Spec.ForProvider, rg, ccList); diff != "" ||
+		e.cache.currentAuthToken != e.cache.desiredAuthToken || cr.Status.AtProvider.LastAppliedAuthTokenAppliedStrategy != cr.Spec.ForProvider.AuthTokenUpdateStrategy {
+		_, err = e.client.ModifyReplicationGroup(ctx, elasticache.NewModifyReplicationGroupInput(cr.Spec.ForProvider, meta.GetExternalName(cr), &e.cache.desiredAuthToken))
 		if err != nil {
 			return managed.ExternalUpdate{}, errorutils.Wrap(err, errModifyReplicationGroup)
 		}
-		e.cache.currentPassword = e.cache.desiredPassword
-		return managed.ExternalUpdate{}, nil
-
-	}
-	err = e.updateTags(ctx, cr.Spec.ForProvider.Tags, rg.ARN)
-	if err != nil {
-		return managed.ExternalUpdate{}, errorutils.Wrap(err, errUpdateReplicationGroupTags)
+		cr.Status.AtProvider.LastAppliedAuthTokenAppliedStrategy = cr.Spec.ForProvider.AuthTokenUpdateStrategy
 	}
 	return managed.ExternalUpdate{ConnectionDetails: managed.ConnectionDetails{
-		xpv1.ResourceCredentialsSecretPasswordKey: []byte(e.cache.currentPassword),
+		xpv1.ResourceCredentialsSecretPasswordKey: []byte(e.cache.currentAuthToken),
 	}}, nil
 }
 
@@ -420,14 +424,14 @@ func getVersion(version *string) (*string, error) {
 }
 
 // GetSecretValue retrieves the value of a secret key from a Kubernetes Secret.
-func getSecretPassword(ctx context.Context, kube client.Client, slr *xpv1.SecretKeySelector) (pw string, err error) {
+func getSecretPassword(ctx context.Context, kube client.Client, sks *xpv1.SecretKeySelector) (pw string, err error) {
 	secret := new(corev1.Secret)
-	ref := slr.SecretReference
+	ref := sks.SecretReference
 	err = kube.Get(ctx, types.NamespacedName{Name: ref.Name, Namespace: ref.Namespace}, secret)
 	if err != nil {
 		return "", err
 	}
-	pwdRaw := secret.Data[slr.Key]
+	pwdRaw := secret.Data[sks.Key]
 	return string(pwdRaw), nil
 }
 

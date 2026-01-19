@@ -18,6 +18,7 @@ package elasticache
 
 import (
 	"context"
+	"fmt"
 	"reflect"
 	"strconv"
 	"strings"
@@ -139,16 +140,16 @@ func NewCreateReplicationGroupInput(g v1beta1.ReplicationGroupParameters, id str
 // NewModifyReplicationGroupInput returns ElastiCache replication group
 // modification input suitable for use with the AWS API.
 func NewModifyReplicationGroupInput(g v1beta1.ReplicationGroupParameters, id string, token *string) *elasticache.ModifyReplicationGroupInput {
-	return &elasticache.ModifyReplicationGroupInput{
+	input := &elasticache.ModifyReplicationGroupInput{
 		ReplicationGroupId:          aws.String(id),
 		ApplyImmediately:            &g.ApplyModificationsImmediately,
-		AuthToken:                   token,
 		AuthTokenUpdateStrategy:     elasticachetypes.AuthTokenUpdateStrategyType(g.AuthTokenUpdateStrategy),
 		AutomaticFailoverEnabled:    g.AutomaticFailoverEnabled,
 		CacheNodeType:               aws.String(g.CacheNodeType),
 		CacheParameterGroupName:     g.CacheParameterGroupName,
 		CacheSecurityGroupNames:     g.CacheSecurityGroupNames,
 		EngineVersion:               g.EngineVersion,
+		LogDeliveryConfigurations:   generateLogDeliveryConfigurationsRequest(g.LogDeliveryConfigurations),
 		MultiAZEnabled:              g.MultiAZEnabled,
 		NotificationTopicArn:        g.NotificationTopicARN,
 		NotificationTopicStatus:     g.NotificationTopicStatus,
@@ -160,6 +161,10 @@ func NewModifyReplicationGroupInput(g v1beta1.ReplicationGroupParameters, id str
 		SnapshotWindow:              g.SnapshotWindow,
 		SnapshottingClusterId:       g.SnapshottingClusterID,
 	}
+	if token != nil && *token != "" {
+		input.AuthToken = token
+	}
+	return input
 }
 
 // NewModifyReplicationGroupShardConfigurationInput returns ElastiCache replication group
@@ -280,6 +285,7 @@ func ReplicationGroupShardConfigurationNeedsUpdate(kube v1beta1.ReplicationGroup
 // ReplicationGroupNeedsUpdate returns true if the supplied ReplicationGroup and
 // the configuration of its member clusters differ from given desired state.
 func ReplicationGroupNeedsUpdate(kube v1beta1.ReplicationGroupParameters, rg elasticachetypes.ReplicationGroup, ccList []elasticachetypes.CacheCluster) string {
+	diffLogDeliveryConfigurations := cmp.Diff(kube.LogDeliveryConfigurations, generateLogDeliveryConfigurations(rg.LogDeliveryConfigurations), cmpopts.EquateEmpty())
 	switch {
 	case !reflect.DeepEqual(kube.AutomaticFailoverEnabled, automaticFailoverEnabled(rg.AutomaticFailover)):
 		return "AutomaticFailover"
@@ -293,6 +299,8 @@ func ReplicationGroupNeedsUpdate(kube v1beta1.ReplicationGroupParameters, rg ela
 		return "MultiAZ"
 	case ReplicationGroupNumCacheClustersNeedsUpdate(kube, ccList):
 		return "NumCacheClusters"
+	case diffLogDeliveryConfigurations != "":
+		return fmt.Sprintf("LogDeliveryConfigurations diff: %s", diffLogDeliveryConfigurations)
 	}
 
 	for _, cc := range ccList {
@@ -576,6 +584,86 @@ func generateReplicationGroupPendingModifiedValues(in elasticachetypes.Replicati
 		}
 	}
 	return r
+}
+
+// generateLogDeliveryConfigurations converts AWS SDK LogDeliveryConfiguration to controllers LogDeliveryConfigurations
+func generateLogDeliveryConfigurations(resp []elasticachetypes.LogDeliveryConfiguration) []v1beta1.LogDeliveryConfigurations {
+	var external []v1beta1.LogDeliveryConfigurations
+	for _, logConf := range resp {
+		extLogConf := v1beta1.LogDeliveryConfigurations{}
+		if logConf.DestinationDetails != nil {
+			destinationDetails := v1beta1.DestinationDetails{}
+			if logConf.DestinationDetails.CloudWatchLogsDetails != nil {
+				cloudWatchLogsDetails := v1beta1.CloudWatchLogsDestinationDetails{}
+				if logConf.DestinationDetails.CloudWatchLogsDetails.LogGroup != nil {
+					cloudWatchLogsDetails.LogGroup = logConf.DestinationDetails.CloudWatchLogsDetails.LogGroup
+					destinationDetails.CloudWatchLogsDetails = &cloudWatchLogsDetails
+				}
+			}
+			if logConf.DestinationDetails.KinesisFirehoseDetails != nil {
+				kinesisFirehoseDetails := v1beta1.KinesisFirehoseDestinationDetails{}
+				if logConf.DestinationDetails.KinesisFirehoseDetails.DeliveryStream != nil {
+					kinesisFirehoseDetails.DeliveryStream = logConf.DestinationDetails.KinesisFirehoseDetails.DeliveryStream
+					destinationDetails.KinesisFirehoseDetails = &kinesisFirehoseDetails
+				}
+			}
+			extLogConf.DestinationDetails = &destinationDetails
+		}
+		if logConf.DestinationType != "" {
+			extLogConf.DestinationType = string(logConf.DestinationType)
+		}
+		if logConf.Status == "active" || logConf.Status == "enabling" {
+			extLogConf.Enabled = aws.Bool(true)
+		}
+		if logConf.LogFormat != "" {
+			extLogConf.LogFormat = string(logConf.LogFormat)
+		}
+		if logConf.LogType != "" {
+			extLogConf.LogType = string(logConf.LogType)
+		}
+		external = append(external, extLogConf)
+	}
+	return external
+}
+
+// generateLogDeliveryConfigurationsRequest converts controllers LogDeliveryConfigurations to AWS SDK type
+func generateLogDeliveryConfigurationsRequest(ds []v1beta1.LogDeliveryConfigurations) []elasticachetypes.LogDeliveryConfigurationRequest {
+	var desired []elasticachetypes.LogDeliveryConfigurationRequest
+	for _, logConf := range ds {
+		desiredLogConf := elasticachetypes.LogDeliveryConfigurationRequest{}
+		if logConf.DestinationDetails != nil {
+			destinationDetails := elasticachetypes.DestinationDetails{}
+			if logConf.DestinationDetails.CloudWatchLogsDetails != nil {
+				cloudWatchLogsDetails := elasticachetypes.CloudWatchLogsDestinationDetails{}
+				if logConf.DestinationDetails.CloudWatchLogsDetails.LogGroup != nil {
+					cloudWatchLogsDetails.LogGroup = logConf.DestinationDetails.CloudWatchLogsDetails.LogGroup
+					destinationDetails.CloudWatchLogsDetails = &cloudWatchLogsDetails
+				}
+			}
+			if logConf.DestinationDetails.KinesisFirehoseDetails != nil {
+				kinesisFirehoseDetails := elasticachetypes.KinesisFirehoseDestinationDetails{}
+				if logConf.DestinationDetails.KinesisFirehoseDetails.DeliveryStream != nil {
+					kinesisFirehoseDetails.DeliveryStream = logConf.DestinationDetails.KinesisFirehoseDetails.DeliveryStream
+					destinationDetails.KinesisFirehoseDetails = &kinesisFirehoseDetails
+				}
+			}
+			desiredLogConf.DestinationDetails = &destinationDetails
+		}
+		if logConf.DestinationType != "" {
+			desiredLogConf.DestinationType = elasticachetypes.DestinationType(logConf.DestinationType)
+		}
+		if logConf.Enabled != nil {
+			desiredLogConf.Enabled = logConf.Enabled
+		}
+		if logConf.LogFormat != "" {
+			desiredLogConf.LogFormat = elasticachetypes.LogFormat(logConf.LogFormat)
+		}
+		if logConf.LogType != "" {
+			desiredLogConf.LogType = elasticachetypes.LogType(logConf.LogType)
+		}
+		desired = append(desired, desiredLogConf)
+	}
+	return desired
 }
 
 // newEndpoint returns the endpoint end users should use to connect to this cluster.

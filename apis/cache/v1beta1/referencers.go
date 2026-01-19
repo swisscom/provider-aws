@@ -119,6 +119,6 @@ func (mg *ReplicationGroup) ResolveReferences(ctx context.Context, c client.Read
 	return nil
 }
 
-func (mg *ReplicationGroup) GetPasswordSecretRef() *xpv1.SecretKeySelector {
+func (mg *ReplicationGroup) GetAuthTokenSecretRef() *xpv1.SecretKeySelector {
 	return mg.Spec.ForProvider.AuthTokenSecretRef
 }

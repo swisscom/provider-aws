@@ -180,6 +180,8 @@ type ReplicationGroupObservation struct {
 	// endpoint to connect to this replication group.
 	ConfigurationEndpoint Endpoint `json:"configurationEndpoint,omitempty"`
 
+	LastAppliedAuthTokenAppliedStrategy string `json:"lastAppliedAuthTokenAppliedStrategy,omitempty"`
+
 	// MemberClusters is the list of names of all the cache clusters that are
 	// part of this replication group.
 	MemberClusters []string `json:"memberClusters,omitempty"`
@@ -206,6 +208,57 @@ type Tag struct {
 
 	// Value of the tag.
 	Value string `json:"value"`
+}
+
+type CloudWatchLogsDestinationDetails struct {
+
+	// The name of the CloudWatch Logs log group.
+	// +optional
+	LogGroup *string `json:"logGroup,omitempty"`
+}
+
+type KinesisFirehoseDestinationDetails struct {
+
+	// The name of the Kinesis Data Firehose delivery stream.
+	// +optional
+	DeliveryStream *string `json:"deliveryStream,omitempty"`
+}
+
+type DestinationDetails struct {
+
+	// The configuration details of the CloudWatch Logs destination.
+	// +optional
+	CloudWatchLogsDetails *CloudWatchLogsDestinationDetails `json:"cloudWatchLogsDetails,omitempty"`
+
+	// The configuration details of the Kinesis Data Firehose destination.
+	// +optional
+	KinesisFirehoseDetails *KinesisFirehoseDestinationDetails `json:"kinesisFirehoseDetails,omitempty"`
+}
+
+type LogDeliveryConfigurations struct {
+
+	// Configuration details of either a CloudWatch Logs destination or Kinesis Data
+	// Firehose destination.
+	// +optional
+	DestinationDetails *DestinationDetails `json:"destinationDetails,omitempty"`
+
+	// Specify either cloudwatch-logs or kinesis-firehose as the destination type.
+	// +optional
+	DestinationType string `json:"destinationType,omitempty"`
+
+	// Specify if log delivery is enabled. Default true .
+	// +optional
+	Enabled *bool `json:"enabled,omitempty"`
+
+	// Specifies either JSON or TEXT
+	// +optional
+	LogFormat string `json:"logFormat,omitempty"`
+
+	// Refers to [slow-log] or engine-log..
+	//
+	// [slow-log]: https://redis.io/commands/slowlog
+	// +optional
+	LogType string `json:"logType,omitempty"`
 }
 
 // A NodeGroupConfigurationSpec specifies the desired state of a node group.
@@ -323,7 +376,7 @@ type ReplicationGroupParameters struct {
 	//
 	//   - SET - allowed only after ROTATE
 	//
-	//   - DELETE - allowed only when transitioning to RBAC(not supported by the provider yet)
+	//   - DELETE - allowed only when transitioning to RBAC
 	//
 	// For more information, see [Authenticating Users with AUTH]
 	//
@@ -433,6 +486,10 @@ type ReplicationGroupParameters struct {
 	// engine version.
 	// +optional
 	EngineVersion *string `json:"engineVersion,omitempty"`
+
+	// Specifies the destination, format and type of the logs.
+	// +optional
+	LogDeliveryConfigurations []LogDeliveryConfigurations `json:"logDeliveryConfigurations,omitempty"`
 
 	// MultiAZEnabled specifies if Multi-AZ is enabled to enhance fault tolerance
 	// You must have nodes across two or more Availability Zones in order to enable

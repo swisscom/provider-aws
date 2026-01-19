@@ -17,6 +17,7 @@ limitations under the License.
 package elasticache
 
 import (
+	"github.com/aws/aws-sdk-go/aws"
 	"sort"
 	"strconv"
 	"testing"
@@ -288,7 +289,7 @@ func TestNewModifyReplicationGroupInput(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			got := NewModifyReplicationGroupInput(*tc.params, name)
+			got := NewModifyReplicationGroupInput(*tc.params, name, aws.String(""))
 
 			if diff := cmp.Diff(tc.want, got, cmpopts.IgnoreTypes(document.NoSerde{})); diff != "" {
 				t.Errorf("NewModifyReplicationGroupInput(...): -want, +got:\n%s", diff)
