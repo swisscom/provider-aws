@@ -78,10 +78,10 @@ type testCase struct {
 }
 
 type testCaseIsUpToDate struct {
-	name                       string
-	e                          managed.ExternalClient
-	cr                         *v1beta1.ReplicationGroup
-	want                       wantIsUpToDate
+	name string
+	e    managed.ExternalClient
+	cr   *v1beta1.ReplicationGroup
+	want wantIsUpToDate
 }
 
 type wantIsUpToDate struct {
@@ -99,13 +99,19 @@ func withAutomaticFailover(v types.AutomaticFailoverStatus) replicationGroupModi
 }
 
 func withAuthTokenSecretRef(reference *xpv1.SecretKeySelector) replicationGroupModifier {
-	return func(r *v1beta1.ReplicationGroup) {
-		r.Spec.ForProvider.AuthTokenSecretRef = reference
-	}
+	return func(r *v1beta1.ReplicationGroup) { r.Spec.ForProvider.AuthTokenSecretRef = reference }
+}
+
+func withAuthTokenUpdateStrategy(s string) replicationGroupModifier {
+	return func(r *v1beta1.ReplicationGroup) { r.Spec.ForProvider.AuthTokenUpdateStrategy = s }
 }
 
 func withConditions(c ...xpv1.Condition) replicationGroupModifier {
 	return func(r *v1beta1.ReplicationGroup) { r.Status.ConditionedStatus.Conditions = c }
+}
+
+func withProviderStatusLastAppliedAuthTokenUpdateStrategy(s string) replicationGroupModifier {
+	return func(r *v1beta1.ReplicationGroup) { r.Status.AtProvider.LastAppliedAuthTokenUpdateStrategy = s }
 }
 
 func withProviderStatus(s string) replicationGroupModifier {
@@ -157,7 +163,7 @@ func withEngineVersion(e string) replicationGroupModifier {
 }
 
 func withWriteConnectionSecretToReference(ref xpv1.SecretReference) replicationGroupModifier {
-	return func(r *v1beta1.ReplicationGroup) {r.Spec.ResourceSpec.WriteConnectionSecretToReference = &ref}
+	return func(r *v1beta1.ReplicationGroup) { r.Spec.ResourceSpec.WriteConnectionSecretToReference = &ref }
 }
 
 func replicationGroup(rm ...replicationGroupModifier) *v1beta1.ReplicationGroup {
@@ -651,11 +657,167 @@ func TestIsUpToDate(t *testing.T) {
 					Key: xpv1.ResourceCredentialsSecretPasswordKey,
 				}),
 				withWriteConnectionSecretToReference(xpv1.SecretReference{
-					Name:      "writeConnectionSecretToRefName", // This secret has "currentAuthToken"(set in mockGettingSecretDataWithDiff)
+					Name: "writeConnectionSecretToRefName", // This secret has "currentAuthToken"(set in mockGettingSecretDataWithDiff)
+				}),
+			),
+			want: wantIsUpToDate{
+				isUpToDate: false,
+				err:        nil,
+			},
+		},
+		{
+			name: "PasswordIsNoTChanged",
+			e: &external{
+				cache: &cache{},
+				client: &fake.MockClient{
+					MockDescribeReplicationGroups: func(ctx context.Context, _ *elasticache.DescribeReplicationGroupsInput, opts []func(*elasticache.Options)) (*elasticache.DescribeReplicationGroupsOutput, error) {
+						return &elasticache.DescribeReplicationGroupsOutput{
+							ReplicationGroups: []types.ReplicationGroup{
+								{
+									Status:                 aws.String(v1beta1.StatusModifying),
+									AutomaticFailover:      types.AutomaticFailoverStatusEnabled,
+									CacheNodeType:          aws.String(cacheNodeType),
+									SnapshotRetentionLimit: aws.Int32(int32(snapshotRetentionLimit)),
+									SnapshotWindow:         aws.String(snapshotWindow),
+									ClusterEnabled:         aws.Bool(true),
+									MemberClusters:         []string{cacheClusterID},
+								},
+							},
+						}, nil
+					},
+					MockDescribeCacheClusters: func(ctx context.Context, _ *elasticache.DescribeCacheClustersInput, opts []func(*elasticache.Options)) (*elasticache.DescribeCacheClustersOutput, error) {
+						return &elasticache.DescribeCacheClustersOutput{
+							CacheClusters: []types.CacheCluster{
+								{EngineVersion: aws.String(engineVersion), PreferredMaintenanceWindow: aws.String(maintenanceWindow)},
+							},
+						}, nil
+					},
+				},
+				kube: &test.MockClient{
+					MockGet:    test.NewMockGetFn(nil, mockGettingSecretData), // This mock returns same auth token for both secrets
+					MockUpdate: test.NewMockUpdateFn(nil),
+				},
+			},
+			cr: replicationGroup(
+				withReplicationGroupID(name),
+				withAuthTokenSecretRef(&xpv1.SecretKeySelector{
+					SecretReference: xpv1.SecretReference{
+						Name:      "authTokenSecret",
+						Namespace: "default"},
+					Key: xpv1.ResourceCredentialsSecretPasswordKey,
+				}),
+				withWriteConnectionSecretToReference(xpv1.SecretReference{
+					Name: "writeConnectionSecretToRefName",
 				}),
 			),
 			want: wantIsUpToDate{
 				isUpToDate: true,
+				err:        nil,
+			},
+		},
+		{
+			name: "AuthTokenAppliedStrategyChanged",
+			e: &external{
+				cache: &cache{},
+				client: &fake.MockClient{
+					MockDescribeReplicationGroups: func(ctx context.Context, _ *elasticache.DescribeReplicationGroupsInput, opts []func(*elasticache.Options)) (*elasticache.DescribeReplicationGroupsOutput, error) {
+						return &elasticache.DescribeReplicationGroupsOutput{
+							ReplicationGroups: []types.ReplicationGroup{
+								{
+									Status:                 aws.String(v1beta1.StatusModifying),
+									AutomaticFailover:      types.AutomaticFailoverStatusEnabled,
+									CacheNodeType:          aws.String(cacheNodeType),
+									SnapshotRetentionLimit: aws.Int32(int32(snapshotRetentionLimit)),
+									SnapshotWindow:         aws.String(snapshotWindow),
+									ClusterEnabled:         aws.Bool(true),
+									MemberClusters:         []string{cacheClusterID},
+								},
+							},
+						}, nil
+					},
+					MockDescribeCacheClusters: func(ctx context.Context, _ *elasticache.DescribeCacheClustersInput, opts []func(*elasticache.Options)) (*elasticache.DescribeCacheClustersOutput, error) {
+						return &elasticache.DescribeCacheClustersOutput{
+							CacheClusters: []types.CacheCluster{
+								{EngineVersion: aws.String(engineVersion), PreferredMaintenanceWindow: aws.String(maintenanceWindow)},
+							},
+						}, nil
+					},
+				},
+				kube: &test.MockClient{
+					MockGet:    test.NewMockGetFn(nil, mockGettingSecretData), // This mock returns same auth token for both secrets
+					MockUpdate: test.NewMockUpdateFn(nil),
+				},
+			},
+			cr: replicationGroup(
+				withReplicationGroupID(name),
+				withAuthTokenSecretRef(&xpv1.SecretKeySelector{
+					SecretReference: xpv1.SecretReference{
+						Name:      "authTokenSecret",
+						Namespace: "default"},
+					Key: xpv1.ResourceCredentialsSecretPasswordKey,
+				}),
+				withAuthTokenUpdateStrategy("SET"),
+				withProviderStatusLastAppliedAuthTokenUpdateStrategy("ROTATE"),
+
+				withWriteConnectionSecretToReference(xpv1.SecretReference{
+					Name: "writeConnectionSecretToRefName",
+				}),
+			),
+			want: wantIsUpToDate{
+				isUpToDate: false,
+				err:        nil,
+			},
+		},
+		{
+			name: "AuthTokenAppliedStrategyIsNotChanged",
+			e: &external{
+				cache: &cache{},
+				client: &fake.MockClient{
+					MockDescribeReplicationGroups: func(ctx context.Context, _ *elasticache.DescribeReplicationGroupsInput, opts []func(*elasticache.Options)) (*elasticache.DescribeReplicationGroupsOutput, error) {
+						return &elasticache.DescribeReplicationGroupsOutput{
+							ReplicationGroups: []types.ReplicationGroup{
+								{
+									Status:                 aws.String(v1beta1.StatusModifying),
+									AutomaticFailover:      types.AutomaticFailoverStatusEnabled,
+									CacheNodeType:          aws.String(cacheNodeType),
+									SnapshotRetentionLimit: aws.Int32(int32(snapshotRetentionLimit)),
+									SnapshotWindow:         aws.String(snapshotWindow),
+									ClusterEnabled:         aws.Bool(true),
+									MemberClusters:         []string{cacheClusterID},
+								},
+							},
+						}, nil
+					},
+					MockDescribeCacheClusters: func(ctx context.Context, _ *elasticache.DescribeCacheClustersInput, opts []func(*elasticache.Options)) (*elasticache.DescribeCacheClustersOutput, error) {
+						return &elasticache.DescribeCacheClustersOutput{
+							CacheClusters: []types.CacheCluster{
+								{EngineVersion: aws.String(engineVersion), PreferredMaintenanceWindow: aws.String(maintenanceWindow)},
+							},
+						}, nil
+					},
+				},
+				kube: &test.MockClient{
+					MockGet:    test.NewMockGetFn(nil, mockGettingSecretData), // This mock returns same auth token for both secrets
+					MockUpdate: test.NewMockUpdateFn(nil),
+				},
+			},
+			cr: replicationGroup(
+				withReplicationGroupID(name),
+				withAuthTokenSecretRef(&xpv1.SecretKeySelector{
+					SecretReference: xpv1.SecretReference{
+						Name:      "authTokenSecret",
+						Namespace: "default"},
+					Key: xpv1.ResourceCredentialsSecretPasswordKey,
+				}),
+				withAuthTokenUpdateStrategy("ROTATE"),
+				withProviderStatusLastAppliedAuthTokenUpdateStrategy("ROTATE"),
+
+				withWriteConnectionSecretToReference(xpv1.SecretReference{
+					Name: "writeConnectionSecretToRefName",
+				}),
+			),
+			want: wantIsUpToDate{
+				isUpToDate: false,
 				err:        nil,
 			},
 		},

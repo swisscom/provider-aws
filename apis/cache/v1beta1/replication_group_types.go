@@ -180,7 +180,7 @@ type ReplicationGroupObservation struct {
 	// endpoint to connect to this replication group.
 	ConfigurationEndpoint Endpoint `json:"configurationEndpoint,omitempty"`
 
-	LastAppliedAuthTokenAppliedStrategy string `json:"lastAppliedAuthTokenAppliedStrategy,omitempty"`
+	LastAppliedAuthTokenUpdateStrategy string `json:"LastAppliedAuthTokenUpdateStrategy,omitempty"`
 
 	// MemberClusters is the list of names of all the cache clusters that are
 	// part of this replication group.

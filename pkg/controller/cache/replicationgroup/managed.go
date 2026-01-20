@@ -134,6 +134,7 @@ type cache struct {
 	desiredAuthToken string
 }
 
+
 func (e *external) Observe(ctx context.Context, mg resource.Managed) (managed.ExternalObservation, error) { //nolint:gocyclo
 	cr, ok := mg.(*v1beta1.ReplicationGroup)
 	if !ok {
@@ -158,6 +159,8 @@ func (e *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 	}
 
 	current := cr.Spec.ForProvider.DeepCopy()
+	// keep track of last applied auth token strategy from the previous reconciliation loop
+	lastAppliedAuthTokenUpdateStrategy := cr.Status.AtProvider.DeepCopy().LastAppliedAuthTokenUpdateStrategy
 	elasticache.LateInitialize(&cr.Spec.ForProvider, rg, oneCC)
 	if !reflect.DeepEqual(current, &cr.Spec.ForProvider) {
 		if err := e.kube.Update(ctx, cr); err != nil {
@@ -165,6 +168,9 @@ func (e *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 		}
 	}
 	cr.Status.AtProvider = elasticache.GenerateObservation(rg)
+	// AuthTokenUpdateStrategy is not declarative parameter from aws perspective, so there is no api call to check if it is up to date.
+	// We track the last applied strategy in status to be able to compare with the desired one in spec.
+	cr.Status.AtProvider.LastAppliedAuthTokenUpdateStrategy = lastAppliedAuthTokenUpdateStrategy
 
 	switch cr.Status.AtProvider.Status {
 	case v1beta1.StatusAvailable:
@@ -204,9 +210,10 @@ func (e *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 	if e.cache.desiredAuthToken == "" && aws.ToBool(cr.Spec.ForProvider.AuthEnabled) {
 		e.cache.desiredAuthToken = e.cache.currentAuthToken
 	}
-	// AuthTokenUpdateStrategy is not declarative parameter from aws perspective, so there is no api call to check if it is up to date.
-	// We track the last applied strategy in status and compare it with the desired one.
-	pwChanged := e.cache.currentAuthToken != e.cache.desiredAuthToken || cr.Status.AtProvider.LastAppliedAuthTokenAppliedStrategy != cr.Spec.ForProvider.AuthTokenUpdateStrategy
+
+
+	pwChanged := e.cache.currentAuthToken != e.cache.desiredAuthToken || cr.Status.AtProvider.LastAppliedAuthTokenUpdateStrategy != cr.Spec.ForProvider.AuthTokenUpdateStrategy
+	fmt.Printf("LastAppliedAuthTokenUpdateStrategy: %s, Desired AuthTokenUpdateStrategy: %s\n", cr.Status.AtProvider.LastAppliedAuthTokenUpdateStrategy, cr.Spec.ForProvider.AuthTokenUpdateStrategy)
 	diff := fmt.Sprintf("ReplicationGroup diff: '%s', Tags need update: %t, AuthToken changed: %t", rgDiff, tagsNeedUpdate, pwChanged)
 
 	return managed.ExternalObservation{
@@ -311,12 +318,12 @@ func (e *external) Update(ctx context.Context, mg resource.Managed) (managed.Ext
 	}
 
 	if diff := elasticache.ReplicationGroupNeedsUpdate(cr.Spec.ForProvider, rg, ccList); diff != "" ||
-		e.cache.currentAuthToken != e.cache.desiredAuthToken || cr.Status.AtProvider.LastAppliedAuthTokenAppliedStrategy != cr.Spec.ForProvider.AuthTokenUpdateStrategy {
+		e.cache.currentAuthToken != e.cache.desiredAuthToken || cr.Status.AtProvider.LastAppliedAuthTokenUpdateStrategy != cr.Spec.ForProvider.AuthTokenUpdateStrategy {
 		_, err = e.client.ModifyReplicationGroup(ctx, elasticache.NewModifyReplicationGroupInput(cr.Spec.ForProvider, meta.GetExternalName(cr), &e.cache.desiredAuthToken))
 		if err != nil {
 			return managed.ExternalUpdate{}, errorutils.Wrap(err, errModifyReplicationGroup)
 		}
-		cr.Status.AtProvider.LastAppliedAuthTokenAppliedStrategy = cr.Spec.ForProvider.AuthTokenUpdateStrategy
+		cr.Status.AtProvider.LastAppliedAuthTokenUpdateStrategy = cr.Spec.ForProvider.AuthTokenUpdateStrategy
 	}
 	return managed.ExternalUpdate{ConnectionDetails: managed.ConnectionDetails{
 		xpv1.ResourceCredentialsSecretPasswordKey: []byte(e.cache.currentAuthToken),
