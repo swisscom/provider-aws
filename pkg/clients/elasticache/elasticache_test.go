@@ -256,6 +256,9 @@ func TestNewModifyReplicationGroupInput(t *testing.T) {
 				SnapshotRetentionLimit:      pointer.ToIntAsInt32Ptr(&snapshotRetentionLimit),
 				SnapshotWindow:              pointer.ToOrNilIfZeroValue(snapshotWindow),
 				SnapshottingClusterId:       pointer.ToOrNilIfZeroValue(snapshottingClusterID),
+				LogDeliveryConfigurations: []elasticachetypes.LogDeliveryConfigurationRequest{
+					{Enabled: aws.Bool(false), LogType: "engine-log"}, {Enabled: aws.Bool(false), LogType: "slow-log"},
+				},
 			},
 		},
 		{
@@ -269,6 +272,9 @@ func TestNewModifyReplicationGroupInput(t *testing.T) {
 				ReplicationGroupId:          ptr.To(name),
 				ReplicationGroupDescription: ptr.To(description),
 				CacheNodeType:               ptr.To(cacheNodeType),
+				LogDeliveryConfigurations: []elasticachetypes.LogDeliveryConfigurationRequest{
+					{Enabled: aws.Bool(false), LogType: "engine-log"}, {Enabled: aws.Bool(false), LogType: "slow-log"},
+				},
 			},
 		},
 		{
@@ -283,6 +289,9 @@ func TestNewModifyReplicationGroupInput(t *testing.T) {
 				ReplicationGroupId:          ptr.To(name),
 				ReplicationGroupDescription: ptr.To(description),
 				CacheNodeType:               ptr.To(cacheNodeType),
+				LogDeliveryConfigurations: []elasticachetypes.LogDeliveryConfigurationRequest{
+					{Enabled: aws.Bool(false), LogType: "engine-log"}, {Enabled: aws.Bool(false), LogType: "slow-log"},
+				},
 			},
 		},
 	}

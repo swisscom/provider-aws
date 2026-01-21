@@ -817,7 +817,7 @@ func TestIsUpToDate(t *testing.T) {
 				}),
 			),
 			want: wantIsUpToDate{
-				isUpToDate: false,
+				isUpToDate: true,
 				err:        nil,
 			},
 		},

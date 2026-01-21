@@ -324,6 +324,7 @@ func (e *external) Update(ctx context.Context, mg resource.Managed) (managed.Ext
 			return managed.ExternalUpdate{}, errorutils.Wrap(err, errModifyReplicationGroup)
 		}
 		cr.Status.AtProvider.LastAppliedAuthTokenUpdateStrategy = cr.Spec.ForProvider.AuthTokenUpdateStrategy
+		fmt.Printf("Updated LastAppliedAuthTokenUpdateStrategy to: %s\n", cr.Status.AtProvider.LastAppliedAuthTokenUpdateStrategy)
 	}
 	return managed.ExternalUpdate{ConnectionDetails: managed.ConnectionDetails{
 		xpv1.ResourceCredentialsSecretPasswordKey: []byte(e.cache.currentAuthToken),

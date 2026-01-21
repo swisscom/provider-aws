@@ -180,7 +180,7 @@ type ReplicationGroupObservation struct {
 	// endpoint to connect to this replication group.
 	ConfigurationEndpoint Endpoint `json:"configurationEndpoint,omitempty"`
 
-	LastAppliedAuthTokenUpdateStrategy string `json:"LastAppliedAuthTokenUpdateStrategy,omitempty"`
+	LastAppliedAuthTokenUpdateStrategy string `json:"lastAppliedAuthTokenUpdateStrategy,omitempty"`
 
 	// MemberClusters is the list of names of all the cache clusters that are
 	// part of this replication group.
@@ -213,14 +213,14 @@ type Tag struct {
 type CloudWatchLogsDestinationDetails struct {
 
 	// The name of the CloudWatch Logs log group.
-	// +optional
+	// +required
 	LogGroup *string `json:"logGroup,omitempty"`
 }
 
 type KinesisFirehoseDestinationDetails struct {
 
 	// The name of the Kinesis Data Firehose delivery stream.
-	// +optional
+	// +required
 	DeliveryStream *string `json:"deliveryStream,omitempty"`
 }
 
@@ -235,30 +235,27 @@ type DestinationDetails struct {
 	KinesisFirehoseDetails *KinesisFirehoseDestinationDetails `json:"kinesisFirehoseDetails,omitempty"`
 }
 
-type LogDeliveryConfigurations struct {
-
+type LogsConf struct {
 	// Configuration details of either a CloudWatch Logs destination or Kinesis Data
-	// Firehose destination.
-	// +optional
+	// +required
 	DestinationDetails *DestinationDetails `json:"destinationDetails,omitempty"`
-
-	// Specify either cloudwatch-logs or kinesis-firehose as the destination type.
-	// +optional
-	DestinationType string `json:"destinationType,omitempty"`
 
 	// Specify if log delivery is enabled. Default true .
 	// +optional
 	Enabled *bool `json:"enabled,omitempty"`
 
 	// Specifies either JSON or TEXT
-	// +optional
+	// +required
 	LogFormat string `json:"logFormat,omitempty"`
+}
 
-	// Refers to [slow-log] or engine-log..
-	//
-	// [slow-log]: https://redis.io/commands/slowlog
+type LogDeliveryConfiguration struct {
+	// Configuration for engine logs.
 	// +optional
-	LogType string `json:"logType,omitempty"`
+	EngineLogs *LogsConf `json:"engineLogs,omitempty"`
+	// Configuration for slow logs.
+	// +optional
+	SlowLogs   *LogsConf   `json:"slowLogs,omitempty"`
 }
 
 // A NodeGroupConfigurationSpec specifies the desired state of a node group.
@@ -487,9 +484,9 @@ type ReplicationGroupParameters struct {
 	// +optional
 	EngineVersion *string `json:"engineVersion,omitempty"`
 
-	// Specifies the destination, format and type of the logs.
+	// Specifies the destination and format of the logs.
 	// +optional
-	LogDeliveryConfigurations []LogDeliveryConfigurations `json:"logDeliveryConfigurations,omitempty"`
+	LogDeliveryConfiguration LogDeliveryConfiguration `json:"logDeliveryConfiguration,omitempty"`
 
 	// MultiAZEnabled specifies if Multi-AZ is enabled to enhance fault tolerance
 	// You must have nodes across two or more Availability Zones in order to enable

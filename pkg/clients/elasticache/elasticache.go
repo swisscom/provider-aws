@@ -149,7 +149,7 @@ func NewModifyReplicationGroupInput(g v1beta1.ReplicationGroupParameters, id str
 		CacheParameterGroupName:     g.CacheParameterGroupName,
 		CacheSecurityGroupNames:     g.CacheSecurityGroupNames,
 		EngineVersion:               g.EngineVersion,
-		LogDeliveryConfigurations:   generateLogDeliveryConfigurationsRequest(g.LogDeliveryConfigurations),
+		LogDeliveryConfigurations:   generateLogDeliveryConfigurationsRequest(g.LogDeliveryConfiguration),
 		MultiAZEnabled:              g.MultiAZEnabled,
 		NotificationTopicArn:        g.NotificationTopicARN,
 		NotificationTopicStatus:     g.NotificationTopicStatus,
@@ -285,7 +285,7 @@ func ReplicationGroupShardConfigurationNeedsUpdate(kube v1beta1.ReplicationGroup
 // ReplicationGroupNeedsUpdate returns true if the supplied ReplicationGroup and
 // the configuration of its member clusters differ from given desired state.
 func ReplicationGroupNeedsUpdate(kube v1beta1.ReplicationGroupParameters, rg elasticachetypes.ReplicationGroup, ccList []elasticachetypes.CacheCluster) string {
-	diffLogDeliveryConfigurations := cmp.Diff(kube.LogDeliveryConfigurations, generateLogDeliveryConfigurations(rg.LogDeliveryConfigurations), cmpopts.EquateEmpty())
+	diffLogDeliveryConfigurations := cmp.Diff(kube.LogDeliveryConfiguration, generateLogDeliveryConfigurations(rg.LogDeliveryConfigurations), cmpopts.EquateEmpty())
 	switch {
 	case !reflect.DeepEqual(kube.AutomaticFailoverEnabled, automaticFailoverEnabled(rg.AutomaticFailover)):
 		return "AutomaticFailover"
@@ -586,82 +586,105 @@ func generateReplicationGroupPendingModifiedValues(in elasticachetypes.Replicati
 	return r
 }
 
+func setLogDeliveryConfigurationController(extConf elasticachetypes.LogDeliveryConfiguration) *v1beta1.LogsConf {
+	extEngineLogConf := v1beta1.LogsConf{}
+	if extConf.DestinationDetails != nil {
+		destinationDetails := v1beta1.DestinationDetails{}
+		if extConf.DestinationDetails.CloudWatchLogsDetails != nil {
+			cloudWatchLogsDetails := v1beta1.CloudWatchLogsDestinationDetails{}
+			if extConf.DestinationDetails.CloudWatchLogsDetails.LogGroup != nil {
+				cloudWatchLogsDetails.LogGroup = extConf.DestinationDetails.CloudWatchLogsDetails.LogGroup
+				destinationDetails.CloudWatchLogsDetails = &cloudWatchLogsDetails
+			}
+		}
+		if extConf.DestinationDetails.KinesisFirehoseDetails != nil {
+			kinesisFirehoseDetails := v1beta1.KinesisFirehoseDestinationDetails{}
+			if extConf.DestinationDetails.KinesisFirehoseDetails.DeliveryStream != nil {
+				kinesisFirehoseDetails.DeliveryStream = extConf.DestinationDetails.KinesisFirehoseDetails.DeliveryStream
+				destinationDetails.KinesisFirehoseDetails = &kinesisFirehoseDetails
+			}
+		}
+		extEngineLogConf.DestinationDetails = &destinationDetails
+	}
+	if extConf.Status == "active" || extConf.Status == "enabling" {
+		extEngineLogConf.Enabled = aws.Bool(true)
+	}
+	if extConf.LogFormat != "" {
+		extEngineLogConf.LogFormat = string(extConf.LogFormat)
+	}
+	return &extEngineLogConf
+}
+
 // generateLogDeliveryConfigurations converts AWS SDK LogDeliveryConfiguration to controllers LogDeliveryConfigurations
-func generateLogDeliveryConfigurations(resp []elasticachetypes.LogDeliveryConfiguration) []v1beta1.LogDeliveryConfigurations {
-	var external []v1beta1.LogDeliveryConfigurations
+func generateLogDeliveryConfigurations(resp []elasticachetypes.LogDeliveryConfiguration) v1beta1.LogDeliveryConfiguration {
+	var external v1beta1.LogDeliveryConfiguration
 	for _, logConf := range resp {
-		extLogConf := v1beta1.LogDeliveryConfigurations{}
-		if logConf.DestinationDetails != nil {
-			destinationDetails := v1beta1.DestinationDetails{}
-			if logConf.DestinationDetails.CloudWatchLogsDetails != nil {
-				cloudWatchLogsDetails := v1beta1.CloudWatchLogsDestinationDetails{}
-				if logConf.DestinationDetails.CloudWatchLogsDetails.LogGroup != nil {
-					cloudWatchLogsDetails.LogGroup = logConf.DestinationDetails.CloudWatchLogsDetails.LogGroup
-					destinationDetails.CloudWatchLogsDetails = &cloudWatchLogsDetails
-				}
-			}
-			if logConf.DestinationDetails.KinesisFirehoseDetails != nil {
-				kinesisFirehoseDetails := v1beta1.KinesisFirehoseDestinationDetails{}
-				if logConf.DestinationDetails.KinesisFirehoseDetails.DeliveryStream != nil {
-					kinesisFirehoseDetails.DeliveryStream = logConf.DestinationDetails.KinesisFirehoseDetails.DeliveryStream
-					destinationDetails.KinesisFirehoseDetails = &kinesisFirehoseDetails
-				}
-			}
-			extLogConf.DestinationDetails = &destinationDetails
+		if logConf.LogType == elasticachetypes.LogTypeEngineLog {
+			external.EngineLogs = setLogDeliveryConfigurationController(logConf)
+
 		}
-		if logConf.DestinationType != "" {
-			extLogConf.DestinationType = string(logConf.DestinationType)
+		if logConf.LogType == elasticachetypes.LogTypeSlowLog {
+			external.SlowLogs = setLogDeliveryConfigurationController(logConf)
 		}
-		if logConf.Status == "active" || logConf.Status == "enabling" {
-			extLogConf.Enabled = aws.Bool(true)
-		}
-		if logConf.LogFormat != "" {
-			extLogConf.LogFormat = string(logConf.LogFormat)
-		}
-		if logConf.LogType != "" {
-			extLogConf.LogType = string(logConf.LogType)
-		}
-		external = append(external, extLogConf)
 	}
 	return external
 }
 
+// setLogDeliveryConfigurationSDK converts controllers LogDeliveryConfiguration to AWS SDK type
+func setLogDeliveryConfigurationSDK(ds v1beta1.LogDeliveryConfiguration, logType elasticachetypes.LogType) elasticachetypes.LogDeliveryConfigurationRequest {
+	logConf := elasticachetypes.LogDeliveryConfigurationRequest{LogType: logType}
+	if ds.EngineLogs.Enabled != nil {
+		logConf.Enabled = ds.EngineLogs.Enabled
+	}
+	if ds.EngineLogs.LogFormat != "" {
+		logConf.LogFormat = elasticachetypes.LogFormat(ds.EngineLogs.LogFormat)
+	}
+	if ds.EngineLogs.DestinationDetails != nil {
+		destinationDetails := elasticachetypes.DestinationDetails{}
+		if ds.EngineLogs.DestinationDetails.CloudWatchLogsDetails != nil {
+			cloudWatchLogsDetails := elasticachetypes.CloudWatchLogsDestinationDetails{}
+			if ds.EngineLogs.DestinationDetails.CloudWatchLogsDetails.LogGroup != nil {
+				cloudWatchLogsDetails.LogGroup = ds.EngineLogs.DestinationDetails.CloudWatchLogsDetails.LogGroup
+				destinationDetails.CloudWatchLogsDetails = &cloudWatchLogsDetails
+				logConf.DestinationType = elasticachetypes.DestinationTypeCloudWatchLogs
+			}
+		}
+		if ds.EngineLogs.DestinationDetails.KinesisFirehoseDetails != nil {
+			kinesisFirehoseDetails := elasticachetypes.KinesisFirehoseDestinationDetails{}
+			if ds.EngineLogs.DestinationDetails.KinesisFirehoseDetails.DeliveryStream != nil {
+				kinesisFirehoseDetails.DeliveryStream = ds.EngineLogs.DestinationDetails.KinesisFirehoseDetails.DeliveryStream
+				destinationDetails.KinesisFirehoseDetails = &kinesisFirehoseDetails
+				logConf.DestinationType = elasticachetypes.DestinationTypeKinesisFirehose
+			}
+		}
+		logConf.DestinationDetails = &destinationDetails
+	}
+
+	return logConf
+}
+
 // generateLogDeliveryConfigurationsRequest converts controllers LogDeliveryConfigurations to AWS SDK type
-func generateLogDeliveryConfigurationsRequest(ds []v1beta1.LogDeliveryConfigurations) []elasticachetypes.LogDeliveryConfigurationRequest {
+func generateLogDeliveryConfigurationsRequest(ds v1beta1.LogDeliveryConfiguration) []elasticachetypes.LogDeliveryConfigurationRequest {
 	var desired []elasticachetypes.LogDeliveryConfigurationRequest
-	for _, logConf := range ds {
-		desiredLogConf := elasticachetypes.LogDeliveryConfigurationRequest{}
-		if logConf.DestinationDetails != nil {
-			destinationDetails := elasticachetypes.DestinationDetails{}
-			if logConf.DestinationDetails.CloudWatchLogsDetails != nil {
-				cloudWatchLogsDetails := elasticachetypes.CloudWatchLogsDestinationDetails{}
-				if logConf.DestinationDetails.CloudWatchLogsDetails.LogGroup != nil {
-					cloudWatchLogsDetails.LogGroup = logConf.DestinationDetails.CloudWatchLogsDetails.LogGroup
-					destinationDetails.CloudWatchLogsDetails = &cloudWatchLogsDetails
-				}
-			}
-			if logConf.DestinationDetails.KinesisFirehoseDetails != nil {
-				kinesisFirehoseDetails := elasticachetypes.KinesisFirehoseDestinationDetails{}
-				if logConf.DestinationDetails.KinesisFirehoseDetails.DeliveryStream != nil {
-					kinesisFirehoseDetails.DeliveryStream = logConf.DestinationDetails.KinesisFirehoseDetails.DeliveryStream
-					destinationDetails.KinesisFirehoseDetails = &kinesisFirehoseDetails
-				}
-			}
-			desiredLogConf.DestinationDetails = &destinationDetails
+	if ds.EngineLogs != nil {
+		engineLogConf := setLogDeliveryConfigurationSDK(ds, elasticachetypes.LogTypeEngineLog)
+		desired = append(desired, engineLogConf)
+	} else {
+		engineLogConfDisabled := elasticachetypes.LogDeliveryConfigurationRequest{
+			LogType: elasticachetypes.LogTypeEngineLog,
+			Enabled: aws.Bool(false),
 		}
-		if logConf.DestinationType != "" {
-			desiredLogConf.DestinationType = elasticachetypes.DestinationType(logConf.DestinationType)
+		desired = append(desired, engineLogConfDisabled)
+	}
+	if ds.SlowLogs != nil {
+		slowLogConf := setLogDeliveryConfigurationSDK(ds, elasticachetypes.LogTypeSlowLog)
+		desired = append(desired, slowLogConf)
+	} else {
+		slowLogConfDisabled := elasticachetypes.LogDeliveryConfigurationRequest{
+			LogType: elasticachetypes.LogTypeSlowLog,
+			Enabled: aws.Bool(false),
 		}
-		if logConf.Enabled != nil {
-			desiredLogConf.Enabled = logConf.Enabled
-		}
-		if logConf.LogFormat != "" {
-			desiredLogConf.LogFormat = elasticachetypes.LogFormat(logConf.LogFormat)
-		}
-		if logConf.LogType != "" {
-			desiredLogConf.LogType = elasticachetypes.LogType(logConf.LogType)
-		}
-		desired = append(desired, desiredLogConf)
+		desired = append(desired, slowLogConfDisabled)
 	}
 	return desired
 }
