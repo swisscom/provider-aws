@@ -18,7 +18,6 @@ package replicationgroup
 
 import (
 	"context"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 	"testing"
 	"time"
 
@@ -34,6 +33,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/ptr"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/crossplane-contrib/provider-aws/apis/cache/v1beta1"
 	"github.com/crossplane-contrib/provider-aws/pkg/clients/elasticache/fake"
@@ -164,6 +164,10 @@ func withEngineVersion(e string) replicationGroupModifier {
 
 func withWriteConnectionSecretToReference(ref xpv1.SecretReference) replicationGroupModifier {
 	return func(r *v1beta1.ReplicationGroup) { r.Spec.ResourceSpec.WriteConnectionSecretToReference = &ref }
+}
+
+func withLogDeliveryConfiguration(config v1beta1.LogDeliveryConfiguration) replicationGroupModifier {
+	return func(r *v1beta1.ReplicationGroup) { r.Spec.ForProvider.LogDeliveryConfiguration = config }
 }
 
 func replicationGroup(rm ...replicationGroupModifier) *v1beta1.ReplicationGroup {
@@ -644,6 +648,7 @@ func TestIsUpToDate(t *testing.T) {
 					},
 				},
 				kube: &test.MockClient{
+					// This mock returns different auth tokens from secrets specified in spec.forProvider.authTokenSecretRef and spec.writeConnectionSecretToRef
 					MockGet:    test.NewMockGetFn(nil, mockGettingSecretDataWithDiff),
 					MockUpdate: test.NewMockUpdateFn(nil),
 				},
@@ -694,7 +699,8 @@ func TestIsUpToDate(t *testing.T) {
 					},
 				},
 				kube: &test.MockClient{
-					MockGet:    test.NewMockGetFn(nil, mockGettingSecretData), // This mock returns same auth token for both secrets
+					// This mock returns the same auth token for both secrets(spec.forProvider.authTokenSecretRef and spec.writeConnectionSecretToRef)
+					MockGet:    test.NewMockGetFn(nil, mockGettingSecretData),
 					MockUpdate: test.NewMockUpdateFn(nil),
 				},
 			},
@@ -744,7 +750,8 @@ func TestIsUpToDate(t *testing.T) {
 					},
 				},
 				kube: &test.MockClient{
-					MockGet:    test.NewMockGetFn(nil, mockGettingSecretData), // This mock returns same auth token for both secrets
+					// This mock returns the same auth token for both secrets(spec.forProvider.authTokenSecretRef and spec.writeConnectionSecretToRef)
+					MockGet:    test.NewMockGetFn(nil, mockGettingSecretData),
 					MockUpdate: test.NewMockUpdateFn(nil),
 				},
 			},
@@ -797,7 +804,8 @@ func TestIsUpToDate(t *testing.T) {
 					},
 				},
 				kube: &test.MockClient{
-					MockGet:    test.NewMockGetFn(nil, mockGettingSecretData), // This mock returns same auth token for both secrets
+					// This mock returns the same auth token for both secrets(spec.forProvider.authTokenSecretRef and spec.writeConnectionSecretToRef)
+					MockGet:    test.NewMockGetFn(nil, mockGettingSecretData),
 					MockUpdate: test.NewMockUpdateFn(nil),
 				},
 			},
@@ -814,6 +822,202 @@ func TestIsUpToDate(t *testing.T) {
 
 				withWriteConnectionSecretToReference(xpv1.SecretReference{
 					Name: "writeConnectionSecretToRefName",
+				}),
+			),
+			want: wantIsUpToDate{
+				isUpToDate: true,
+				err:        nil,
+			},
+		},
+		{
+			name: "LogDeliveryConfigurationChanged",
+			e: &external{
+				cache: &cache{},
+				client: &fake.MockClient{
+					MockDescribeReplicationGroups: func(ctx context.Context, _ *elasticache.DescribeReplicationGroupsInput, opts []func(*elasticache.Options)) (*elasticache.DescribeReplicationGroupsOutput, error) {
+						return &elasticache.DescribeReplicationGroupsOutput{
+							ReplicationGroups: []types.ReplicationGroup{
+								{
+									Status:                 aws.String(v1beta1.StatusModifying),
+									AutomaticFailover:      types.AutomaticFailoverStatusEnabled,
+									CacheNodeType:          aws.String(cacheNodeType),
+									SnapshotRetentionLimit: aws.Int32(int32(snapshotRetentionLimit)),
+									SnapshotWindow:         aws.String(snapshotWindow),
+									ClusterEnabled:         aws.Bool(true),
+									MemberClusters:         []string{cacheClusterID},
+									LogDeliveryConfigurations: []types.LogDeliveryConfiguration{
+										{
+											LogFormat: "json",
+											LogType: types.LogTypeSlowLog,
+											DestinationType: types.DestinationTypeCloudWatchLogs,
+											DestinationDetails: &types.DestinationDetails{
+												CloudWatchLogsDetails: &types.CloudWatchLogsDestinationDetails{
+													LogGroup: aws.String("old-log-group"),
+												},
+											},
+											Status: "active",
+										},
+										{
+											LogFormat: "text",
+											LogType: types.LogTypeEngineLog,
+											DestinationType: types.DestinationTypeKinesisFirehose,
+											DestinationDetails: &types.DestinationDetails{
+												KinesisFirehoseDetails: &types.KinesisFirehoseDestinationDetails{
+													DeliveryStream: aws.String("firehose-stream"),
+												},
+											},
+											Status: "modifying",
+										},
+									},
+								},
+							},
+						}, nil
+					},
+					MockDescribeCacheClusters: func(ctx context.Context, _ *elasticache.DescribeCacheClustersInput, opts []func(*elasticache.Options)) (*elasticache.DescribeCacheClustersOutput, error) {
+						return &elasticache.DescribeCacheClustersOutput{
+							CacheClusters: []types.CacheCluster{
+								{EngineVersion: aws.String(engineVersion), PreferredMaintenanceWindow: aws.String(maintenanceWindow)},
+							},
+						}, nil
+					},
+				},
+				kube: &test.MockClient{
+					// This mock returns the same auth token for both secrets(spec.forProvider.authTokenSecretRef and spec.writeConnectionSecretToRef)
+					MockGet:    test.NewMockGetFn(nil, mockGettingSecretData),
+					MockUpdate: test.NewMockUpdateFn(nil),
+				},
+			},
+			cr: replicationGroup(
+				withReplicationGroupID(name),
+				withAuthTokenSecretRef(&xpv1.SecretKeySelector{
+					SecretReference: xpv1.SecretReference{
+						Name:      "authTokenSecret",
+						Namespace: "default"},
+					Key: xpv1.ResourceCredentialsSecretPasswordKey,
+				}),
+				withAuthTokenUpdateStrategy("ROTATE"),
+				withProviderStatusLastAppliedAuthTokenUpdateStrategy("ROTATE"),
+
+				withWriteConnectionSecretToReference(xpv1.SecretReference{
+					Name: "writeConnectionSecretToRefName",
+				}),
+				withLogDeliveryConfiguration(v1beta1.LogDeliveryConfiguration{
+					SlowLogs: &v1beta1.LogsConf{
+						DestinationDetails: &v1beta1.DestinationDetails{
+							CloudWatchLogsDetails: &v1beta1.CloudWatchLogsDestinationDetails{
+								LogGroup: aws.String("new-log-group"),
+							},
+						},
+						LogFormat:      "JSON",
+					},
+					EngineLogs: &v1beta1.LogsConf{
+						DestinationDetails: &v1beta1.DestinationDetails{
+							KinesisFirehoseDetails: &v1beta1.KinesisFirehoseDestinationDetails{
+								DeliveryStream: aws.String("firehose-stream"),
+							},
+						},
+						LogFormat:      "TEXT",
+						Enabled: aws.Bool(true),
+					},
+				}),
+			),
+			want: wantIsUpToDate{
+				isUpToDate: false,
+				err:        nil,
+			},
+		},
+		{
+			name: "LogDeliveryConfigurationIsNotChanged",
+			e: &external{
+				cache: &cache{},
+				client: &fake.MockClient{
+					MockDescribeReplicationGroups: func(ctx context.Context, _ *elasticache.DescribeReplicationGroupsInput, opts []func(*elasticache.Options)) (*elasticache.DescribeReplicationGroupsOutput, error) {
+						return &elasticache.DescribeReplicationGroupsOutput{
+							ReplicationGroups: []types.ReplicationGroup{
+								{
+									Status:                 aws.String(v1beta1.StatusModifying),
+									AutomaticFailover:      types.AutomaticFailoverStatusEnabled,
+									CacheNodeType:          aws.String(cacheNodeType),
+									SnapshotRetentionLimit: aws.Int32(int32(snapshotRetentionLimit)),
+									SnapshotWindow:         aws.String(snapshotWindow),
+									ClusterEnabled:         aws.Bool(true),
+									MemberClusters:         []string{cacheClusterID},
+									LogDeliveryConfigurations: []types.LogDeliveryConfiguration{
+										{
+											LogFormat: "json",
+											LogType: types.LogTypeSlowLog,
+											DestinationType: types.DestinationTypeCloudWatchLogs,
+											DestinationDetails: &types.DestinationDetails{
+												CloudWatchLogsDetails: &types.CloudWatchLogsDestinationDetails{
+													LogGroup: aws.String("old-log-group"),
+												},
+											},
+											Status: "active",
+										},
+										{
+											LogFormat: "text",
+											LogType: types.LogTypeEngineLog,
+											DestinationType: types.DestinationTypeKinesisFirehose,
+											DestinationDetails: &types.DestinationDetails{
+												KinesisFirehoseDetails: &types.KinesisFirehoseDestinationDetails{
+													DeliveryStream: aws.String("firehose-stream"),
+												},
+											},
+											Status: "modifying",
+										},
+									},
+								},
+							},
+						}, nil
+					},
+					MockDescribeCacheClusters: func(ctx context.Context, _ *elasticache.DescribeCacheClustersInput, opts []func(*elasticache.Options)) (*elasticache.DescribeCacheClustersOutput, error) {
+						return &elasticache.DescribeCacheClustersOutput{
+							CacheClusters: []types.CacheCluster{
+								{EngineVersion: aws.String(engineVersion), PreferredMaintenanceWindow: aws.String(maintenanceWindow)},
+							},
+						}, nil
+					},
+				},
+				kube: &test.MockClient{
+					// This mock returns the same auth token for both secrets(spec.forProvider.authTokenSecretRef and spec.writeConnectionSecretToRef)
+					MockGet:    test.NewMockGetFn(nil, mockGettingSecretData),
+					MockUpdate: test.NewMockUpdateFn(nil),
+				},
+			},
+			cr: replicationGroup(
+				withReplicationGroupID(name),
+				withAuthTokenSecretRef(&xpv1.SecretKeySelector{
+					SecretReference: xpv1.SecretReference{
+						Name:      "authTokenSecret",
+						Namespace: "default"},
+					Key: xpv1.ResourceCredentialsSecretPasswordKey,
+				}),
+				withAuthTokenUpdateStrategy("ROTATE"),
+				withProviderStatusLastAppliedAuthTokenUpdateStrategy("ROTATE"),
+
+				withWriteConnectionSecretToReference(xpv1.SecretReference{
+					Name: "writeConnectionSecretToRefName",
+				}),
+				withLogDeliveryConfiguration(v1beta1.LogDeliveryConfiguration{
+					SlowLogs: &v1beta1.LogsConf{
+						DestinationDetails: &v1beta1.DestinationDetails{
+							CloudWatchLogsDetails: &v1beta1.CloudWatchLogsDestinationDetails{
+								LogGroup: aws.String("old-log-group"),
+							},
+						},
+						LogFormat:      "JSON",
+						// If Enabled is not set, it is considered true by default
+						//Enabled: aws.Bool(true),
+					},
+					EngineLogs: &v1beta1.LogsConf{
+						DestinationDetails: &v1beta1.DestinationDetails{
+							KinesisFirehoseDetails: &v1beta1.KinesisFirehoseDestinationDetails{
+								DeliveryStream: aws.String("firehose-stream"),
+							},
+						},
+						LogFormat:      "TEXT",
+						Enabled: aws.Bool(true),
+					},
 				}),
 			),
 			want: wantIsUpToDate{

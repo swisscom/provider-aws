@@ -18,7 +18,6 @@ package elasticache
 
 import (
 	"context"
-	"fmt"
 	"reflect"
 	"strconv"
 	"strings"
@@ -285,7 +284,7 @@ func ReplicationGroupShardConfigurationNeedsUpdate(kube v1beta1.ReplicationGroup
 // ReplicationGroupNeedsUpdate returns true if the supplied ReplicationGroup and
 // the configuration of its member clusters differ from given desired state.
 func ReplicationGroupNeedsUpdate(kube v1beta1.ReplicationGroupParameters, rg elasticachetypes.ReplicationGroup, ccList []elasticachetypes.CacheCluster) string {
-	diffLogDeliveryConfigurations := cmp.Diff(kube.LogDeliveryConfiguration, generateLogDeliveryConfigurations(rg.LogDeliveryConfigurations), cmpopts.EquateEmpty())
+	diffLogDeliveryConfigurations := compareLogsDeliveryConfigurations(kube.LogDeliveryConfiguration, GenerateLogDeliveryConfigurations(rg.LogDeliveryConfigurations))
 	switch {
 	case !reflect.DeepEqual(kube.AutomaticFailoverEnabled, automaticFailoverEnabled(rg.AutomaticFailover)):
 		return "AutomaticFailover"
@@ -300,7 +299,7 @@ func ReplicationGroupNeedsUpdate(kube v1beta1.ReplicationGroupParameters, rg ela
 	case ReplicationGroupNumCacheClustersNeedsUpdate(kube, ccList):
 		return "NumCacheClusters"
 	case diffLogDeliveryConfigurations != "":
-		return fmt.Sprintf("LogDeliveryConfigurations diff: %s", diffLogDeliveryConfigurations)
+		return "LogDeliveryConfigurations: diff: " + diffLogDeliveryConfigurations
 	}
 
 	for _, cc := range ccList {
@@ -606,8 +605,11 @@ func setLogDeliveryConfigurationController(extConf elasticachetypes.LogDeliveryC
 		}
 		extEngineLogConf.DestinationDetails = &destinationDetails
 	}
-	if extConf.Status == "active" || extConf.Status == "enabling" {
+	if extConf.Status == "active" || extConf.Status == "modifying" {
 		extEngineLogConf.Enabled = aws.Bool(true)
+	}
+	if extConf.Status == "disabling" {
+		extEngineLogConf.Enabled = aws.Bool(false)
 	}
 	if extConf.LogFormat != "" {
 		extEngineLogConf.LogFormat = string(extConf.LogFormat)
@@ -615,8 +617,8 @@ func setLogDeliveryConfigurationController(extConf elasticachetypes.LogDeliveryC
 	return &extEngineLogConf
 }
 
-// generateLogDeliveryConfigurations converts AWS SDK LogDeliveryConfiguration to controllers LogDeliveryConfigurations
-func generateLogDeliveryConfigurations(resp []elasticachetypes.LogDeliveryConfiguration) v1beta1.LogDeliveryConfiguration {
+// GenerateLogDeliveryConfigurations  converts AWS SDK LogDeliveryConfiguration to controllers LogDeliveryConfigurations
+func GenerateLogDeliveryConfigurations(resp []elasticachetypes.LogDeliveryConfiguration) v1beta1.LogDeliveryConfiguration {
 	var external v1beta1.LogDeliveryConfiguration
 	for _, logConf := range resp {
 		if logConf.LogType == elasticachetypes.LogTypeEngineLog {
@@ -631,30 +633,34 @@ func generateLogDeliveryConfigurations(resp []elasticachetypes.LogDeliveryConfig
 }
 
 // setLogDeliveryConfigurationSDK converts controllers LogDeliveryConfiguration to AWS SDK type
-func setLogDeliveryConfigurationSDK(ds v1beta1.LogDeliveryConfiguration, logType elasticachetypes.LogType) elasticachetypes.LogDeliveryConfigurationRequest {
+func setLogDeliveryConfigurationSDK(ds *v1beta1.LogsConf, logType elasticachetypes.LogType) elasticachetypes.LogDeliveryConfigurationRequest {
 	logConf := elasticachetypes.LogDeliveryConfigurationRequest{LogType: logType}
-	if ds.EngineLogs.Enabled != nil {
-		logConf.Enabled = ds.EngineLogs.Enabled
+	if ds.Enabled != nil {
+		logConf.Enabled = ds.Enabled
+		// Disabling of logs requires strictly setting Enabled to false and set LogType
+		if !*ds.Enabled {
+			return logConf
+		}
 	}
-	if ds.EngineLogs.LogFormat != "" {
-		logConf.LogFormat = elasticachetypes.LogFormat(ds.EngineLogs.LogFormat)
+	if ds.LogFormat != "" {
+		logConf.LogFormat = elasticachetypes.LogFormat(ds.LogFormat)
 	}
-	if ds.EngineLogs.DestinationDetails != nil {
+	if ds.DestinationDetails != nil {
 		destinationDetails := elasticachetypes.DestinationDetails{}
-		if ds.EngineLogs.DestinationDetails.CloudWatchLogsDetails != nil {
+		if ds.DestinationDetails.CloudWatchLogsDetails != nil {
+			logConf.DestinationType = elasticachetypes.DestinationTypeCloudWatchLogs
 			cloudWatchLogsDetails := elasticachetypes.CloudWatchLogsDestinationDetails{}
-			if ds.EngineLogs.DestinationDetails.CloudWatchLogsDetails.LogGroup != nil {
-				cloudWatchLogsDetails.LogGroup = ds.EngineLogs.DestinationDetails.CloudWatchLogsDetails.LogGroup
+			if ds.DestinationDetails.CloudWatchLogsDetails.LogGroup != nil {
+				cloudWatchLogsDetails.LogGroup = ds.DestinationDetails.CloudWatchLogsDetails.LogGroup
 				destinationDetails.CloudWatchLogsDetails = &cloudWatchLogsDetails
-				logConf.DestinationType = elasticachetypes.DestinationTypeCloudWatchLogs
 			}
 		}
-		if ds.EngineLogs.DestinationDetails.KinesisFirehoseDetails != nil {
+		if ds.DestinationDetails.KinesisFirehoseDetails != nil {
+			logConf.DestinationType = elasticachetypes.DestinationTypeKinesisFirehose
 			kinesisFirehoseDetails := elasticachetypes.KinesisFirehoseDestinationDetails{}
-			if ds.EngineLogs.DestinationDetails.KinesisFirehoseDetails.DeliveryStream != nil {
-				kinesisFirehoseDetails.DeliveryStream = ds.EngineLogs.DestinationDetails.KinesisFirehoseDetails.DeliveryStream
+			if ds.DestinationDetails.KinesisFirehoseDetails.DeliveryStream != nil {
+				kinesisFirehoseDetails.DeliveryStream = ds.DestinationDetails.KinesisFirehoseDetails.DeliveryStream
 				destinationDetails.KinesisFirehoseDetails = &kinesisFirehoseDetails
-				logConf.DestinationType = elasticachetypes.DestinationTypeKinesisFirehose
 			}
 		}
 		logConf.DestinationDetails = &destinationDetails
@@ -667,24 +673,12 @@ func setLogDeliveryConfigurationSDK(ds v1beta1.LogDeliveryConfiguration, logType
 func generateLogDeliveryConfigurationsRequest(ds v1beta1.LogDeliveryConfiguration) []elasticachetypes.LogDeliveryConfigurationRequest {
 	var desired []elasticachetypes.LogDeliveryConfigurationRequest
 	if ds.EngineLogs != nil {
-		engineLogConf := setLogDeliveryConfigurationSDK(ds, elasticachetypes.LogTypeEngineLog)
+		engineLogConf := setLogDeliveryConfigurationSDK(ds.EngineLogs, elasticachetypes.LogTypeEngineLog)
 		desired = append(desired, engineLogConf)
-	} else {
-		engineLogConfDisabled := elasticachetypes.LogDeliveryConfigurationRequest{
-			LogType: elasticachetypes.LogTypeEngineLog,
-			Enabled: aws.Bool(false),
-		}
-		desired = append(desired, engineLogConfDisabled)
 	}
 	if ds.SlowLogs != nil {
-		slowLogConf := setLogDeliveryConfigurationSDK(ds, elasticachetypes.LogTypeSlowLog)
+		slowLogConf := setLogDeliveryConfigurationSDK(ds.SlowLogs, elasticachetypes.LogTypeSlowLog)
 		desired = append(desired, slowLogConf)
-	} else {
-		slowLogConfDisabled := elasticachetypes.LogDeliveryConfigurationRequest{
-			LogType: elasticachetypes.LogTypeSlowLog,
-			Enabled: aws.Bool(false),
-		}
-		desired = append(desired, slowLogConfDisabled)
 	}
 	return desired
 }
@@ -1006,4 +1000,47 @@ func getVersion(version *string) (*string, error) {
 		versionOut += "." + strconv.Itoa(version2)
 	}
 	return &versionOut, nil
+}
+
+func compareLogsDeliveryConfigurations(ds v1beta1.LogDeliveryConfiguration, cr v1beta1.LogDeliveryConfiguration) string {
+	diff := cmp.Diff(ds, cr, cmpopts.EquateEmpty(),
+		cmp.Comparer(func(a, b *v1beta1.LogsConf) bool {
+			// Treat desired(a) explicitly disabled and current(b) nil as equal
+			if a != nil && a.Enabled != nil && !aws.ToBool(a.Enabled) && b == nil {
+				a = nil
+			}
+			// Treat nil and true as equal for Enabled
+			enabledA := a != nil && (a.Enabled == nil || aws.ToBool(a.Enabled))
+			enabledB := b != nil && (b.Enabled == nil || aws.ToBool(b.Enabled))
+			if enabledA != enabledB {
+				return false
+			}
+			// Treat LogFormat case-insensitively
+			logFormatA, logFormatB := "", ""
+			if a != nil {
+				logFormatA = a.LogFormat
+			}
+			if b != nil {
+				logFormatB = b.LogFormat
+			}
+			if !strings.EqualFold(logFormatA, logFormatB) {
+				return false
+			}
+			// Compare other fields normally
+			aCopy := v1beta1.LogsConf{}
+			bCopy := v1beta1.LogsConf{}
+			if a != nil {
+				aCopy = *a
+				aCopy.Enabled = nil
+				aCopy.LogFormat = ""
+			}
+			if b != nil {
+				bCopy = *b
+				bCopy.Enabled = nil
+				bCopy.LogFormat = ""
+			}
+			return cmp.Equal(aCopy, bCopy, cmpopts.EquateEmpty())
+		}),
+	)
+	return diff
 }
