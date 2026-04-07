@@ -445,7 +445,7 @@ func TestIsUpToDate(t *testing.T) {
 						{
 							DeletionProtection: aws.Bool(true),
 							TagList: []*svcsdk.Tag{
-								{Key: aws.String("aws:createdBy"), Value: aws.String("terraform")},
+								{Key: aws.String("aws:createdBy"), Value: aws.String("value")},
 								{Key: aws.String("c7n:policy"), Value: aws.String("auto")},
 								{Key: aws.String("env"), Value: aws.String("prod")},
 							},
@@ -479,7 +479,7 @@ func TestIsUpToDate(t *testing.T) {
 						{
 							DeletionProtection: aws.Bool(true),
 							TagList: []*svcsdk.Tag{
-								{Key: aws.String("aws:createdBy"), Value: aws.String("terraform")},
+								{Key: aws.String("aws:createdBy"), Value: aws.String("value")},
 								{Key: aws.String("c7n:policy"), Value: aws.String("auto")},
 								{Key: aws.String("c7n:other"), Value: aws.String("x")},
 								{Key: aws.String("env"), Value: aws.String("prod")},
