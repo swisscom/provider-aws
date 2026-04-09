@@ -10,7 +10,6 @@ import (
 	"strings"
 
 	svcsdk "github.com/aws/aws-sdk-go/service/rds"
-	"k8s.io/utils/ptr"
 	svcsdkapi "github.com/aws/aws-sdk-go/service/rds/rdsiface"
 	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
 	"github.com/crossplane/crossplane-runtime/pkg/connection"
@@ -24,6 +23,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/pkg/errors"
+	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -681,7 +681,22 @@ func (s *shared) isUpToDate(ctx context.Context, cr *svcapitypes.DBCluster, out 
 		diff += "\nscalingConfiguration changed"
 	}
 
-	s.cache.addTags, s.cache.removeTags = utils.DiffTags(cr.Spec.ForProvider.Tags, out.DBClusters[0].TagList)
+	ignore := []string{"aws:*"}
+	for _, r := range cr.Spec.ForProvider.TagsIgnore {
+		ignore = append(ignore, r.Key)
+	}
+	cr.Status.AtProvider.ObservedTags = nil
+	var observedTags []*svcsdk.Tag
+	if out.DBClusters[0].TagList != nil {
+		for _, tag := range out.DBClusters[0].TagList {
+			cr.Status.AtProvider.ObservedTags = append(cr.Status.AtProvider.ObservedTags, &svcapitypes.Tag{Key: tag.Key, Value: tag.Value})
+			if utils.ShouldIgnore(pointer.StringValue(tag.Key), ignore) {
+				continue
+			}
+			observedTags = append(observedTags, &svcsdk.Tag{Key: tag.Key, Value: tag.Value})
+		}
+	}
+	s.cache.addTags, s.cache.removeTags = utils.DiffTags(cr.Spec.ForProvider.Tags, observedTags)
 	tagsChanged := len(s.cache.addTags) != 0 || len(s.cache.removeTags) != 0
 	if tagsChanged {
 		diff += fmt.Sprintf("\nadd %d tag(s) and remove %d tag(s)", len(s.cache.addTags), len(s.cache.removeTags))
