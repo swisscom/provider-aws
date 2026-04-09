@@ -355,10 +355,23 @@ type CustomDBClusterParameters struct {
 	// RestoreFrom specifies the details of the backup to restore when creating a new DBCluster.
 	// +optional
 	RestoreFrom *RestoreDBClusterBackupConfiguration `json:"restoreFrom,omitempty"`
+
+	// TagsIgnore contains rules that tell the reconciler to pretend matching
+	// tags don't exist during diff/updates. A rule key supports either exact
+	// match (e.g. "c7n:policy") or a simple prefix glob using a trailing *
+	// (e.g. "c7n:*" or "prefix*"). In all cases tags starting with the
+	// prefix "aws:" are always ignored (implicit rule "aws:*").
+	// +optional
+	TagsIgnore []TagIgnoreRule `json:"tagsIgnore,omitempty"`
 }
 
 // CustomDBClusterObservation includes the custom status fields of DBCluster.
-type CustomDBClusterObservation struct{}
+type CustomDBClusterObservation struct {
+	// ObservedTags exposes the full, unfiltered set of external tags returned
+	// by AWS for observability. These are never used for diffing directly.
+	// +optional
+	ObservedTags []*Tag `json:"observedTags,omitempty"`
+}
 
 // S3RestoreBackupConfiguration defines the details of the S3 backup to restore from.
 type S3RestoreBackupConfiguration struct {
