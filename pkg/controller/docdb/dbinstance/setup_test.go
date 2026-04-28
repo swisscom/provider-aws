@@ -314,7 +314,7 @@ func TestObserve(t *testing.T) {
 				},
 			},
 		},
-		"AvailableState_and_outdated_AutoMinorVersionUpgrade": {
+		"AvailableState_AutoMinorVersionUpgrade_diff_ignored": {
 			args: args{
 				docdb: &fake.MockDocDBClient{
 					MockDescribeDBInstancesWithContext: func(c context.Context, ddi *docdb.DescribeDBInstancesInput, o []request.Option) (*docdb.DescribeDBInstancesOutput, error) {
@@ -353,7 +353,7 @@ func TestObserve(t *testing.T) {
 				),
 				result: managed.ExternalObservation{
 					ResourceExists:    true,
-					ResourceUpToDate:  false,
+					ResourceUpToDate:  true,
 					ConnectionDetails: generateConnectionDetails(testAddress, testPort),
 				},
 				docdb: fake.MockDocDBClientCall{
@@ -366,6 +366,9 @@ func TestObserve(t *testing.T) {
 							)),
 							Opts: nil,
 						},
+					},
+					ListTagsForResource: []*fake.CallListTagsForResource{
+						{I: &docdb.ListTagsForResourceInput{ResourceName: pointer.ToOrNilIfZeroValue(testDBInstanceArn)}},
 					},
 				},
 			},
@@ -836,7 +839,7 @@ func TestObserve(t *testing.T) {
 				},
 			},
 		},
-		"FailedState_and_outdated_AutoMinorVersionUpgrade": {
+		"FailedState_AutoMinorVersionUpgrade_diff_ignored": {
 			args: args{
 				docdb: &fake.MockDocDBClient{
 					MockDescribeDBInstancesWithContext: func(c context.Context, ddi *docdb.DescribeDBInstancesInput, o []request.Option) (*docdb.DescribeDBInstancesOutput, error) {
@@ -873,7 +876,7 @@ func TestObserve(t *testing.T) {
 				),
 				result: managed.ExternalObservation{
 					ResourceExists:    true,
-					ResourceUpToDate:  false,
+					ResourceUpToDate:  true,
 					ConnectionDetails: generateConnectionDetails(testAddress, testPort),
 				},
 				docdb: fake.MockDocDBClientCall{
@@ -886,6 +889,9 @@ func TestObserve(t *testing.T) {
 							)),
 							Opts: nil,
 						},
+					},
+					ListTagsForResource: []*fake.CallListTagsForResource{
+						{I: &docdb.ListTagsForResourceInput{}},
 					},
 				},
 			},
@@ -1351,7 +1357,7 @@ func TestObserve(t *testing.T) {
 				},
 			},
 		},
-		"DeletingState_and_outdated_AutoMinorVersionUpgrade": {
+		"DeletingState_AutoMinorVersionUpgrade_diff_ignored": {
 			args: args{
 				docdb: &fake.MockDocDBClient{
 					MockDescribeDBInstancesWithContext: func(c context.Context, ddi *docdb.DescribeDBInstancesInput, o []request.Option) (*docdb.DescribeDBInstancesOutput, error) {
@@ -1388,7 +1394,7 @@ func TestObserve(t *testing.T) {
 				),
 				result: managed.ExternalObservation{
 					ResourceExists:    true,
-					ResourceUpToDate:  false,
+					ResourceUpToDate:  true,
 					ConnectionDetails: generateConnectionDetails(testAddress, testPort),
 				},
 				docdb: fake.MockDocDBClientCall{
@@ -1401,6 +1407,9 @@ func TestObserve(t *testing.T) {
 							)),
 							Opts: nil,
 						},
+					},
+					ListTagsForResource: []*fake.CallListTagsForResource{
+						{I: &docdb.ListTagsForResourceInput{}},
 					},
 				},
 			},
@@ -1866,7 +1875,7 @@ func TestObserve(t *testing.T) {
 				},
 			},
 		},
-		"CreatingState_and_outdated_AutoMinorVersionUpgrade": {
+		"CreatingState_AutoMinorVersionUpgrade_diff_ignored": {
 			args: args{
 				docdb: &fake.MockDocDBClient{
 					MockDescribeDBInstancesWithContext: func(c context.Context, ddi *docdb.DescribeDBInstancesInput, o []request.Option) (*docdb.DescribeDBInstancesOutput, error) {
@@ -1903,7 +1912,7 @@ func TestObserve(t *testing.T) {
 				),
 				result: managed.ExternalObservation{
 					ResourceExists:    true,
-					ResourceUpToDate:  false,
+					ResourceUpToDate:  true,
 					ConnectionDetails: generateConnectionDetails(testAddress, testPort),
 				},
 				docdb: fake.MockDocDBClientCall{
@@ -1916,6 +1925,9 @@ func TestObserve(t *testing.T) {
 							)),
 							Opts: nil,
 						},
+					},
+					ListTagsForResource: []*fake.CallListTagsForResource{
+						{I: &docdb.ListTagsForResourceInput{}},
 					},
 				},
 			},
@@ -2993,6 +3005,58 @@ func TestUpdate(t *testing.T) {
 								Tags: []*docdb.Tag{
 									{Key: pointer.ToOrNilIfZeroValue(testOtherTagKey), Value: pointer.ToOrNilIfZeroValue(testOtherTagValue)},
 								},
+							},
+						},
+					},
+				},
+			},
+		},
+		"SuccessfulUpdate_AutoMinorVersionUpgrade_not_sent": {
+			args: args{
+				docdb: &fake.MockDocDBClient{
+					MockModifyDBInstanceWithContext: func(c context.Context, mdi *docdb.ModifyDBInstanceInput, o []request.Option) (*docdb.ModifyDBInstanceOutput, error) {
+						if mdi.AutoMinorVersionUpgrade != nil {
+							return nil, errors.New("AutoMinorVersionUpgrade must not be sent to DocumentDB ModifyDBInstance")
+						}
+						return &docdb.ModifyDBInstanceOutput{
+							DBInstance: &docdb.DBInstance{
+								DBInstanceIdentifier: pointer.ToOrNilIfZeroValue(testDBIdentifier),
+								DBInstanceArn:        pointer.ToOrNilIfZeroValue(testDBInstanceArn),
+							},
+						}, nil
+					},
+					MockListTagsForResource: func(ltfri *docdb.ListTagsForResourceInput) (*docdb.ListTagsForResourceOutput, error) {
+						return &docdb.ListTagsForResourceOutput{}, nil
+					},
+				},
+				cr: instance(
+					withDBIdentifier(testDBIdentifier),
+					withDBInstanceArn(testDBInstanceArn),
+					withExternalName(testDBIdentifier),
+					withAutoMinorVersionUpgrade(true),
+				),
+			},
+			want: want{
+				cr: instance(
+					withDBIdentifier(testDBIdentifier),
+					withDBInstanceArn(testDBInstanceArn),
+					withExternalName(testDBIdentifier),
+					withAutoMinorVersionUpgrade(true),
+				),
+				result: managed.ExternalUpdate{},
+				docdb: fake.MockDocDBClientCall{
+					ModifyDBInstanceWithContext: []*fake.CallModifyDBInstanceWithContext{
+						{
+							Ctx: context.Background(),
+							I: &docdb.ModifyDBInstanceInput{
+								DBInstanceIdentifier: pointer.ToOrNilIfZeroValue(testDBIdentifier),
+							},
+						},
+					},
+					ListTagsForResource: []*fake.CallListTagsForResource{
+						{
+							I: &docdb.ListTagsForResourceInput{
+								ResourceName: pointer.ToOrNilIfZeroValue(testDBInstanceArn),
 							},
 						},
 					},

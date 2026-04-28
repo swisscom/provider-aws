@@ -129,8 +129,7 @@ func (e *hooks) isUpToDate(_ context.Context, cr *svcapitypes.DBInstance, resp *
 	instance := resp.DBInstances[0]
 
 	switch {
-	case pointer.BoolValue(cr.Spec.ForProvider.AutoMinorVersionUpgrade) != pointer.BoolValue(instance.AutoMinorVersionUpgrade),
-		pointer.StringValue(cr.Spec.ForProvider.CACertificateIdentifier) != pointer.StringValue(instance.CACertificateIdentifier),
+	case pointer.StringValue(cr.Spec.ForProvider.CACertificateIdentifier) != pointer.StringValue(instance.CACertificateIdentifier),
 		pointer.StringValue(cr.Spec.ForProvider.DBInstanceClass) != pointer.StringValue(instance.DBInstanceClass),
 		pointer.StringValue(cr.Spec.ForProvider.PreferredMaintenanceWindow) != pointer.StringValue(instance.PreferredMaintenanceWindow),
 		pointer.Int64Value(cr.Spec.ForProvider.PromotionTier) != pointer.Int64Value(instance.PromotionTier):
@@ -145,7 +144,6 @@ func lateInitialize(cr *svcapitypes.DBInstanceParameters, resp *svcsdk.DescribeD
 	instance := resp.DBInstances[0]
 
 	cr.AvailabilityZone = pointer.LateInitialize(cr.AvailabilityZone, instance.AvailabilityZone)
-	cr.AutoMinorVersionUpgrade = pointer.LateInitialize(cr.AutoMinorVersionUpgrade, instance.AutoMinorVersionUpgrade)
 	cr.CACertificateIdentifier = pointer.LateInitialize(cr.CACertificateIdentifier, instance.CACertificateIdentifier)
 	cr.PreferredMaintenanceWindow = pointer.LateInitialize(cr.PreferredMaintenanceWindow, instance.PreferredMaintenanceWindow)
 	cr.PromotionTier = pointer.LateInitialize(cr.PromotionTier, instance.PromotionTier)
@@ -156,6 +154,9 @@ func preUpdate(ctx context.Context, cr *svcapitypes.DBInstance, obj *svcsdk.Modi
 	obj.DBInstanceIdentifier = pointer.ToOrNilIfZeroValue(meta.GetExternalName(cr))
 	obj.CACertificateIdentifier = cr.Spec.ForProvider.CACertificateIdentifier
 	obj.ApplyImmediately = cr.Spec.ForProvider.ApplyImmediately
+	// AutoMinorVersionUpgrade is not supported by the DocumentDB ModifyDBInstance
+	// API and must be omitted from update requests to avoid a terminal error.
+	obj.AutoMinorVersionUpgrade = nil
 	return nil
 }
 
