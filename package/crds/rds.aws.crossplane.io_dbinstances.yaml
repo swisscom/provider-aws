@@ -2346,6 +2346,10 @@ spec:
                       full, the DB instance automates monitoring and instance recovery. If all
                       paused, the instance pauses automation for the duration set by --resume-full-automation-mode-minutes.
                     type: string
+                  availabilityZone:
+                    description: AvailabilityZone is the Availability Zone where the
+                      DB instance is located.
+                    type: string
                   awsBackupRecoveryPointARN:
                     description: |-
                       The Amazon Resource Name (ARN) of the recovery point in Amazon Web Services
