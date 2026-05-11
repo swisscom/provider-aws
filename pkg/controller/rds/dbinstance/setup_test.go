@@ -3,6 +3,7 @@ package dbinstance
 import (
 	"context"
 	"errors"
+	"fmt"
 	"testing"
 
 	"github.com/aws/aws-sdk-go/aws"
@@ -549,6 +550,37 @@ func TestIsUpToDate(t *testing.T) {
 				err:      nil,
 			},
 		},
+		"GP3BelowThresholdIopsAndStorageThroughputDiffReturnsError": {
+			args: args{
+				cr: &svcapitypes.DBInstance{
+					Spec: svcapitypes.DBInstanceSpec{
+						ForProvider: svcapitypes.DBInstanceParameters{
+							StorageType:       aws.String("gp3"),
+							AllocatedStorage:  aws.Int64(20),
+							Engine:            aws.String("postgres"),
+							IOPS:              aws.Int64(3200),
+							StorageThroughput: aws.Int64(150),
+						},
+					},
+				},
+				out: &svcsdk.DescribeDBInstancesOutput{
+					DBInstances: []*svcsdk.DBInstance{
+						{
+							StorageType:       aws.String("gp3"),
+							AllocatedStorage:  aws.Int64(20),
+							Engine:            aws.String("postgres"),
+							Iops:              aws.Int64(3000),
+							StorageThroughput: aws.Int64(125),
+						},
+					},
+				},
+				kube: test.NewMockClient(),
+			},
+			want: want{
+				upToDate: false,
+				err:      fmt.Errorf("cannot reconcile desired iops/storageThroughput: gp3 volumes below 400GB (engine: postgres) use fixed defaults (3000 IOPS / 125 MB/s). Increase allocatedStorage to provision custom values"),
+			},
+		},
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
@@ -556,7 +588,7 @@ func TestIsUpToDate(t *testing.T) {
 			ce := newCustomExternal(tc.kube, nil)
 			upToDate, diffMsg, err := ce.isUpToDate(context.TODO(), cr, tc.args.out)
 
-			if diff := cmp.Diff(tc.want.err, err); diff != "" {
+			if diff := cmp.Diff(errToString(tc.want.err), errToString(err)); diff != "" {
 				t.Errorf("r: -want, +got error: \n%s", diff)
 			}
 			if diff := cmp.Diff(tc.want.upToDate, upToDate); diff != "" {
@@ -782,4 +814,11 @@ func TestPostObserve(t *testing.T) {
 			}
 		})
 	}
+}
+
+func errToString(err error) string {
+	if err == nil {
+		return ""
+	}
+	return err.Error()
 }
