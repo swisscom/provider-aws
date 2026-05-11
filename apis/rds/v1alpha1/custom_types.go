@@ -852,6 +852,10 @@ type CustomDBInstanceObservation struct {
 	// The database role may be Standalone, Primary or Replica.
 	DatabaseRole *string `json:"databaseRole,omitempty"`
 
+	// AvailabilityZone is the Availability Zone where the DB instance is located.
+	// +optional
+	AvailabilityZone *string `json:"availabilityZone,omitempty"`
+
 	// ObservedTags exposes the full, unfiltered set of external tags returned
 	// by AWS for observability. These are never used for diffing directly.
 	// +optional

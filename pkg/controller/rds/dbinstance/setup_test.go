@@ -526,6 +526,29 @@ func TestIsUpToDate(t *testing.T) {
 				err:      nil,
 			},
 		},
+		"AvailabilityZoneDiffIgnored": {
+			args: args{
+				cr: &svcapitypes.DBInstance{
+					Spec: svcapitypes.DBInstanceSpec{
+						ForProvider: svcapitypes.DBInstanceParameters{
+							AvailabilityZone: aws.String("eu-central-1b"),
+						},
+					},
+				},
+				out: &svcsdk.DescribeDBInstancesOutput{
+					DBInstances: []*svcsdk.DBInstance{
+						{
+							AvailabilityZone: aws.String("eu-central-1a"),
+						},
+					},
+				},
+				kube: test.NewMockClient(),
+			},
+			want: want{
+				upToDate: true,
+				err:      nil,
+			},
+		},
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
@@ -720,6 +743,29 @@ func TestPostObserve(t *testing.T) {
 				},
 			},
 		},
+		"availabilityZoneSetInStatus": {
+			args: args{
+				cr: &svcapitypes.DBInstance{
+					Status: svcapitypes.DBInstanceStatus{},
+				},
+				out: &svcsdk.DescribeDBInstancesOutput{
+					DBInstances: []*svcsdk.DBInstance{
+						{
+							DeletionProtection: aws.Bool(true),
+							AvailabilityZone:   aws.String("eu-central-1a"),
+						},
+					},
+				},
+				kube: test.NewMockClient(),
+			},
+			want: want{
+				err: nil,
+				statusAtProvider: &svcapitypes.CustomDBInstanceObservation{
+					DatabaseRole:     aws.String(databaseRoleStandalone),
+					AvailabilityZone: aws.String("eu-central-1a"),
+				},
+			},
+		},
 	}
 
 	for name, tc := range cases {
@@ -731,8 +777,8 @@ func TestPostObserve(t *testing.T) {
 			if diff := cmp.Diff(tc.want.err, err); diff != "" {
 				t.Errorf("r: -want, +got error: \n%s", diff)
 			}
-			if diff := cmp.Diff(tc.want.statusAtProvider.DatabaseRole, cr.Status.AtProvider.DatabaseRole); diff != "" {
-				t.Errorf("r: -want, +got: \n%s", diff)
+			if diff := cmp.Diff(tc.want.statusAtProvider, &cr.Status.AtProvider.CustomDBInstanceObservation); diff != "" {
+				t.Errorf("statusAtProvider: -want, +got: \n%s", diff)
 			}
 		})
 	}

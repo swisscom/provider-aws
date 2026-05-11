@@ -632,6 +632,11 @@ func (in *CustomDBInstanceObservation) DeepCopyInto(out *CustomDBInstanceObserva
 		*out = new(string)
 		**out = **in
 	}
+	if in.AvailabilityZone != nil {
+		in, out := &in.AvailabilityZone, &out.AvailabilityZone
+		*out = new(string)
+		**out = **in
+	}
 	if in.ObservedTags != nil {
 		in, out := &in.ObservedTags, &out.ObservedTags
 		*out = make([]*Tag, len(*in))

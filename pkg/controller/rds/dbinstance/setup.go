@@ -473,6 +473,8 @@ func (s *shared) postObserve(ctx context.Context, cr *svcapitypes.DBInstance, re
 		cr.Status.AtProvider.DatabaseRole = aws.String(databaseRoleStandalone)
 	}
 
+	cr.Status.AtProvider.AvailabilityZone = db.AvailabilityZone
+
 	obs.ConnectionDetails, err = s.updateConnectionDetails(ctx, cr, obs.ConnectionDetails)
 	return obs, err
 }
@@ -694,6 +696,7 @@ func (s *shared) isUpToDate(ctx context.Context, cr *svcapitypes.DBInstance, out
 	diff = cmp.Diff(&svcapitypes.DBInstanceParameters{}, patch, cmpopts.EquateEmpty(),
 		cmpopts.IgnoreTypes(&xpv1.Reference{}, &xpv1.Selector{}, []xpv1.Reference{}),
 		cmpopts.IgnoreFields(svcapitypes.DBInstanceParameters{}, "Region"),
+		cmpopts.IgnoreFields(svcapitypes.DBInstanceParameters{}, "AvailabilityZone"),
 		cmpopts.IgnoreFields(svcapitypes.DBInstanceParameters{}, "AllowMajorVersionUpgrade"),
 		cmpopts.IgnoreFields(svcapitypes.DBInstanceParameters{}, "BackupRetentionPeriod"),
 		cmpopts.IgnoreFields(svcapitypes.DBInstanceParameters{}, "DBParameterGroupName"),
