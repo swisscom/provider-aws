@@ -684,8 +684,20 @@ func (s *shared) isUpToDate(ctx context.Context, cr *svcapitypes.DBInstance, out
 	// Depending on whether the instance was created as gp2 or modified from another type (s.g. gp3) to gp2,
 	// AWS provides different responses for IOPS/StorageThroughput (either 0 or nil).
 	// Therefore, we consider both 0 and nil to be equivalent.
-	iopsChanged := !(pointer.Int64Value(cr.Spec.ForProvider.IOPS) == pointer.Int64Value(db.Iops))
-	storageThroughputChanged := !(pointer.Int64Value(cr.Spec.ForProvider.StorageThroughput) == pointer.Int64Value(db.StorageThroughput))
+	// For gp3 volumes below the engine-specific allocatedStorage threshold, AWS rejects custom
+	// iops/storageThroughput values. Return an error so the resource shows SYNCED=False.
+	iopsChanged := false
+	storageThroughputChanged := false
+	if isStorageTypeGP3BelowAllocatedStorageThreshold(cr) {
+		if pointer.Int64Value(cr.Spec.ForProvider.IOPS) != pointer.Int64Value(db.Iops) ||
+			pointer.Int64Value(cr.Spec.ForProvider.StorageThroughput) != pointer.Int64Value(db.StorageThroughput) {
+			return false, "", fmt.Errorf("cannot reconcile desired iops/storageThroughput: gp3 volumes below %dGB (engine: %s) use fixed defaults (3000 IOPS / 125 MB/s). Increase allocatedStorage to provision custom values",
+				gp3AllocatedStorageThreshold(cr), pointer.StringValue(cr.Spec.ForProvider.Engine))
+		}
+	} else {
+		iopsChanged = !(pointer.Int64Value(cr.Spec.ForProvider.IOPS) == pointer.Int64Value(db.Iops))
+		storageThroughputChanged = !(pointer.Int64Value(cr.Spec.ForProvider.StorageThroughput) == pointer.Int64Value(db.StorageThroughput))
+	}
 	s.cache.engineVersionUpToDate = isEngineVersionUpToDate(cr, out)
 	versionChanged := !s.cache.engineVersionUpToDate
 
@@ -1031,12 +1043,16 @@ func isStorageTypeGP3BelowAllocatedStorageThreshold(cr *svcapitypes.DBInstance) 
 		return false
 	}
 
-	switch allocatedStorage, engine := pointer.Int64Value(cr.Spec.ForProvider.AllocatedStorage), pointer.StringValue(cr.Spec.ForProvider.Engine); engine {
-	case "mariadb", "mysql", "postgres":
-		return allocatedStorage < 400
-	case "oracle-ee", "oracle-ee-cdb", "oracle-se2", "oracle-se2-cdb":
-		return allocatedStorage < 200
-	}
+	return pointer.Int64Value(cr.Spec.ForProvider.AllocatedStorage) < gp3AllocatedStorageThreshold(cr)
+}
 
-	return false
+// gp3AllocatedStorageThreshold returns the minimum allocatedStorage (in GB) required to provision custom iops/storageThroughput.
+func gp3AllocatedStorageThreshold(cr *svcapitypes.DBInstance) int64 {
+	switch pointer.StringValue(cr.Spec.ForProvider.Engine) {
+	case "mariadb", "mysql", "postgres":
+		return 400
+	case "oracle-ee", "oracle-ee-cdb", "oracle-se2", "oracle-se2-cdb":
+		return 200
+	}
+	return 400
 }
