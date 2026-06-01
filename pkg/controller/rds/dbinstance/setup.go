@@ -320,7 +320,7 @@ func (s *shared) updateConnectionDetails(ctx context.Context, cr *svcapitypes.DB
 	return details, nil
 }
 
-func (s *shared) preUpdate(ctx context.Context, cr *svcapitypes.DBInstance, obj *svcsdk.ModifyDBInstanceInput) (err error) {
+func (s *shared) preUpdate(ctx context.Context, cr *svcapitypes.DBInstance, obj *svcsdk.ModifyDBInstanceInput) (err error) { //nolint:gocyclo
 	obj.DBInstanceIdentifier = pointer.ToOrNilIfZeroValue(meta.GetExternalName(cr))
 	obj.ApplyImmediately = cr.Spec.ForProvider.ApplyImmediately
 	// Only set MasterUserPassword if it has changed, otherwise it triggers "Resetting master password" on aws side,
@@ -360,6 +360,15 @@ func (s *shared) preUpdate(ctx context.Context, cr *svcapitypes.DBInstance, obj 
 	}
 	if s.cache.backupRetentionPeriodUpToDate {
 		obj.BackupRetentionPeriod = nil
+	}
+
+	obj.DBPortNumber = cr.Spec.ForProvider.Port
+
+	// LicenseModel cannot be modified on read replicas - AWS rejects the entire ModifyDBInstance request.
+	// After LateInitialize(), licenseModel is always populated in spec.forProvider from the observed AWS state,
+	// which causes it to be included in every subsequent modify call.
+	if cr.Spec.ForProvider.SourceDBInstanceID != nil {
+		obj.LicenseModel = nil
 	}
 
 	return nil
@@ -617,6 +626,9 @@ func setPendingModifiedValues(cr *svcsdk.DescribeDBInstancesOutput) { //nolint:g
 			}
 			if cr.DBInstances[0].PendingModifiedValues.StorageType != nil {
 				cr.DBInstances[0].StorageType = cr.DBInstances[0].PendingModifiedValues.StorageType
+			}
+			if cr.DBInstances[0].PendingModifiedValues.Port != nil {
+				cr.DBInstances[0].DbInstancePort = cr.DBInstances[0].PendingModifiedValues.Port
 			}
 		}
 	}
