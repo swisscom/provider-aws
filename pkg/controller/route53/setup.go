@@ -22,6 +22,7 @@ import (
 
 	"github.com/crossplane-contrib/provider-aws/pkg/controller/route53/hostedzone"
 	"github.com/crossplane-contrib/provider-aws/pkg/controller/route53/resourcerecordset"
+	resourcerecordsetns "github.com/crossplane-contrib/provider-aws/pkg/controller/route53/resourcerecordset_ns"
 	"github.com/crossplane-contrib/provider-aws/pkg/utils/setup"
 )
 
@@ -31,5 +32,6 @@ func Setup(mgr ctrl.Manager, o controller.Options) error {
 		mgr, o,
 		hostedzone.SetupHostedZone,
 		resourcerecordset.SetupResourceRecordSet,
+		resourcerecordsetns.SetupResourceRecordSet,
 	)
 }

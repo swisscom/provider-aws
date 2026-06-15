@@ -1,0 +1,313 @@
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.16.0
+  name: dbparametergroups.rds.aws.m.crossplane.io
+spec:
+  group: rds.aws.m.crossplane.io
+  names:
+    categories:
+    - crossplane
+    - managed
+    - aws
+    kind: DBParameterGroup
+    listKind: DBParameterGroupList
+    plural: dbparametergroups
+    singular: dbparametergroup
+  scope: Namespaced
+  versions:
+  - additionalPrinterColumns:
+    - jsonPath: .status.conditions[?(@.type=='Ready')].status
+      name: READY
+      type: string
+    - jsonPath: .status.conditions[?(@.type=='Synced')].status
+      name: SYNCED
+      type: string
+    - jsonPath: .metadata.annotations.crossplane\.io/external-name
+      name: EXTERNAL-NAME
+      type: string
+    - jsonPath: .metadata.creationTimestamp
+      name: AGE
+      type: date
+    name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            properties:
+              deletionPolicy:
+                default: Delete
+                description: |-
+                  DeletionPolicy specifies what will happen to the underlying external
+                  when this managed resource is deleted - either "Delete" or "Orphan" the
+                  external resource.
+                enum:
+                - Orphan
+                - Delete
+                type: string
+              forProvider:
+                description: DBParameterGroupParameters defines the desired state
+                  of DBParameterGroup
+                properties:
+                  dbParameterGroupFamily:
+                    description: |-
+                      The DB parameter group family name. A DB parameter group can be associated
+                      with one and only one DB parameter group family, and can be applied only
+                      to a DB instance running a database engine and engine version compatible
+                      with that DB parameter group family.
+
+                      To list all of the available parameter group families for a DB engine, use
+                      the following command:
+
+                      aws rds describe-db-engine-versions --query "DBEngineVersions[].DBParameterGroupFamily"
+                      --engine <engine>
+
+                      For example, to list all of the available parameter group families for the
+                      MySQL DB engine, use the following command:
+
+                      aws rds describe-db-engine-versions --query "DBEngineVersions[].DBParameterGroupFamily"
+                      --engine mysql
+
+                      The output contains duplicates.
+
+                      The following are the valid DB engine values:
+
+                         * aurora (for MySQL 5.6-compatible Aurora)
+
+                         * aurora-mysql (for MySQL 5.7-compatible Aurora)
+
+                         * aurora-postgresql
+
+                         * mariadb
+
+                         * mysql
+
+                         * oracle-ee
+
+                         * oracle-ee-cdb
+
+                         * oracle-se2
+
+                         * oracle-se2-cdb
+
+                         * postgres
+
+                         * sqlserver-ee
+
+                         * sqlserver-se
+
+                         * sqlserver-ex
+
+                         * sqlserver-web
+
+                      One of DBParameterGroupFamily or DBParameterGroupFamilySelector is required.
+                    type: string
+                  dbParameterGroupFamilySelector:
+                    description: |-
+                      DBParameterGroupFamilySelector determines DBParameterGroupFamily from
+                      the engine and engine version.
+
+                      One of DBParameterGroupFamily or DBParameterGroupFamilySelector is required.
+
+                      Will not be used if DBParameterGroupFamily is already set.
+                    properties:
+                      engine:
+                        description: Engine is the name of the database engine.
+                        type: string
+                      engineVersion:
+                        description: |-
+                          EngineVersion is the version of the database engine.
+                          If it is nil, the default engine version given by AWS will be used.
+                        type: string
+                    required:
+                    - engine
+                    type: object
+                  description:
+                    description: The description for the DB parameter group.
+                    type: string
+                  parameters:
+                    description: |-
+                      A list of parameters to associate with this DB parameter group.
+                      The fields ApplyMethod, ParameterName and ParameterValue are required
+                      for every parameter.
+                      Note: AWS actually only modifies the ApplyMethod of a parameter,
+                      if the ParameterValue changes too.
+                    items:
+                      description: CustomParameter are custom parameters for the Parameter
+                      properties:
+                        applyMethod:
+                          description: |-
+                            The apply method of the parameter.
+                            AWS actually only modifies to value set here, if the parameter value changes too.
+                          enum:
+                          - immediate
+                          - pending-reboot
+                          type: string
+                        parameterName:
+                          description: The name of the parameter.
+                          type: string
+                        parameterValue:
+                          description: The value of the parameter.
+                          type: string
+                      required:
+                      - applyMethod
+                      - parameterName
+                      - parameterValue
+                      type: object
+                    type: array
+                  region:
+                    description: Region is which region the DBParameterGroup will
+                      be created.
+                    type: string
+                  tags:
+                    description: Tags to assign to the DB parameter group.
+                    items:
+                      properties:
+                        key:
+                          type: string
+                        value:
+                          type: string
+                      type: object
+                    type: array
+                required:
+                - description
+                - region
+                type: object
+              managementPolicies:
+                default:
+                - '*'
+                description: |-
+                  ManagementPolicies specify the array of actions Crossplane is allowed to
+                  take on the managed and external resources.
+                items:
+                  description: |-
+                    A ManagementAction represents an action that the Crossplane controllers
+                    can take on an external resource.
+                  enum:
+                  - Observe
+                  - Create
+                  - Update
+                  - Delete
+                  - LateInitialize
+                  - '*'
+                  type: string
+                type: array
+              providerConfigRef:
+                default:
+                  name: default
+                description: ProviderConfigReference specifies how the provider should
+                  be configured.
+                properties:
+                  name:
+                    default: default
+                    description: Name of the provider config.
+                    type: string
+                required:
+                - name
+                type: object
+              writeConnectionSecretToRef:
+                description: |-
+                  WriteConnectionSecretToReference specifies the name of a Secret to write
+                  connection details to. The secret is created in the same namespace as the CR.
+                properties:
+                  name:
+                    description: Name of the secret.
+                    type: string
+                required:
+                - name
+                type: object
+            required:
+            - forProvider
+            type: object
+          status:
+            properties:
+              atProvider:
+                description: DBParameterGroupObservation defines the observed state
+                  of DBParameterGroup
+                properties:
+                  dbParameterGroupARN:
+                    description: The Amazon Resource Name (ARN) for the DB parameter
+                      group.
+                    type: string
+                  dbParameterGroupFamily:
+                    description: |-
+                      The name of the DB parameter group family that this DB parameter group is
+                      compatible with.
+                    type: string
+                  dbParameterGroupName:
+                    description: The name of the DB parameter group.
+                    type: string
+                type: object
+              conditions:
+                description: Conditions of the resource.
+                items:
+                  description: A Condition that may apply to a resource.
+                  properties:
+                    lastTransitionTime:
+                      description: |-
+                        LastTransitionTime is the last time this condition transitioned from one
+                        status to another.
+                      format: date-time
+                      type: string
+                    message:
+                      description: |-
+                        A Message containing details about this condition's last transition from
+                        one status to another, if any.
+                      type: string
+                    observedGeneration:
+                      description: |-
+                        ObservedGeneration represents the .metadata.generation that the condition was set based upon.
+                        For instance, if .metadata.generation is currently 12, but the .status.conditions[x].observedGeneration is 9, the condition is out of date
+                        with respect to the current state of the instance.
+                      format: int64
+                      type: integer
+                    reason:
+                      description: A Reason for this condition's last transition from
+                        one status to another.
+                      type: string
+                    status:
+                      description: Status of this condition; is it currently True,
+                        False, or Unknown?
+                      type: string
+                    type:
+                      description: |-
+                        Type of this condition. At most one of each condition type may apply to
+                        a resource at any point in time.
+                      type: string
+                  required:
+                  - lastTransitionTime
+                  - reason
+                  - status
+                  - type
+                  type: object
+                type: array
+                x-kubernetes-list-map-keys:
+                - type
+                x-kubernetes-list-type: map
+            type: object
+        required:
+        - spec
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}

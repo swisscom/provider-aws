@@ -1,4 +1,4 @@
-package dbinstance
+package dbinstance_ns
 
 import (
 	"context"
@@ -30,6 +30,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	svcapitypes "github.com/crossplane-contrib/provider-aws/apis/rds/v1alpha1"
+	nsapitypes "github.com/crossplane-contrib/provider-aws/apis/rds/v1alpha1ns"
 	"github.com/crossplane-contrib/provider-aws/apis/v1alpha1"
 	dbinstance "github.com/crossplane-contrib/provider-aws/pkg/clients/rds"
 	"github.com/crossplane-contrib/provider-aws/pkg/controller/rds/utils"
@@ -74,7 +75,7 @@ const (
 
 // SetupDBInstance adds a controller that reconciles DBInstance
 func SetupDBInstance(mgr ctrl.Manager, o controller.Options) error {
-	name := managed.ControllerName(svcapitypes.DBInstanceGroupKind)
+	name := managed.ControllerName(nsapitypes.DBInstanceGroupKind)
 
 	cps := []managed.ConnectionPublisher{managed.NewAPISecretPublisher(mgr.GetClient(), mgr.GetScheme())}
 	if o.Features.Enabled(features.EnableAlphaExternalSecretStores) {
@@ -95,14 +96,14 @@ func SetupDBInstance(mgr ctrl.Manager, o controller.Options) error {
 	}
 
 	r := managed.NewReconciler(mgr,
-		resource.ManagedKind(svcapitypes.DBInstanceGroupVersionKind),
+		resource.ManagedKind(nsapitypes.DBInstanceGroupVersionKind),
 		reconcilerOpts...)
 
 	return ctrl.NewControllerManagedBy(mgr).
 		Named(name).
 		WithOptions(o.ForControllerRuntime()).
 		WithEventFilter(resource.DesiredStateChanged()).
-		For(&svcapitypes.DBInstance{}).
+		For(&nsapitypes.DBInstance{}).
 		Complete(r)
 }
 
@@ -154,7 +155,7 @@ func newCustomExternal(kube client.Client, client svcsdkapi.RDSAPI) *customExter
 	}
 }
 
-func (c *customConnector) Connect(ctx context.Context, cr *svcapitypes.DBInstance) (managed.TypedExternalClient[*svcapitypes.DBInstance], error) {
+func (c *customConnector) Connect(ctx context.Context, cr *nsapitypes.DBInstance) (managed.TypedExternalClient[*nsapitypes.DBInstance], error) {
 	sess, err := connectaws.GetConfigV1(ctx, c.kube, cr, cr.Spec.ForProvider.Region)
 	if err != nil {
 		return nil, errors.Wrap(err, errCreateSession)
@@ -162,14 +163,14 @@ func (c *customConnector) Connect(ctx context.Context, cr *svcapitypes.DBInstanc
 	return newCustomExternal(c.kube, svcsdk.New(sess)), nil
 }
 
-func (c *customExternal) Create(ctx context.Context, cr *svcapitypes.DBInstance) (managed.ExternalCreation, error) {
+func (c *customExternal) Create(ctx context.Context, cr *nsapitypes.DBInstance) (managed.ExternalCreation, error) {
 	if cr.Spec.ForProvider.SourceDBInstanceID != nil || cr.Spec.ForProvider.SourceDBInstanceIDRef != nil ||
 		cr.Spec.ForProvider.SourceDBInstanceIDSelector != nil || cr.Spec.ForProvider.SourceDBClusterID != nil ||
 		cr.Spec.ForProvider.SourceDBClusterIDRef != nil || cr.Spec.ForProvider.SourceDBClusterIDSelector != nil {
 		cr.Status.SetConditions(xpv1.Creating())
 		cr.Status.AtProvider.DatabaseRole = aws.String(databaseRoleReadReplica)
 
-		createDBInstanceReadReplicaInput := dbinstance.GenerateCreateDBInstanceReadReplicaInput(cr)
+		createDBInstanceReadReplicaInput := dbinstance.GenerateCreateDBInstanceReadReplicaInput(toV1DBInstance(cr))
 		createDBInstanceReadReplicaInput.DBInstanceIdentifier = pointer.ToOrNilIfZeroValue(meta.GetExternalName(cr))
 
 		_, err := c.client.CreateDBInstanceReadReplicaWithContext(ctx, createDBInstanceReadReplicaInput)
@@ -181,12 +182,12 @@ func (c *customExternal) Create(ctx context.Context, cr *svcapitypes.DBInstance)
 	return c.external.Create(ctx, cr)
 }
 
-func preObserve(_ context.Context, cr *svcapitypes.DBInstance, obj *svcsdk.DescribeDBInstancesInput) error {
+func preObserve(_ context.Context, cr *nsapitypes.DBInstance, obj *svcsdk.DescribeDBInstancesInput) error {
 	obj.DBInstanceIdentifier = pointer.ToOrNilIfZeroValue(meta.GetExternalName(cr))
 	return nil
 }
 
-func (s *shared) preCreate(ctx context.Context, cr *svcapitypes.DBInstance, obj *svcsdk.CreateDBInstanceInput) (err error) { //nolint:gocyclo
+func (s *shared) preCreate(ctx context.Context, cr *nsapitypes.DBInstance, obj *svcsdk.CreateDBInstanceInput) (err error) { //nolint:gocyclo
 	// If the DBInstance is going to be created as a read replica, we do not need to set the MasterUserPassword and the others
 	if cr.Spec.ForProvider.SourceDBInstanceID != nil || cr.Spec.ForProvider.SourceDBInstanceIDRef != nil ||
 		cr.Spec.ForProvider.SourceDBInstanceIDSelector != nil || cr.Spec.ForProvider.SourceDBClusterID != nil ||
@@ -282,7 +283,7 @@ func (s *shared) preCreate(ctx context.Context, cr *svcapitypes.DBInstance, obj 
 	return nil
 }
 
-func (s *shared) postCreate(ctx context.Context, cr *svcapitypes.DBInstance, out *svcsdk.CreateDBInstanceOutput, extCreation managed.ExternalCreation, err error) (managed.ExternalCreation, error) {
+func (s *shared) postCreate(ctx context.Context, cr *nsapitypes.DBInstance, out *svcsdk.CreateDBInstanceOutput, extCreation managed.ExternalCreation, err error) (managed.ExternalCreation, error) {
 	cd, err := s.updateConnectionDetails(ctx, cr, managed.ConnectionDetails{})
 	if err != nil {
 		return managed.ExternalCreation{}, err
@@ -291,7 +292,7 @@ func (s *shared) postCreate(ctx context.Context, cr *svcapitypes.DBInstance, out
 	return extCreation, nil
 }
 
-func (s *shared) updateConnectionDetails(ctx context.Context, cr *svcapitypes.DBInstance, details managed.ConnectionDetails) (managed.ConnectionDetails, error) {
+func (s *shared) updateConnectionDetails(ctx context.Context, cr *nsapitypes.DBInstance, details managed.ConnectionDetails) (managed.ConnectionDetails, error) {
 	if details == nil {
 		details = managed.ConnectionDetails{}
 	}
@@ -320,7 +321,7 @@ func (s *shared) updateConnectionDetails(ctx context.Context, cr *svcapitypes.DB
 	return details, nil
 }
 
-func (s *shared) preUpdate(ctx context.Context, cr *svcapitypes.DBInstance, obj *svcsdk.ModifyDBInstanceInput) (err error) {
+func (s *shared) preUpdate(ctx context.Context, cr *nsapitypes.DBInstance, obj *svcsdk.ModifyDBInstanceInput) (err error) {
 	obj.DBInstanceIdentifier = pointer.ToOrNilIfZeroValue(meta.GetExternalName(cr))
 	obj.ApplyImmediately = cr.Spec.ForProvider.ApplyImmediately
 	// Only set MasterUserPassword if it has changed, otherwise it triggers "Resetting master password" on aws side,
@@ -366,7 +367,7 @@ func (s *shared) preUpdate(ctx context.Context, cr *svcapitypes.DBInstance, obj 
 	return nil
 }
 
-func (s *shared) postUpdate(ctx context.Context, cr *svcapitypes.DBInstance, out *svcsdk.ModifyDBInstanceOutput, upd managed.ExternalUpdate, err error) (managed.ExternalUpdate, error) {
+func (s *shared) postUpdate(ctx context.Context, cr *nsapitypes.DBInstance, out *svcsdk.ModifyDBInstanceOutput, upd managed.ExternalUpdate, err error) (managed.ExternalUpdate, error) {
 	if err != nil {
 		return upd, err
 	}
@@ -406,7 +407,7 @@ func (s *shared) postUpdate(ctx context.Context, cr *svcapitypes.DBInstance, out
 	return upd, err
 }
 
-func (s *shared) preDelete(ctx context.Context, cr *svcapitypes.DBInstance, obj *svcsdk.DeleteDBInstanceInput) (bool, error) {
+func (s *shared) preDelete(ctx context.Context, cr *nsapitypes.DBInstance, obj *svcsdk.DeleteDBInstanceInput) (bool, error) {
 	obj.DBInstanceIdentifier = pointer.ToOrNilIfZeroValue(meta.GetExternalName(cr))
 	obj.FinalDBSnapshotIdentifier = pointer.ToOrNilIfZeroValue(cr.Spec.ForProvider.FinalDBSnapshotIdentifier)
 	obj.SkipFinalSnapshot = pointer.ToOrNilIfZeroValue(cr.Spec.ForProvider.SkipFinalSnapshot)
@@ -419,7 +420,7 @@ func (s *shared) preDelete(ctx context.Context, cr *svcapitypes.DBInstance, obj 
 	return false, nil
 }
 
-func (s *shared) postDelete(ctx context.Context, cr *svcapitypes.DBInstance, obj *svcsdk.DeleteDBInstanceOutput, err error) (managed.ExternalDelete, error) {
+func (s *shared) postDelete(ctx context.Context, cr *nsapitypes.DBInstance, obj *svcsdk.DeleteDBInstanceOutput, err error) (managed.ExternalDelete, error) {
 	if err != nil {
 		return managed.ExternalDelete{}, err
 	}
@@ -427,7 +428,7 @@ func (s *shared) postDelete(ctx context.Context, cr *svcapitypes.DBInstance, obj
 	return managed.ExternalDelete{}, dbinstance.DeleteCache(ctx, s.kube, cr)
 }
 
-func (s *shared) postObserve(ctx context.Context, cr *svcapitypes.DBInstance, resp *svcsdk.DescribeDBInstancesOutput, obs managed.ExternalObservation, err error) (managed.ExternalObservation, error) { //nolint:gocyclo
+func (s *shared) postObserve(ctx context.Context, cr *nsapitypes.DBInstance, resp *svcsdk.DescribeDBInstancesOutput, obs managed.ExternalObservation, err error) (managed.ExternalObservation, error) { //nolint:gocyclo
 	if err != nil {
 		return obs, err
 	}
@@ -623,7 +624,7 @@ func setPendingModifiedValues(cr *svcsdk.DescribeDBInstancesOutput) { //nolint:g
 	}
 }
 
-func (s *shared) isUpToDate(ctx context.Context, cr *svcapitypes.DBInstance, out *svcsdk.DescribeDBInstancesOutput) (upToDate bool, diff string, err error) { //nolint:gocyclo
+func (s *shared) isUpToDate(ctx context.Context, cr *nsapitypes.DBInstance, out *svcsdk.DescribeDBInstancesOutput) (upToDate bool, diff string, err error) { //nolint:gocyclo
 	// If ApplyImmediately is not true we update external state of db instance with pending modified values to prevent redundant updates
 	if !ptr.Deref(cr.Spec.ForProvider.ApplyImmediately, false) {
 		setPendingModifiedValues(out)
@@ -812,7 +813,7 @@ func (s *shared) isUpToDate(ctx context.Context, cr *svcapitypes.DBInstance, out
 	return false, diff, nil
 }
 
-func hasPreferredBackupWindowChanged(cr *svcapitypes.DBInstance, out *svcsdk.DBInstance) (bool, error) {
+func hasPreferredBackupWindowChanged(cr *nsapitypes.DBInstance, out *svcsdk.DBInstance) (bool, error) {
 	// 1. If PreferredBackupWindow is not set, AWS sets a random window
 	// so we do not try to update in this case
 	// 2. AWS Backup takes ownership of PreferredBackupWindow if it is in use.
@@ -824,7 +825,7 @@ func hasPreferredBackupWindowChanged(cr *svcapitypes.DBInstance, out *svcsdk.DBI
 	return false, nil
 }
 
-func isBackupRetentionPeriodUpToDate(cr *svcapitypes.DBInstance, out *svcsdk.DBInstance) bool {
+func isBackupRetentionPeriodUpToDate(cr *nsapitypes.DBInstance, out *svcsdk.DBInstance) bool {
 	// 1. If BackupRetentionPeriod is not set, AWS sets a default value
 	// so we do not try to update in this case
 	// 2. AWS Backup takes ownership of BackupRetentionPeriod if it is in use.
@@ -838,7 +839,7 @@ func isBackupRetentionPeriodUpToDate(cr *svcapitypes.DBInstance, out *svcsdk.DBI
 	return true
 }
 
-func isEngineVersionUpToDate(cr *svcapitypes.DBInstance, out *svcsdk.DescribeDBInstancesOutput) bool {
+func isEngineVersionUpToDate(cr *nsapitypes.DBInstance, out *svcsdk.DescribeDBInstancesOutput) bool {
 	// If EngineVersion is not set, AWS sets a default value,
 	// so we do not try to update in this case
 	if cr.Spec.ForProvider.EngineVersion != nil {
@@ -870,7 +871,7 @@ func isEngineVersionUpToDate(cr *svcapitypes.DBInstance, out *svcsdk.DescribeDBI
 	return true
 }
 
-func isOptionGroupUpToDate(cr *svcapitypes.DBInstance, out *svcsdk.DBInstance) bool {
+func isOptionGroupUpToDate(cr *nsapitypes.DBInstance, out *svcsdk.DBInstance) bool {
 	// If OptionGroupName is not set, AWS sets a default OptionGroup,
 	// so we do not try to update in this case
 	if cr.Spec.ForProvider.OptionGroupName != nil {
@@ -965,7 +966,7 @@ func compareTimeRanges(format string, expectedWindow *string, actualWindow *stri
 	return false, nil
 }
 
-func areVPCSecurityGroupIDsUpToDate(cr *svcapitypes.DBInstance, out *svcsdk.DBInstance) bool {
+func areVPCSecurityGroupIDsUpToDate(cr *nsapitypes.DBInstance, out *svcsdk.DBInstance) bool {
 	// VPCSecurityGroupIDs is ignored for instances that belong to a cluster.
 	if out.DBClusterIdentifier != nil {
 		return true
@@ -996,7 +997,7 @@ func areVPCSecurityGroupIDsUpToDate(cr *svcapitypes.DBInstance, out *svcsdk.DBIn
 	return cmp.Equal(desiredIDs, actualIDs)
 }
 
-func isDBParameterGroupNameUpToDate(cr *svcapitypes.DBInstance, out *svcsdk.DBInstance) bool {
+func isDBParameterGroupNameUpToDate(cr *nsapitypes.DBInstance, out *svcsdk.DBInstance) bool {
 	desiredGroup := cr.Spec.ForProvider.DBParameterGroupName
 
 	// if user is fine with default DBParameterGroup or lets DBCluster manage it
@@ -1017,7 +1018,7 @@ func isDBParameterGroupNameUpToDate(cr *svcapitypes.DBInstance, out *svcsdk.DBIn
 	return false
 }
 
-func filterList(cr *svcapitypes.DBInstance, obj *svcsdk.DescribeDBInstancesOutput) *svcsdk.DescribeDBInstancesOutput {
+func filterList(cr *nsapitypes.DBInstance, obj *svcsdk.DescribeDBInstancesOutput) *svcsdk.DescribeDBInstancesOutput {
 	resp := &svcsdk.DescribeDBInstancesOutput{}
 	for _, dbInstance := range obj.DBInstances {
 		if pointer.StringValue(dbInstance.DBInstanceIdentifier) == meta.GetExternalName(cr) {
@@ -1039,7 +1040,7 @@ func handleKmsKey(inKey *string, dbKey *string) *string {
 
 // isStorageTypeGP3BelowAllocatedStorageThreshold returns true if storageType is gp3 and allocatedStorage is below engine specific threshold
 // See also https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/CHAP_Storage.html#gp3-storage.
-func isStorageTypeGP3BelowAllocatedStorageThreshold(cr *svcapitypes.DBInstance) bool {
+func isStorageTypeGP3BelowAllocatedStorageThreshold(cr *nsapitypes.DBInstance) bool {
 	if pointer.StringValue(cr.Spec.ForProvider.StorageType) != "gp3" {
 		return false
 	}
@@ -1048,7 +1049,7 @@ func isStorageTypeGP3BelowAllocatedStorageThreshold(cr *svcapitypes.DBInstance) 
 }
 
 // gp3AllocatedStorageThreshold returns the minimum allocatedStorage (in GB) required to provision custom iops/storageThroughput.
-func gp3AllocatedStorageThreshold(cr *svcapitypes.DBInstance) int64 {
+func gp3AllocatedStorageThreshold(cr *nsapitypes.DBInstance) int64 {
 	switch pointer.StringValue(cr.Spec.ForProvider.Engine) {
 	case "mariadb", "mysql", "postgres":
 		return 400

@@ -21,6 +21,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 
 	"github.com/crossplane-contrib/provider-aws/pkg/controller/database/dbsubnetgroup"
+	dbsubnetgroupns "github.com/crossplane-contrib/provider-aws/pkg/controller/database/dbsubnetgroup_ns"
 	"github.com/crossplane-contrib/provider-aws/pkg/controller/database/rdsinstance"
 	"github.com/crossplane-contrib/provider-aws/pkg/utils/setup"
 )
@@ -31,5 +32,6 @@ func Setup(mgr ctrl.Manager, o controller.Options) error {
 		mgr, o,
 		rdsinstance.SetupRDSInstance,
 		dbsubnetgroup.SetupDBSubnetGroup,
+		dbsubnetgroupns.SetupDBSubnetGroup,
 	)
 }

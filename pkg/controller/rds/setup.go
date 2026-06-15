@@ -21,12 +21,19 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 
 	"github.com/crossplane-contrib/provider-aws/pkg/controller/rds/dbcluster"
+	dbclusterns "github.com/crossplane-contrib/provider-aws/pkg/controller/rds/dbcluster_ns"
 	"github.com/crossplane-contrib/provider-aws/pkg/controller/rds/dbclusterparametergroup"
+	dbclusterparametergroupns "github.com/crossplane-contrib/provider-aws/pkg/controller/rds/dbclusterparametergroup_ns"
 	"github.com/crossplane-contrib/provider-aws/pkg/controller/rds/dbinstance"
+	dbinstancens "github.com/crossplane-contrib/provider-aws/pkg/controller/rds/dbinstance_ns"
 	"github.com/crossplane-contrib/provider-aws/pkg/controller/rds/dbinstanceroleassociation"
+	dbinstanceroleassociationns "github.com/crossplane-contrib/provider-aws/pkg/controller/rds/dbinstanceroleassociation_ns"
 	"github.com/crossplane-contrib/provider-aws/pkg/controller/rds/dbparametergroup"
+	dbparametergroupns "github.com/crossplane-contrib/provider-aws/pkg/controller/rds/dbparametergroup_ns"
 	"github.com/crossplane-contrib/provider-aws/pkg/controller/rds/globalcluster"
+	globalclusterns "github.com/crossplane-contrib/provider-aws/pkg/controller/rds/globalcluster_ns"
 	"github.com/crossplane-contrib/provider-aws/pkg/controller/rds/optiongroup"
+	optiongroupns "github.com/crossplane-contrib/provider-aws/pkg/controller/rds/optiongroup_ns"
 	"github.com/crossplane-contrib/provider-aws/pkg/utils/setup"
 )
 
@@ -41,5 +48,13 @@ func Setup(mgr ctrl.Manager, o controller.Options) error {
 		dbparametergroup.SetupDBParameterGroup,
 		globalcluster.SetupGlobalCluster,
 		optiongroup.SetupOptionGroup,
+		// Namespaced (Crossplane v2) controllers
+		dbclusterns.SetupDBCluster,
+		dbclusterparametergroupns.SetupDBClusterParameterGroup,
+		dbinstancens.SetupDBInstance,
+		dbinstanceroleassociationns.SetupDBInstanceRoleAssociation,
+		dbparametergroupns.SetupDBParameterGroup,
+		globalclusterns.SetupGlobalCluster,
+		optiongroupns.SetupOptionGroup,
 	)
 }

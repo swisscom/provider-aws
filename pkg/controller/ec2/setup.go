@@ -30,6 +30,7 @@ import (
 	"github.com/crossplane-contrib/provider-aws/pkg/controller/ec2/route"
 	"github.com/crossplane-contrib/provider-aws/pkg/controller/ec2/routetable"
 	"github.com/crossplane-contrib/provider-aws/pkg/controller/ec2/securitygroup"
+	securitygroupns "github.com/crossplane-contrib/provider-aws/pkg/controller/ec2/securitygroup_ns"
 	"github.com/crossplane-contrib/provider-aws/pkg/controller/ec2/securitygrouprule"
 	"github.com/crossplane-contrib/provider-aws/pkg/controller/ec2/subnet"
 	"github.com/crossplane-contrib/provider-aws/pkg/controller/ec2/transitgateway"
@@ -59,6 +60,7 @@ func Setup(mgr ctrl.Manager, o controller.Options) error {
 		route.SetupRoute,
 		routetable.SetupRouteTable,
 		securitygroup.SetupSecurityGroup,
+		securitygroupns.SetupSecurityGroup,
 		securitygrouprule.SetupSecurityGroupRule,
 		subnet.SetupSubnet,
 		transitgateway.SetupTransitGateway,

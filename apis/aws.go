@@ -40,12 +40,14 @@ import (
 	cognitoidentityprovidermanualv1alpha1 "github.com/crossplane-contrib/provider-aws/apis/cognitoidentityprovider/manualv1alpha1"
 	cognitoidentityproviderv1alpha1 "github.com/crossplane-contrib/provider-aws/apis/cognitoidentityprovider/v1alpha1"
 	databasev1beta1 "github.com/crossplane-contrib/provider-aws/apis/database/v1beta1"
+	databasev1beta1ns "github.com/crossplane-contrib/provider-aws/apis/database/v1beta1ns"
 	daxv1alpha1 "github.com/crossplane-contrib/provider-aws/apis/dax/v1alpha1"
 	docdbv1alpha1 "github.com/crossplane-contrib/provider-aws/apis/docdb/v1alpha1"
 	dynamodbv1alpha1 "github.com/crossplane-contrib/provider-aws/apis/dynamodb/v1alpha1"
 	ec2manualv1alpha1 "github.com/crossplane-contrib/provider-aws/apis/ec2/manualv1alpha1"
 	ec2v1alpha1 "github.com/crossplane-contrib/provider-aws/apis/ec2/v1alpha1"
 	ec2v1beta1 "github.com/crossplane-contrib/provider-aws/apis/ec2/v1beta1"
+	ec2v1beta1ns "github.com/crossplane-contrib/provider-aws/apis/ec2/v1beta1ns"
 	ecrv1alpha1 "github.com/crossplane-contrib/provider-aws/apis/ecr/v1alpha1"
 	ecrv1beta1 "github.com/crossplane-contrib/provider-aws/apis/ecr/v1beta1"
 	ecsv1alpha1 "github.com/crossplane-contrib/provider-aws/apis/ecs/v1alpha1"
@@ -77,8 +79,10 @@ import (
 	prometheusservice "github.com/crossplane-contrib/provider-aws/apis/prometheusservice/v1alpha1"
 	ramv1alpha1 "github.com/crossplane-contrib/provider-aws/apis/ram/v1alpha1"
 	rdsv1alpha1 "github.com/crossplane-contrib/provider-aws/apis/rds/v1alpha1"
+	rdsv1alpha1ns "github.com/crossplane-contrib/provider-aws/apis/rds/v1alpha1ns"
 	redshiftv1alpha1 "github.com/crossplane-contrib/provider-aws/apis/redshift/v1alpha1"
 	route53v1alpha1 "github.com/crossplane-contrib/provider-aws/apis/route53/v1alpha1"
+	route53v1alpha1ns "github.com/crossplane-contrib/provider-aws/apis/route53/v1alpha1ns"
 	route53resolvermanualv1alpha1 "github.com/crossplane-contrib/provider-aws/apis/route53resolver/manualv1alpha1"
 	route53resolverv1alpha1 "github.com/crossplane-contrib/provider-aws/apis/route53resolver/v1alpha1"
 	s3v1alpha2 "github.com/crossplane-contrib/provider-aws/apis/s3/v1alpha3"
@@ -104,6 +108,7 @@ func init() {
 		cachev1alpha1.SchemeBuilder.AddToScheme,
 		cachev1beta1.SchemeBuilder.AddToScheme,
 		databasev1beta1.SchemeBuilder.AddToScheme,
+		databasev1beta1ns.SchemeBuilder.AddToScheme,
 		daxv1alpha1.SchemeBuilder.AddToScheme,
 		docdbv1alpha1.AddToScheme,
 		elasticloadbalancingv1alpha1.SchemeBuilder.AddToScheme,
@@ -113,7 +118,9 @@ func init() {
 		elbv2manualv1alpha1.SchemeBuilder.AddToScheme,
 		elbv2v1alpha1.SchemeBuilder.AddToScheme,
 		route53v1alpha1.SchemeBuilder.AddToScheme,
+		route53v1alpha1ns.SchemeBuilder.AddToScheme,
 		ec2v1beta1.SchemeBuilder.AddToScheme,
+		ec2v1beta1ns.SchemeBuilder.AddToScheme,
 		awsv1alpha1.SchemeBuilder.AddToScheme,
 		awsv1beta1.SchemeBuilder.AddToScheme,
 		acmv1alpha1.SchemeBuilder.AddToScheme,
@@ -141,6 +148,7 @@ func init() {
 		kmsv1alpha1.SchemeBuilder.AddToScheme,
 		efsv1alpha1.SchemeBuilder.AddToScheme,
 		rdsv1alpha1.SchemeBuilder.AddToScheme,
+		rdsv1alpha1ns.SchemeBuilder.AddToScheme,
 		ec2manualv1alpha1.SchemeBuilder.AddToScheme,
 		ec2v1alpha1.SchemeBuilder.AddToScheme,
 		lambdav1alpha1.SchemeBuilder.AddToScheme,
