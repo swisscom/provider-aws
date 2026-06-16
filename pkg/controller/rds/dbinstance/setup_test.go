@@ -822,3 +822,124 @@ func errToString(err error) string {
 	}
 	return err.Error()
 }
+
+func TestPreUpdate(t *testing.T) {
+	type args struct {
+		cr  *svcapitypes.DBInstance
+		obj *svcsdk.ModifyDBInstanceInput
+	}
+
+	type want struct {
+		obj *svcsdk.ModifyDBInstanceInput
+		err error
+	}
+
+	cases := map[string]struct {
+		args
+		want
+	}{
+		"PortIsSetAsDBPortNumber": {
+			args: args{
+				cr: &svcapitypes.DBInstance{
+					Spec: svcapitypes.DBInstanceSpec{
+						ForProvider: svcapitypes.DBInstanceParameters{
+							Port: aws.Int64(5432),
+						},
+					},
+				},
+				obj: &svcsdk.ModifyDBInstanceInput{},
+			},
+			want: want{
+				obj: &svcsdk.ModifyDBInstanceInput{
+					DBPortNumber: aws.Int64(5432),
+				},
+			},
+		},
+		"LicenseModelNilForPostgresReplica": {
+			args: args{
+				cr: &svcapitypes.DBInstance{
+					Spec: svcapitypes.DBInstanceSpec{
+						ForProvider: svcapitypes.DBInstanceParameters{
+							Port: aws.Int64(5432),
+							CustomDBInstanceParameters: svcapitypes.CustomDBInstanceParameters{
+								SourceDBInstanceID: aws.String("source-db"),
+							},
+							Engine:       aws.String("postgres"),
+							LicenseModel: aws.String("postgresql-license"),
+						},
+					},
+				},
+				obj: &svcsdk.ModifyDBInstanceInput{
+					LicenseModel: aws.String("postgresql-license"),
+				},
+			},
+			want: want{
+				obj: &svcsdk.ModifyDBInstanceInput{
+					DBPortNumber: aws.Int64(5432),
+					LicenseModel: nil,
+				},
+			},
+		},
+		"LicenseModelKeptForPostgresPrimary": {
+			args: args{
+				cr: &svcapitypes.DBInstance{
+					Spec: svcapitypes.DBInstanceSpec{
+						ForProvider: svcapitypes.DBInstanceParameters{
+							Port:         aws.Int64(5432),
+							Engine:       aws.String("postgres"),
+							LicenseModel: aws.String("postgresql-license"),
+						},
+					},
+				},
+				obj: &svcsdk.ModifyDBInstanceInput{
+					LicenseModel: aws.String("postgresql-license"),
+				},
+			},
+			want: want{
+				obj: &svcsdk.ModifyDBInstanceInput{
+					DBPortNumber: aws.Int64(5432),
+					LicenseModel: aws.String("postgresql-license"),
+				},
+			},
+		},
+		"LicenseModelNilForMariaDBReplica": {
+			args: args{
+				cr: &svcapitypes.DBInstance{
+					Spec: svcapitypes.DBInstanceSpec{
+						ForProvider: svcapitypes.DBInstanceParameters{
+							Port:   aws.Int64(3306),
+							Engine: aws.String("mariadb"),
+							CustomDBInstanceParameters: svcapitypes.CustomDBInstanceParameters{
+								SourceDBInstanceID: aws.String("mariadb-primary"),
+							},
+							LicenseModel: aws.String("general-public-license"),
+						},
+					},
+				},
+				obj: &svcsdk.ModifyDBInstanceInput{
+					LicenseModel: aws.String("general-public-license"),
+				},
+			},
+			want: want{
+				obj: &svcsdk.ModifyDBInstanceInput{
+					DBPortNumber: aws.Int64(3306),
+					LicenseModel: nil,
+				},
+			},
+		},
+	}
+
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			s := &shared{cache: &cache{}}
+			err := s.preUpdate(context.TODO(), tc.args.cr, tc.args.obj)
+
+			if diff := cmp.Diff(tc.want.err, err, cmpopts.EquateErrors()); diff != "" {
+				t.Errorf("r: -want, +got error:\n%s", diff)
+			}
+			if diff := cmp.Diff(tc.want.obj, tc.args.obj, cmpopts.IgnoreUnexported(svcsdk.ModifyDBInstanceInput{})); diff != "" {
+				t.Errorf("ModifyDBInstanceInput: -want, +got:\n%s", diff)
+			}
+		})
+	}
+}
