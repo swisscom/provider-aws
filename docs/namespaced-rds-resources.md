@@ -84,6 +84,7 @@ Crossplane v2 expects managed resources to be namespaced with a specific spec sh
 | `pkg/controller/route53/setup.go` | Added `resourcerecordset_ns.SetupResourceRecordSet`. |
 | `pkg/controller/database/setup.go` | Added `dbsubnetgroup_ns.SetupDBSubnetGroup`. |
 | `pkg/controller/ec2/setup.go` | Added `securitygroup_ns.SetupSecurityGroup`. |
+| `pkg/utils/reconciler/managed/critical_annotation_updater.go` | Fixed `NamespacedName` to include `Namespace` — without this, the `external-create-pending` annotation was never persisted for namespaced resources, causing permanent `ReconcileError`. |
 | `apis/generate.go` | No change needed — controller-gen skips ns packages because they have no `+kubebuilder:object:generate=true` or `+kubebuilder:object:root=true` markers. CRD generation still works via `+kubebuilder:resource` markers. |
 | `go.mod` | `crossplane-runtime/v2` removed, `controller-runtime` at v0.19.0 (same as before). |
 | `go.sum` | Updated accordingly. |

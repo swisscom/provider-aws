@@ -99,6 +99,7 @@ import (
 	transferv1alpha1 "github.com/crossplane-contrib/provider-aws/apis/transfer/v1alpha1"
 	awsv1alpha1 "github.com/crossplane-contrib/provider-aws/apis/v1alpha1"
 	awsv1beta1 "github.com/crossplane-contrib/provider-aws/apis/v1beta1"
+	awsv1beta1ns "github.com/crossplane-contrib/provider-aws/apis/v1alpha1ns"
 	wafv2v1alpha1 "github.com/crossplane-contrib/provider-aws/apis/wafv2/v1alpha1"
 )
 
@@ -123,6 +124,7 @@ func init() {
 		ec2v1beta1ns.SchemeBuilder.AddToScheme,
 		awsv1alpha1.SchemeBuilder.AddToScheme,
 		awsv1beta1.SchemeBuilder.AddToScheme,
+		awsv1beta1ns.AddToScheme,
 		acmv1alpha1.SchemeBuilder.AddToScheme,
 		acmv1beta1.SchemeBuilder.AddToScheme,
 		s3v1alpha2.SchemeBuilder.AddToScheme,

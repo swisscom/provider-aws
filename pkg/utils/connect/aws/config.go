@@ -46,6 +46,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/crossplane-contrib/provider-aws/apis/v1beta1"
+	v1beta1ns "github.com/crossplane-contrib/provider-aws/apis/v1alpha1ns"
+	custommanaged "github.com/crossplane-contrib/provider-aws/pkg/utils/reconciler/managed"
 	"github.com/crossplane-contrib/provider-aws/pkg/utils/metrics"
 	"github.com/crossplane-contrib/provider-aws/pkg/utils/pointer"
 	"github.com/crossplane-contrib/provider-aws/pkg/version"
@@ -96,6 +98,17 @@ var (
 	defaultConfigV1 *awsv1.Config
 )
 
+// trackProviderConfigUsage tracks provider config usage, using a namespaced tracker
+// for namespaced managed resources and the standard cluster-scoped tracker otherwise.
+func trackProviderConfigUsage(ctx context.Context, c client.Client, mg resource.Managed) error {
+	if mg.GetNamespace() != "" {
+		t := custommanaged.NewProviderConfigUsageTracker(c, &v1beta1ns.ProviderConfigUsage{})
+		return t.Track(ctx, mg)
+	}
+	t := resource.NewProviderConfigUsageTracker(c, &v1beta1.ProviderConfigUsage{})
+	return t.Track(ctx, mg)
+}
+
 // GetConfig constructs an *aws.Config that can be used to authenticate to AWS
 // API by the AWS clients.
 func GetConfig(ctx context.Context, c client.Client, mg resource.Managed, region string) (*aws.Config, error) {
@@ -109,8 +122,7 @@ func UseProviderConfig(ctx context.Context, c client.Client, mg resource.Managed
 		return nil, errors.Wrap(err, "cannot get referenced Provider")
 	}
 
-	t := resource.NewProviderConfigUsageTracker(c, &v1beta1.ProviderConfigUsage{})
-	if err := t.Track(ctx, mg); err != nil {
+	if err := trackProviderConfigUsage(ctx, c, mg); err != nil {
 		return nil, errors.Wrap(err, "cannot track ProviderConfig usage")
 	}
 
@@ -438,8 +450,7 @@ func GetConfigV1(ctx context.Context, c client.Client, mg resource.Managed, regi
 		return nil, errors.Wrap(err, "cannot get referenced ProviderConfig")
 	}
 
-	t := resource.NewProviderConfigUsageTracker(c, &v1beta1.ProviderConfigUsage{})
-	if err := t.Track(ctx, mg); err != nil {
+	if err := trackProviderConfigUsage(ctx, c, mg); err != nil {
 		return nil, errors.Wrap(err, "cannot track ProviderConfig usage")
 	}
 	switch s := pc.Spec.Credentials.Source; s { //nolint:exhaustive
