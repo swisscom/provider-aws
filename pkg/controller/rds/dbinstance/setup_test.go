@@ -1001,6 +1001,22 @@ func TestPreUpdate(t *testing.T) {
 				},
 			},
 		},
+		"PortNotSetForClusterMember": {
+			args: args{
+				cr: &svcapitypes.DBInstance{
+					Spec: svcapitypes.DBInstanceSpec{
+						ForProvider: svcapitypes.DBInstanceParameters{
+							Port:                aws.Int64(5432),
+							DBClusterIdentifier: aws.String("my-cluster"),
+						},
+					},
+				},
+				obj: &svcsdk.ModifyDBInstanceInput{},
+			},
+			want: want{
+				obj: &svcsdk.ModifyDBInstanceInput{},
+			},
+		},
 		"LicenseModelNilForPostgresReplica": {
 			args: args{
 				cr: &svcapitypes.DBInstance{
