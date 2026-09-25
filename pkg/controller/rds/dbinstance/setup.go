@@ -362,7 +362,12 @@ func (s *shared) preUpdate(ctx context.Context, cr *svcapitypes.DBInstance, obj 
 		obj.BackupRetentionPeriod = nil
 	}
 
-	obj.DBPortNumber = cr.Spec.ForProvider.Port
+	// The port of an instance that belongs to a DBCluster is managed by the cluster and AWS rejects
+	// ModifyDBInstance requests containing DBPortNumber with InvalidParameterCombination.
+	// Spec.ForProvider.DBClusterIdentifier is set from the observed AWS state in postObserve.
+	if cr.Spec.ForProvider.DBClusterIdentifier == nil {
+		obj.DBPortNumber = cr.Spec.ForProvider.Port
+	}
 
 	obj.CloudwatchLogsExportConfiguration = utils.GenerateCloudWatchExportConfiguration(
 		cr.Spec.ForProvider.EnableCloudwatchLogsExports,
